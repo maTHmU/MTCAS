@@ -1,0 +1,401 @@
+#title 对称特征值问题
+
+<contents>
+
+由于对称矩阵的结构性质,其特征值问题在数值线性代数中有许多漂亮的算法.除$QR$迭代可以应用于对称特征值问题外,还有Jacobi迭代以及与SVD直接相关的三对角方法.
+
+* 对称$QR$算法
+
+将$QR$迭代的思想结合矩阵的对称性质可以得到对称$QR$算法.其导出思路可以简述如下:
+
+用于求最大特征值及特征向量的幂法和用于求不变子空间的$QR$迭代分别以$\left|\frac{\lambda_2}{\lambda_1}\right|^{2k}$和$\left|\frac{\lambda_{r+1}}{\lambda_r}\right|^k$的方式收敛到相应特征向量和不变子空间.这引导我们考虑$QR$迭代,这相当于$r=n$的正交迭代.
+
+我们考察对称$QR$迭代的加速算法.首先通过一系列Householder变换$U$使得$U^TAU=T$是三对角阵,从而将之后每步迭代的运算量降至$O (n)$个flop,而三对角化这一步骤约需$4n^3/3$个flop.其次,应用位移思想,可使收敛到对角形的速率为立方收敛.我们着重分析位移思想.
+
+若$s$是一个近似特征值,则我们期望用位移$s$进行一次$QR$迭代后,$(n,n-1)$元会很小.若
+<latex>
+\begin{equation*}
+  T=
+  \begin{bmatrix}
+    a_1& b_1\\
+    b_1& a_2& \ddots\\
+    & \ddots& \ddots& b_{n-1}\\
+    & & b_{n-1}& a_n
+  \end{bmatrix},
+\end{equation*}
+</latex>由Gerschgorin定理,位移的一个合理选择是$\mu=a_n$,而一个更有效的选择是用$\left[\begin{smallmatrix}a_{n-1}& b_{n-1}\\ b_{n-1}& a_n \end{smallmatrix}\right]$靠近$a_n$的特征值作位移,这称为Wilkinson位移,它由
+<latex>
+\begin{equation*}
+  \mu=a_n+d-\mathrm{sign} (d)\sqrt{d^2+b_{n-1}^2}
+\end{equation*}
+</latex>给出,其中$d\equiv (a_{n-1}-a_n)/2$.Wilkinson<cite>Wil68</cite>证明了以上两种位移策略都是立方收敛,并给出了理由为什么更偏好后者.
+
+应用隐式Q定理,不必显式形成矩阵$T-\mu I$就能实现从$T$到$T^+\equiv RU+\mu I=U^TTU$的变换,这在$\mu$远大于某个$a_j$时有优点.
+
+首先取
+<latex>
+\begin{equation*}
+  G_1=G(1,2,\theta)=\left[
+  \begin{array}{cc|c}
+    c& s& \\
+    -s& c& \\\hline
+    & & I_{n-2}
+  \end{array}\right],
+\end{equation*}
+</latex>使得
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    c& s\\
+    -s& c
+  \end{bmatrix}^T
+  \begin{bmatrix}
+    a_1-\mu\\
+    b_1
+  \end{bmatrix}=
+  \begin{bmatrix}
+    x\\
+    0
+  \end{bmatrix},
+\end{equation*}
+</latex>则
+<latex>
+\begin{equation*}
+  G_1e_1=Ue_1.
+\end{equation*}
+</latex>再计算$G_2,\cdots,G_{n-1}$使得$Z\equiv G_1\cdots G_{n-1}$满足$Ze_1=G_1e_1=Ue_1$且$Z^TTZ$是三对角阵,就可以应用隐式Q定理.而实际中,我们使
+<latex>
+\begin{equation*}
+  G_i=G (i,i+1,\theta_i),(i=2:n-1),
+\end{equation*}
+</latex>则$Z$和$Q$的第一列相等且$G_i$可用于将多余的非零元素逐出矩阵$G_1^TTG_1$.这样就完成了$T$到$T^+=Z^TTZ$的变换,从而完成了对称$QR$算法的一个步骤.
+
+* Jacobi方法
+
+求解对称特征值问题的Jacobi迭代法因易于并行化而引起人们的注意.它通过进行一系列正交相似变换
+<latex>
+\begin{equation*}
+A\leftarrow Q^TAQ,
+\end{equation*}
+</latex>逐步减小
+<latex>
+\begin{equation*}
+  \text{off} (A)\equiv \sqrt{\sum\limits_{i=1}^n\sum\limits_{j\neq i}a_{ij}^2}.
+\end{equation*}
+</latex>我们可以形象地称$\text{off}(A)$为非对角元素的Frobenius范数.实现它的工具是Jacobi-Givens旋转变换.
+
+Jacobi方法的基本步骤:
+
+ 1. 选择指标$(p,q) (1\leqslant p<q\leqslant n)$,在经典Jacobi算法中选择$(p,q)$使$a_{pq}^2$最大.
+ 2. 计算一个余弦-正弦对$(c,s)$,使得
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    c& s\\
+    -s& c
+  \end{bmatrix}^T
+  \begin{bmatrix}
+    a_{pp}& a_{pq}\\
+    a_{qp}& a_{qq}
+  \end{bmatrix}
+  \begin{bmatrix}
+    c& s\\
+    -s& c
+  \end{bmatrix}=
+  \begin{bmatrix}
+    b_{pp}& 0\\
+    0& b_{qq}
+  \end{bmatrix}
+\end{equation*}
+</latex>为对角阵.
+ 3. 令$J=J(p,q,\theta)$,计算$B=J^TAJ$并覆盖$A$.
+
+容易得到,经过一次Jacobi步骤后,
+<latex>
+\begin{equation*}
+  \text{off} (B)^2=\text{off} (A)^2-2a_{pq}^2.
+\end{equation*}
+</latex>在此意义下,每个Jacobi步骤后$A$更"靠近"对角形.
+
+经典Jacobi方法(选取$a_{pq}^2$最大)的每次校正要做$O (n)$次运算,但选取最大元素却需$O (n^2)$次比较.解决此矛盾的途径是将变换顺序固定下来,如逐行进行"扫描",这称为行循环方法,它是二次收敛的.作为对比，$QR$算法是立方收敛的.
+
+如前所述,Jacobi方法的优势在于其并行本性.事实上,Jacobi旋转$J(p,q,\theta)$只作用于$p$,$q$行和$p$,$q$列.这样,每次将矩阵的全部行与列划分为若干互不冲突的组,每组的运算可以得到并行的处理.各族变换并行处理完成后,变换行与列的划分(类似一次循环赛的过程),直至所有$(p,q)$对都得到处理.这种并行的思想也同样适用于分块的Jacobi迭代.
+
+* 对称三对角矩阵的特征值方法
+
+** Sturm序列与二分法
+
+令$T_r$表示$T $的$r $阶顺序主子阵,定义其特征多项式$p_r (x)=\det (T_r-xI)$,则有以下递推公式(设$p_0 (x)\equiv 1$):
+<latex>
+\begin{equation*}
+  p_r (x)= (a_r-x)p_{r-1} (x)-b_{r-1} ^2p_{r-2}(x).
+\end{equation*}
+</latex>因通过$O (n)$次运算即可计算$p_n (x)$的值,故利用二分法找它的根是可行的.显然,二分迭代是线性收敛,即每步将误差减半.
+
+对于不可约三对角阵,有如下经典结果,其证明可参见<cite>Wil65</cite>.
+
+<theorem  name="Sturm序列性质">
+对于不可约三对角阵$T$,$T_{r-1}$的特征值严格隔离$T_r$的特征值:
+<latex>
+\begin{equation*}
+  \lambda_r (T_r)<\lambda_{r-1} (T_{r-1})<\lambda_{r-1} (T_r)<\cdots<\lambda_2 (T_r)<\lambda_1 (T_{r-1})<\lambda_1 (T_r).
+\end{equation*}
+</latex>
+
+此外,若$a(\lambda)$表示在序列$\{p_0 (\lambda),p_1 (\lambda),\cdots,p_n (\lambda)\}$中符号改变的个数,则$a(\lambda)$等于$T$的比$\lambda$小的特征值个数.其中$p_r (\lambda)$如上定义,且约定若$p_(\lambda)=0$,则$p_r(\lambda)$与$p_{r-1} (\lambda)$反号.
+</theorem>
+
+结合Gerschgorin定理可知$\lambda_k (T)\in [y,z]$.其中$y\equiv \min\limits_{1\leqslant i\leqslant n} (a_i-|b_i|-|b_{i-1}|)$,$z\equiv \max\limits_{1\leqslant i\leqslant n} (a_i+|b_i|+|b_{i-1}|)$.于是我们可以此为初始值,进行二分法迭代,每次迭代的判断条件为$a (x)\geqslant n-k$,则可求出$T$的第$k $大的特征值.
+
+与$QR$迭代相比,对分法的优势在于无论特征值大小,计算值都具有小的相对误差.
+
+** 分而治之方法
+
+适合于并行处理的三对角阵特征值算法是以以下观察为基础的:设$n=2m$,定义
+<latex>
+\begin{equation*}
+  v=
+  \begin{bmatrix}
+    e_m^{(m)}\\
+    \theta e_1^{(m)}
+  \end{bmatrix}
+\in \mathbb{R}^n,
+\end{equation*}
+</latex>则
+<latex>
+\begin{equation*}
+  \tilde{T}=T-\rho vv^T
+\end{equation*}
+</latex>除了"中间四个"元素
+<latex>
+\begin{equation*}
+  \tilde{T} (m:m+1,m:m+1)\equiv 
+  \begin{bmatrix}
+    a_m-\rho& b_m-\rho\theta\\
+    b_m-\rho\theta& a_{m+1}-\rho\theta^2
+  \end{bmatrix},
+\end{equation*}
+</latex>$\tilde{T}$与$T $相等.若取$\rho\theta=b_m$,则
+<latex>
+\begin{equation*}
+  T=
+  \begin{bmatrix}
+    T_1\\
+    & T_2
+  \end{bmatrix}+\rho vv^T,
+\end{equation*}
+</latex>其中,
+<latex>
+\begin{align*}
+  T_1 &\equiv
+  \begin{bmatrix}
+    a_1& b_1\\
+    b_1& a_2& \ddots\\
+    & \ddots& \ddots& b_{m-1}\\
+    & & b_{m-1}& a_m-\rho
+  \end{bmatrix},\\
+  T_2 &\equiv
+  \begin{bmatrix}
+    a_{m+1}-\rho\theta^2& b_{m+1}\\
+    b_{m+1}& a_{m+2}& \ddots\\
+    & \ddots& \ddots& b_{n-1}\\
+    & & b_{n-1}& a_n
+  \end{bmatrix}.
+\end{align*}
+</latex>这样,我们就把$T$"撕"成了两片,并加上一个修正项.分别解决$T_1$,$T_2$的特征值问题
+<latex>
+\begin{align*}
+  Q_1^TT_1Q_1&=D_1,\\
+  Q_2^TT_2Q_2&=D_2
+\end{align*}
+</latex>后,只要快速求解一个对角矩阵向量外积修正的特征值问题
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    D_1\\
+    & D_2
+  \end{bmatrix}+\rho (U^Tv) (U^Tv)^T
+\end{equation*}
+</latex>就可以了.
+
+对角矩阵向量外积修正的特征值问题的主要计算依赖于以下结果:
+
+<theorem>
+假定$D\in \mathrm{R}^{n\times n}$具有性质$d_1>\cdots>d_n$.又设$\rho\neq 0$且$z\in \mathrm{R}^n$没有零分量.若$(D+\rho zz^T)v=\lambda v,v\neq 0$,则$z^Tv\neq0$且$D-\lambda I$非奇异.
+</theorem>
+<theorem>
+设$D=\mathrm{diag} (d_1,\cdots,d_n)\in \mathrm{R}^{n\times n}$且对角元满足$d_1>\cdots>d_n$.假定$\rho\neq 0$且$z\in \mathrm{R}^n$没有零分量,若正交阵$V\in \mathrm{R}^{n\times n}$使得
+<latex>
+\begin{equation*}
+  V^T (D+\rho zz^T)=\mathrm{diag} (\lambda_1,\cdots,\lambda_n),
+\end{equation*}
+</latex>其中$\lambda_1\geqslant\cdots\geqslant\lambda_n$,且$V=[v_1,\cdots,v_n]$.则
+
+ 1. $\lambda_i$是
+<latex>
+\begin{equation*}
+  f (\lambda)=1+\rho z^T (D-\lambda I)^{-1}z
+\end{equation*}
+</latex>的$n$个零解.
+ 2. 当$\rho>0$,则
+<latex>
+\begin{equation*}
+  \lambda_1>d_1>\lambda_2>\cdots>d_n.
+\end{equation*}
+</latex>当$\rho<0$,则
+<latex>
+\begin{equation*}
+  d_1>\lambda_1>d_2>\cdots>\lambda_n.
+\end{equation*}
+</latex>
+ 3. 特殊向量$v_i$是$(D-v_i I)^{-1}z$的倍数.
+</theorem>
+
+上述定理表明要计算$V$,我们应首先用Newton型算法找出$f$的根$\lambda_1,\cdots,\lambda_n$,然后对$i=1:n$,通过正规化向量$(D-\lambda_iI)^{-1}z$来计算$V$的列向量.
+
+以下考察有重复的$d_i$或零分量$z_i$的情形,我们对以下定理给出一个构造性的证明,从而解决问题:
+<theorem>
+若$D=\mathrm{diag} (d_1,\cdots,d_n)$且$z\in \mathrm{R}^n$,则存在一正交阵$V_1$使得
+<latex>
+\begin{equation*}
+  V_1^TDV_1=\mathrm{diag} (\mu_1,\cdots,\mu_n),
+\end{equation*}
+</latex>且
+<latex>
+\begin{equation*}
+  w=V_Tz,
+\end{equation*}
+</latex>其中
+<latex>
+\begin{equation*}
+  \mu_1>\mu_2>\cdots>\mu_r\geqslant\mu_{r+1}\geqslant\mu_n,
+\end{equation*}
+</latex>其中,$w_i\neq 0,\forall i=1:r$而$w_i=0,\forall i=r+1:n$
+</theorem>
+
+<proof>
+ 1. 假设对某个$i<j$有$d_i=d_j$,令$J (i,j,\theta)$是$(i,j)$平面上的旋转变换,使$J (i,j,\theta)^Tz$的第$j $个分量为$0$.易知
+<latex>
+\begin{equation*}
+  J (i,j,\theta)^TDJ (i,j,\theta)=D.
+\end{equation*}
+</latex>于是,若有一个重复的$d_i$,我们就能使$z$的一个分量化为$0$.
+ 2. 令$p $是$i $和$j $列互换的单位阵,可推出$P^TDP$是对角阵,这样我们就可将为零的$z_i$放在底部.重复以上步骤就可得到所需的标准结构.$V_1$是这些旋转阵之积.
+</proof>
+
+综合上述所述,我们就得到了分而治之算法.
+
+* 计算SVD
+
+矩阵$A$的奇异值分解与对称阵$A^TA$,$AA^T$的Schur分解有着密切的联系.若$U^TAV=\mathrm{diag} (\sigma_1,\cdots,\sigma_n)$是$A\in \mathbb{R}^{m\times n},(m\geqslant n)$的SVD,则
+<latex>
+\begin{align*}
+  V^T (A^TA)V&=\mathrm{diag} (\sigma_1^2,\cdots,\sigma_n^2)\in \mathbb{R}^{n\times n},\\
+  U^T (AA^T)U&=\mathrm{diag} (\sigma_1^2,\cdots,\sigma_n^2;\underbrace{0,\cdots,0}_{m-n})\in \mathbb{R}^{n\times n}.
+\end{align*}
+</latex>
+
+我们计算$A$的SVD的思路就是将其化为$A^TA$的Schur分解来进行.但如果显式形成$A^TA$,则可能造成信息的损失.Golub和Kahan (1965)<cite>GolKah65</cite>给出了基于隐式对称$QR$算法的SVD方法.
+
+首先用Householder变化将$A$化为双对角形:
+<latex>
+\begin{equation*}
+  U_B^AV_B=
+  \begin{bmatrix}
+    B\\
+    O
+  \end{bmatrix},
+\end{equation*}
+</latex>其中
+<latex>
+\begin{equation*}
+  B=
+  \begin{bmatrix}
+    d_1& f_1& \cdots& O\\
+    & d_2& \ddots& \vdots\\
+    & & \ddots& f_{n-1}\\
+    & & & d_n
+  \end{bmatrix}.
+\end{equation*}
+</latex>接下来只要计算$B$的SVD.为此考虑三对角阵$T=B^TB$,应用$QR$算法:
+
+ 1. 计算矩阵
+<latex>
+\begin{equation*}
+\begin{bmatrix}
+  d_m^2+f_m^2& d_mf_m\\
+  d_mf_m& d_n^2+f_n^2
+\end{bmatrix}
+\end{equation*}
+</latex>(其中$m\equiv n-1$)的靠近$d_n^2+f_n^2$的特征值$\lambda$.
+ 2. 计算$c_1=\cos\theta_1$和$s_1=\sin\theta_1$使得
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    c_1& s_1\\
+    -s_1& c_1
+  \end{bmatrix}^T
+  \begin{bmatrix}
+    d_1^2-\lambda\\
+    d_1f_1
+  \end{bmatrix}=
+  \begin{bmatrix}
+    *\\
+    0
+  \end{bmatrix}.
+\end{equation*}
+</latex>令$G_1=G(1,2,\theta)$.
+ 3. 计算Givens旋转$G_2,\cdots,G_{n-1}$,使得当$Q=G_1\cdots G_{n-1}$时,$Q^TTQ$为三对角阵,且$Qe_1=G_1e_1$.
+
+正如之前指出的,以上算法需显式计算$B^TB$,这可能导致算法的不稳定.若我们把Givens变化$G_1$直接作用到$B $上,在决定Givens旋转$U_1,V_2,U_2,\cdots,V_{n-1},U_{n-1}$将$B$恢复为双对角阵,得到
+<latex>
+\begin{equation*}
+  \bar{B}= (U_{n-1}^T\cdots U_1^T)B (G_1V_2\cdots V_{n-1})=\bar{U}^TB\bar{V}.
+\end{equation*}
+</latex>由$V_i$的形式可知
+<latex>
+\begin{equation*}
+  \bar{V}e_1=Qe_1.
+\end{equation*}
+</latex>从而由隐式Q定理断言$\bar{V}$和$Q$本质相同.于是我们隐式地完成了$T=B^TB$到$\bar{T}=\bar{B}^T\bar{B}$的过程.
+
+由于以上本质上是对称$QR$迭代的方法,所以其收敛是三次的.实际中我们通过检测$B$的小次对角元来决定何时将问题降阶或终止迭代.
+
+Chan (1982)<cite>Cha82</cite>对Golub和Kahan的算法进行了改进.通过合理安排运算顺序,在$m>n$时可以有效地减少运算量.
+
+ 1. 形成双对角矩阵时,先通过Householder变换,将$A$上三角化:
+<latex>
+\begin{equation*}
+  L^TA=
+  \begin{bmatrix}
+    R\\
+    O
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    n\\
+    m-n
+  \end{array},
+\end{equation*}
+</latex>其中$R$为上三角阵.随后利用$R$的上三角性质,利用Givens变换或快速Givens变换将其化为双对角形.由于R-双对角化时只需对较短的向量进行操作,而Givens变换较Householder变换可以减少加法的数目,特别在不需要求变换矩阵时可以有效地减少运算量.当$m\gg n$时尤其有效.
+ 2. 当求得$R=X\Sigma Y^T$之后,SVD的变换矩阵可如下求出:
+<latex>
+\begin{equation*}
+  A=L
+  \begin{bmatrix}
+    X\\
+    O
+  \end{bmatrix}
+\Sigma Y^T=L
+\begin{bmatrix}
+  I\\
+  O
+\end{bmatrix}
+X\Sigma Y^T.
+\end{equation*}
+</latex>
+
+Chan给出了算法复杂度的详细分析.他指出在$m\simeq 2n$时,R-双对角化几乎总是比Golub-Kahan算法更快速,特别在不需显式求出变换矩阵的情况下.
+
+设我们已求得$m\times n$矩阵$A$的奇异值$\{\sigma_1,\cdots,\sigma_r\}$,来考虑如何求正交矩阵$U$,$V$,使$A=U^T\Sigma V$,其中$\Sigma=\mathrm{diag} (\sigma_1,\cdots,\sigma_r)$.
+
+事实上,我们已求得$A^TA$的特征值$\sigma_1^2,\cdots,\sigma_r^2,0,\cdots,0$,要求正交矩阵$V$,其列向量是$A^TA$的特征向量,我们只要用逆迭代求解$A^TAy=\sigma^2y$ .实用中采用双对角矩阵$J$代替$A$,之后令$U$的相应列$x=\sigma^{-1}Jy$即可.这些算法都是稳定有效的.

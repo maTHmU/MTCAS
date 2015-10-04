@@ -1,0 +1,817 @@
+#title 非对称特征值问题
+
+<contents>
+
+代数特征值问题是继线性方程组求解和最小二乘法之后数值线性代数中的第三个大问题.我们首先给出关于特征值问题的一些一般性的结论,随后在本章和下一章分别讨论非对称矩阵的特征值问题及对称矩阵的特征值问题.
+
+* 特征值问题的一般结论
+
+矩阵$A\in \mathbb{C}^{n\times n}$的特征值是其特征多项式$p(z)\equiv \det (zI-A)$的$n$个根.这些根的集合称为矩阵$A$的谱,记为$\lambda (A)$.
+
+若$\lambda\in \lambda (A)$,则满足$Ax=\lambda x$的非零向量$x\in \mathbb{C}^n$称为$A$的(右)特征向量,满足$x^HA=\lambda x^H$的非零向量$x\in \mathbb{C}^n$称为左特征向量.
+
+以下是一些关于矩阵分解的结论,其证明可参考一般的线性代数教材,如<cite>ZhaXu04</cite><cite>Wil65</cite>.
+
+<theorem>
+若$T\in \mathbb{C}^{n\times n}$的分划如下:
+<latex>
+\begin{equation*}
+  T=
+  \begin{bmatrix}
+    T_{11}& T_{12}\\
+    O& T_{22}
+  \end{bmatrix},
+\end{equation*}
+</latex>其中,$T_{11}$与$T_{12}$分别为$p\times p$及$q\times q$方阵$(p+q=n)$.则
+<latex>
+\begin{equation*}
+  \lambda (T)=\lambda (T_{11})\cup \lambda (T_{22}).
+\end{equation*}
+</latex>
+</theorem>
+
+<theorem  name="Schur分解">
+若$A\in \mathbb{C}^{n\times n}$,则存在酉方阵$Q\in \mathbb{C}^{n\times n}$使得
+<latex>
+\begin{equation*}
+  T\equiv Q^HAQ=D+N,
+\end{equation*}
+</latex>其中$D=\mathrm{diag} (\lambda_1,\cdots,\lambda_n)$,$N\in \mathbb{C}^{n\times n}$是严格上三角阵.
+</theorem>
+
+<theorem  name="实Schur分解">
+若$A\in \mathbb{R}^{n\times n}$,则存在一个实正交阵$Q\in \mathbb{R}^{n\times n}$使得
+<latex>
+\begin{equation*}
+  T\equiv Q^TAQ=
+  \begin{bmatrix}
+    R_{11}& R_{12}& \cdots& R_{1m}\\
+    & R_{22}& \cdots& R_{2m}\\
+    & & \ddots& \vdots\\
+    O& & & R_{mm}
+  \end{bmatrix},
+\end{equation*}
+</latex>其中每个$R_{ii}$不是$1\times 1$阵就是有复共轭特征值的$2\times 2$矩阵.
+</theorem>
+
+<theorem>
+设$T\in \mathbb{C}^{n\times n}$分划如下
+<latex>
+\begin{equation*}
+  T=
+  \begin{bmatrix}
+    T_{11}& T_{12}\\
+    O& T_{22}
+  \end{bmatrix},
+\end{equation*}
+</latex>其中$T_{11}$和$T_{22}$分别为$p\times p$和$q\times q$方阵.定义线性变换
+<latex>
+\begin{gather*}
+  \varphi :\mathbb{C}^{p\times q}\rightarrow \mathbb{C}^{p\times q},\\
+  \varphi (X)=T_{11}X-XT_{22},
+\end{gather*}
+</latex>其中$X\in \mathbb{R}^{p\times q}$.则$\varphi$非奇异当且仅当
+<latex>
+\begin{equation*}
+  \lambda (T_{11})\cap\lambda( T_{22})=\varnothing.
+\end{equation*}
+</latex>
+
+若$\varphi$非奇异且定义$Y\in \mathbb{C}^{n\times n}$为
+<latex>
+\begin{equation*}
+  Y=
+  \begin{bmatrix}
+    I_p& Z\\
+    O& I_q
+  \end{bmatrix},
+\end{equation*}
+</latex>其中$Z$满足
+<latex>
+\begin{equation*}
+  \varphi (Z)=-T_{12}.
+\end{equation*}
+</latex>则
+<latex>
+\begin{equation*}
+  Y^{-1}TY=\mathrm{diag} (T_{11},T_{22}).
+\end{equation*}
+</latex>
+</theorem>
+
+<theorem  name="分块对角分解">
+假设$A\in \mathbb{C}^{n\times n}$有Schur分解
+<latex>
+\begin{equation*}
+  T\equiv Q^HAQ=
+  \begin{bmatrix}
+    T_{11}& T_{12}& \cdots& T_{1q}\\
+    & T_{22}& \cdots & T_{2q}\\
+    & & \ddots& \vdots\\
+    & & & T_{qq}
+  \end{bmatrix},
+\end{equation*}
+</latex>且设$T_{ii}$为方阵.如果
+<latex>
+\begin{equation*}
+  \lambda (T_{ii})\cap \lambda (T_{jj})=\varnothing,\forall i\neq j,
+\end{equation*}
+</latex>则存在一个非奇异矩阵$Y\in \mathbb{C}^{n\times n}$使得
+<latex>
+\begin{equation*}
+  (QY)^{-1}A (QY)=\mathrm{diag} (T_{11},\cdots,T_{qq}).
+\end{equation*}
+</latex>
+</theorem>
+
+<theorem  name="Jordan分解">
+如果$A\in \mathbb{C}^{n\times n}$,那么存在一个非奇异阵$X\in \mathbb{C}^{n\times n}$使得
+<latex>
+\begin{equation*}
+  X^{-1}AX=\mathrm{diag} (J_1,\cdots,J_t),
+\end{equation*}
+</latex>这里
+<latex>
+\begin{equation*}
+  J_i\equiv 
+  \begin{bmatrix}
+    \lambda_i& 1& \cdots& 0\\
+    & \ddots& \ddots&\vdots\\
+    & & \ddots& 1\\
+    & & &\lambda_i
+  \end{bmatrix}
+\end{equation*}
+</latex>是$m_i\times m_i$矩阵且
+<latex>
+\begin{equation*}
+  m_1+\cdots+m_t=n.
+\end{equation*}
+</latex>
+</theorem>
+
+在之后的讨论中我们更多地采用酉相似变换 (或正交相似变换) 决定矩阵的特征值,这是由于酉矩阵 (或正交矩阵)具有好的条件数.事实上
+<latex>
+\begin{equation*}
+  \mathrm{fl} (X^{-1}AX)=X^{-1}AX+E,
+\end{equation*}
+</latex>而
+<latex>
+\begin{equation*}
+  \|E\|_2\simeq \mu\kappa_2 (X)\|A\|_2.
+\end{equation*}
+</latex>
+
+退化矩阵的Jordan块结构难以从数值上确定,这是因为退化矩阵 (即不能通过相似变换化为对角形的矩阵,也即Jordan标准型中包含高于一阶的Jordan块的矩阵) 构成的集合在$\mathbb{C}^{n\times n}$中是零测度的,很小的数值扰动就可能造成矩阵块结构很大的变化.幸好我们通常不须通过数值方法确定其Jordan块结构,而在精确线性代数中则有其他方法来确定.
+
+* 扰动理论
+
+Galois理论告诉我们在$n>4$时,矩阵特征值的计算只能是迭代的.因此,我们需要扰动理论来考虑近似特征值和不变子空间.
+
+<theorem  name="Gerschgorin圆盘定理">
+ 1. 矩阵$A$的每个特征值至少位于复平面上一个以$a_{ii}$为中心,半径为$\sum\limits_{j\neq i}|a_{ij}|$的圆盘中.
+ 2. 若以上所述圆盘中的$s$个组成一个连通域,并与其余圆盘隔离开,则在此连通域中恰好有$s$个$A$的特征值.
+</theorem>
+<proof>
+设$x$为相应$A$的特征值$\lambda$的特征向量,且设$x_i\equiv\max\{x_1,\cdots,x_n\}=1$.由
+<latex>
+\begin{equation*}
+  \lambda=\lambda x_i=\sum\limits_j a_{ij}x_j=a_{ii}+\sum\limits_{j\neq i}a_{ij}x_j
+\end{equation*}
+</latex>得到
+<latex>
+\begin{equation*}
+  |\lambda-a_{ii}|=\left|\sum\limits_{j\neq i}a_{ij}x{j}\right| \leqslant \left|\sum\limits_{j\neq i}a_{ij}\right|.
+\end{equation*}
+</latex>记
+<latex>
+\begin{equation*}
+  A=D+N\equiv\mathrm{diag} (a_{11},\cdots,a_{nn}) + (A-\mathrm{diag} (a_{11},\cdots,a_{nn})),
+\end{equation*}
+</latex>且令
+<latex>
+\begin{equation*}
+  A (\tau)\equiv D+\tau N,
+\end{equation*}
+</latex>由特征多项式解对多项式系数,从而对矩阵元的连续依赖性,得到$A(\tau)$的特征值随$\tau$连续地变化.当$\tau$从$0$连续地变化到$1$时,$A (\tau)$的特征值从$a_{ii}(1\leqslant i \leqslant n)$连续地变化到$\lambda_i (1\leqslant i\leqslant)$,定理因而停留在$s$个圆盘组成的连通域中.
+</proof>
+
+我们将在之后的"带位移$QR$算法"中看到Gerschgorin的应用.
+
+<theorem  name="Bauer-Fike">
+若$\mu$是$A+E\in \mathbb{C}^{n\times n}$的一个特征值,且$X^{-1}AX=D\equiv \mathrm{diag} (\lambda_1,\cdots,\lambda_n)$.则
+<latex>
+\begin{equation*}
+  \min\limits_{\lambda\in\lambda (A)}|\mu-\lambda|\leqslant \kappa_p (x)\|E\|_p.
+\end{equation*}
+</latex>
+</theorem>
+
+<theorem>
+设$Q^HAQ=D+N$是$A\in \mathbb{C}^{n\times n}$的一个Schur分解.如果$\mu\in \lambda (A+E)$且$p$是使得$N^p=0$成立的最小正整数,则
+<latex>
+\begin{equation*}
+  \min\limits_{\lambda\in\lambda (A)}|\lambda-\mu|\leqslant \max\{\theta,\theta^{1/p}\},
+\end{equation*}
+</latex>其中
+<latex>
+\begin{equation*}
+  \theta=\|E\|_2\sum\limits_{k=0}^{p-1}\|N\|_k^k.
+\end{equation*}
+</latex>
+</theorem>
+
+以上结论为我们选取正交变换而非一般的相似变换提供了说明.
+
+<theorem  name="单特征值的扰动理论">
+设$Ax=\lambda x$,其中$\lambda$为$A$的单特征值,并设$F $为对$A$的扰动使
+<latex>
+\begin{equation*}
+  (A+\epsilon F)x (\epsilon)=\lambda (\epsilon)x (\epsilon).
+\end{equation*}
+</latex>在单特征值情形,$\lambda$及$x$可微,且
+<latex>
+\begin{equation*}
+  A\dot{x} (0)+Fx=\dot{\lambda} (0)x+\lambda\dot{x} (0).
+\end{equation*}
+</latex>以$y^H$左乘之,得到
+<latex>
+\begin{equation*}
+  |\dot{\lambda} (0)|=\frac{|y^HFx|}{|y^Hx|}\leqslant \frac{1}{|y^Hx|},
+\end{equation*}
+</latex>从而
+<latex>
+\begin{equation*}
+  \frac{1}{s (\lambda)}\equiv\frac{1}{|y^Hx|}
+\end{equation*}
+</latex>描述了单特征值的扰动,称为单特征值的条件数.
+</theorem>
+
+关于重特征值及不变子空间的扰动理论有以下结果:
+
+ 1. 若$\lambda$是多重特征值,若$\lambda$对应一个$p$阶Jordan块,则一般地$A$的$O (\epsilon)$扰动将导致$\lambda$的$O (\epsilon^{1/p})$的扰动.
+ 2. 不变子空间对扰动的敏感程度由不变子空间之间的分离程度决定.粗略地说,分离程度越大,对扰动越不敏感.
+
+以上有关结论的证明,可参考<cite>GolVan01</cite>.
+
+* 幂迭代
+
+从本节起我们将导出特征值问题的最有效的算法:$QR$迭代,并给出其实用形式.
+
+** 幂法
+
+假设$A\in \mathbb{C}^{n\times n}$可对角化,且
+<latex>
+\begin{equation*}
+  X^{-1}AX=\mathrm{diag} (\lambda_1,\cdots,\lambda_n),
+\end{equation*}
+</latex>其中,$X=[x_1,\cdots,x_n]$,$|\lambda_1|>|\lambda_2|\geqslant \cdots \geqslant |\lambda_n|$.给出一单位向量$q^{(0)}\in \mathbb{C}^n$,幂法产生如下序列$q^{(k)}$:
+<latex>
+\begin{align*}
+  z^{(k)}&=Aq^{(k-1)},\\
+  q^{(k)}&=\frac{z^{(k)}}{\|z^{(k)}\|_2},\\
+  \lambda^{(k)}&=[q^{(k)}]^HAq^{(k)}.
+\end{align*}
+</latex>只要$q^{(0)}$在$x$方向的分量不为$0$ (实用中常通过预先估计保证该分量较大),则容易证明
+<latex>
+\begin{equation*}
+  |\lambda_1-\lambda^{(k)}|=O \left(\left|\frac{\lambda_2}{\lambda_1}\right|^k\right).
+\end{equation*}
+</latex>
+
+** 正交迭代法
+
+幂法的直接推广可用来计算高维的不变子空间.令$r $是一选定整数$1\leqslant r\leqslant n$.给定具有正交列的$n\times r$矩阵$Q_0$,正交迭代法产生以下的一列矩阵$\{Q_k\}\subseteq \mathbb{C}^{n\times r}$:
+<latex>
+\begin{align*}
+  Z_k&= AQ_{k-1},\\
+  Q_kR_k&=Z_k (QR\text{分解}).
+\end{align*}
+</latex>注意到若$r=1$,这就是幂法,且序列$\{Q_ke_1\}$正是幂法当初值为$q^{(0)}=Q_0e_1$时所产生的向量序列.
+
+可以证明,在合理的假设下,由以上算法产生的子空间$\mathrm{span} (Q_r)$按$O\left(\left|\frac{\lambda_{r+1}}{\lambda_r}\right|^k\right)$收敛到前$r $个特征值对应的不变子空间.
+
+** $QR$迭代
+
+假设正交迭代中$r=n$,且矩阵$A$的特征值满足$|\lambda_1|>|\lambda_2|>\cdots>|\lambda_n|$.$A$有Schur分解
+<latex>
+\begin{equation*}
+  T\equiv Q^HAQ=\mathrm{diag} (\lambda_i)+N,
+\end{equation*}
+</latex>并记$Q=[q_1,\cdots,q_n]$,$q_k=\left[q_1^{(k)},\cdots,q_n^{(k)}\right]$.若
+<latex>
+\begin{equation*}
+  \mathrm{dist} (\mathrm{span}\{q_1^{(k)},\cdots,q_i^{(k)}\},\mathrm{span}\{q_1,\cdots,q_i\})\rightarrow 0,
+\end{equation*}
+</latex>从而有$T_k\equiv Q_k^HAQ_k$定义的矩阵$T_k$收敛到上三角阵.于是,可以说,只要初始阵$Q_0\in \mathbb{C}^{n\times n}$不是退化阵,则正交迭代法就能算出Schur分解.
+
+注:两同维子空间的距离定义为向两子空间分别做正交投射的线性算子的距离:
+<latex>
+\begin{equation*}
+  \mathrm{dist} (S_1,S_2)\equiv \|P_1-P_2\|_2.
+\end{equation*}
+</latex>可以证明,对于$\mathbb{R}^n$中任意同维子空间$S_1$与$S_2$,有
+<latex>
+\begin{equation*}
+  0\leqslant \mathrm{dist} (S_1,S_2)\leqslant 1.
+\end{equation*}
+</latex>上式当$S_1=S_2$时左边等号成立,当$S_1\cap S_2^\perp \neq \{0\}$时右边等号成立.
+
+考虑怎样从前一个$T_{k-1}$阵直接算出$T_k$,就产生了如下的$QR$迭代算法:
+
+一方面,从正交迭代的步骤以及$T_{k-1}$的定义我们有
+<latex>
+\begin{equation*}
+  T_{k-1}=Q_{k-1}^HAQ_{k-1}=Q_{k-1}^H (AQ_{k-1})= (Q_{k-1}^HQ_k)R_k.
+\end{equation*}
+</latex>另一方面,
+<latex>
+\begin{equation*}
+  T_k=Q_k^HAQ_k= (Q_k^HAQ_{k-}) (Q_k^HQ_k)=R_k (Q_{k-1}^HQ_k).
+\end{equation*}
+</latex>这样,先计算$T_{k-1}$的$QR$分解,然后再将两个因子按逆序乘起来就决定了$T_k$.这就是基本的$QR$迭代每一算法步骤的内容.
+
+以上算法每一步$QR$迭代计算量为$O (n^3)$,而且严格下三角的元素按照线性速度收敛(消去).但这些困难可以通过对算法的改进克服.
+
+* 实用$QR$算法 (1):Hessenberg分解和实Schur型
+
+我们将通过两方面的努力对$QR$分解进行加速.粗略地说,一方面通过预先进行Hessenberg分解使之后的每步迭代只有$O (n^2)$计算量,另一方面通过位移迭代策略使收敛速度具有平方量级.这将分别在之后两节加以介绍.
+
+由于大部分特征值和不变子空间问题只涉及实数据,我们将通过$QR$迭代化矩阵为实Schur型.
+
+** Hessenberg $QR$迭代
+
+设我们合理选取正交阵$U_0$使
+<latex>
+\begin{equation*}
+  H_0\equiv U_0^TAU_0= (h_{ij})
+\end{equation*}
+</latex>是上Hessenberg阵,则以后每步迭代只需$n-1$个Givens旋转依次消去$H(j+1,j)$,从而实现$QR$分解,而计算$RQ$也只要$n-1$次Givens右乘,从而一次迭代计算量仅约为$6n^2$flop.
+
+** Hessenberg阵归约
+
+接下来说明如何计算Hessenberg分解:
+<latex>
+\begin{equation*}
+  U_0^TAU_0=H,
+\end{equation*}
+</latex>其中$U_0^TU_0=I$.我们的做法是通过一系列Householder变换$P_k (k=1:n-2)$,其中$P_k$的作用是将第$k $列在次对角元以下的元素都化为$0$.
+
+这一算法需要$10n^3/3$个flop.若要显式计算$u_0$,需附加$4n^3/3$个flop.第$k $个Householder向量可存放在$A (k+2:n,k)$中.
+
+除利用Householder变换将其化为Hessenberg型外,也可通过非正交的Gauss变换或其他线性变换将其化为友阵型等,但计算特性可能很差,通常并不采用.
+
+* 实用$QR$算法 (2):位移迭代加速策略
+
+不失一般性地,我们可以假定Hessenberg$QR$迭代中每个Hessenberg阵$H$是不可约的,即其次对角元素不为$0$.否则的话,在某一步我们有
+<latex>
+\begin{equation*}
+  H=
+  \begin{bmatrix}
+    H_{11}& H_{12}\\
+    O& H_{22}
+  \end{bmatrix},
+\end{equation*}
+</latex>其中$H_{11}$为$p\times p $方阵,其中$1\leqslant p \leqslant n$,于是问题变成了关于$H_{11}$和$H_{22}$的特征值问题,这一过程称为解耦.
+
+实际中,若$H$的次对角元素充分小,我们就进行解耦.例如,在Eispack中如果
+<latex>
+\begin{equation*}
+|h_{p+1,p}|\leqslant cu (|h_{pp}|+|h_{p+1,p+1}|),
+\end{equation*}
+</latex>(其中$c$为小常数),就把$h_{p+1,p}$断定为$0$.这样做的合理性在于整个矩阵已有了$u\|H\|$量级的舍入误差.
+
+以下讨论迭代中的位移加速策略.
+
+** 带位移$QR$迭代及单步位移策略
+
+令$\mu\in \mathbb{R}$,考虑如下迭代
+<latex>
+\begin{align*}
+  &H=U_0TAU_0 (\text{Hessenberg化简}),\\
+  &\text{执行如下迭代步骤:}\\
+  &~~~~\text{决定标量}\mu,\\
+  &~~~~H-\mu I=UR (QR\text{分解}),\\
+  &~~~~H\leftarrow RU+\mu I.\\
+\end{align*}
+</latex>标量$\mu$称为位移.若$\mu$在迭代过程中固定,并对特征值$\lambda_i$排序
+<latex>
+\begin{equation*}
+  |\lambda_1-\mu|\geqslant \cdots \geqslant |\lambda_n-\mu|,
+\end{equation*}
+</latex>则$H$中第$p$个次对角元素以速率$\left|\frac{\lambda_{p+1}-\mu}{\lambda_p-\mu}\right|^k$收敛于$0$.特别地,若$\mu$比其他特征值更靠近$\lambda_n$,则元素$(n,n-1)$将会很快变为$0$.如果用特征值作位移$\mu=\lambda_n$,则一步迭代就能将矩阵降阶.
+
+实用中,我们会随时参考有关$\lambda (A)$新的 信息改变$\mu$.由Gerschgorin定理,可认为$h_{nn}$是沿对角线的比较好的近似特征值.这样,我们每次取$\mu^{(k)}=H (n,n)$,进行单步位移迭代.
+
+若$(n,n-1)$元素收敛为$0$,则其收敛速度很可能是二次的.
+
+** 双位移策略及隐式双位移策略
+
+若迭代时
+<latex>
+\begin{equation*}
+  G\equiv 
+  \begin{bmatrix}
+    h_{n-1,n-1}& h_{n-1,n}\\
+    h_{n,n-1}& h_{n,n}
+  \end{bmatrix}
+\end{equation*}
+</latex>的两特征值$a_1,a_2$为复数,则$h_{nn}$不能近似代替其特征值做迭代.但我们可以逐次应用$a_1,a_2$做位移量进行两次迭代:
+<latex>
+\begin{align*}
+  H-a_1I&=U_1R_1 (QR\text{分解}),\\
+  H_1&\leftarrow R_1U_1+a_1I,\\
+  H_1-a_2I&=U_2R_2,\\
+  H2&\leftarrow R_2U_2+a_2I.
+\end{align*}
+</latex>于是
+<latex>
+\begin{equation*}
+  M\equiv (H-a_1I) (H-a_2I)= (U_1U_2) (R_2R_1).
+\end{equation*}
+</latex>注意到$M$为实矩阵:
+<latex>
+\begin{equation*}
+  M=H^2-sH+tI,
+\end{equation*}
+</latex>其中,
+<latex>
+\begin{align*}
+  s&=a_1+a_2=h_{n-1,n-1}+h_{nn},\\
+  t&=a_1a_2=h_{n-1,n-1}h_{nn}-h_{n-1,n}h_{n,n-1}=\mathrm{det} (G).
+\end{align*}
+</latex>这样,我们可以进行如下计算得到$H_2$:
+
+ 1. 给出实矩阵$M=H^2-sH+tI$.
+ 2. 计算$M=ZR$的实$QR$分解.
+ 3. 令$H_2\leftarrow Z^THZ$.
+
+但第一步计算量是$O (n^3)$的,因而并非实用.然而,借助下述定理,我们可以将其降至$O (n^2)$.
+
+<theorem  name="隐式Q定理">
+假设$Q=[q_1,\cdots,q_n]$和$V=[v_1,\cdots,v_n]$都是正交阵,且$H\equiv Q^TAQ$和$G\equiv V^TAV$都是上Hessenberg阵,其中$A\in \mathbb{R}^{n\times n}$.令$k$是使$h_{k+1,k}=0$的最小正整数,$H$不可约时约定$k=n$.如果$q_1=v_1$,那么
+<latex>
+\begin{equation*}
+q_i=\pm v_i,
+\end{equation*}
+</latex>且
+<latex>
+\begin{equation*}
+|h_{i,i-1}|=|g_{i,i-1}|,i=2:k.
+\end{equation*}
+</latex>而且,若$k<n$,则
+<latex>
+\begin{equation*}
+g_{k+1,k}=0.
+\end{equation*}
+</latex>
+</theorem>
+
+<proof>
+定义正交阵$W=[w_1,\cdots,w_n]=V^TQ$且注意到$GW=WH$.通过比较这一等式的$i-1$列 $(i=2:k)$,我们知道
+<latex>
+\begin{equation*}
+  h_{i,i-1}w_i=Gw_{i-1}-\sum\limits_{j=1}^{i-1}h_{j,i-1}w_j.
+\end{equation*}
+</latex>由$w_1=e_1$得出$[w_1,\cdots,w_k]$是上三角阵,于是$w_i=\pm I_n (i,i)=\pm e_i,i=2:k$.从$w_i=V^Tq_i$和$h_{i,i-1}=w_i^TGw_{i-1}$可以推出$v_i=\pm q_i$且
+<latex>
+\begin{equation*}
+  |h_{i,i-1}|=|q_i^TAq_{i-1}|=|v_i^TAv_{i-1}|=|g_{i,i-1}|,i=2:k.
+\end{equation*}
+</latex>
+
+如果$k<n$,则
+<latex>
+\begin{equation*}
+\begin{split}
+  g_{k+1,k}&=e_{k+1}^TGe_k=e_{k+1}^TGWe_k=e_{k+1}^TWHe_k\\
+  &=e_{k+1}^T\sum\limits_{i=1}^kh_{ik}We_i=\sum\limits_{i=1}^kh_{ik}e_{k+1}^Te_i=0.
+\end{split}
+\end{equation*}
+</latex>
+</proof>
+
+以上定理表明,若$Q^TAQ=H$和$Z^TAZ=G$都是不可约上Hessenberg阵,且$Q$和$Z$第一列相同,则$G$和$H $"本质上"相等,即
+<latex>
+\begin{align*}
+  G&=D^{-1}HD,\\
+  D&=\mathrm{diag} (\pm 1,\cdots,\pm 1).
+\end{align*}
+</latex>
+
+于是我们每步迭代采用以下步骤:
+
+ 1. 计算$Me_1$,即$M$的第一列.
+ 2. 确定Householder矩阵$P_0$使得$P_0 (Me_1)$是$e_1$的倍数.
+ 3. 计算Householder矩阵$P_1,\cdots,P_{n-2}$使得如果$Z_1=P_0P_1\cdots P_{n-2}$,则$Z_1^THZ_1$是上Hessenberg矩阵.
+
+这样,我们得到$Z^THZ$和$Z_1^THZ_1$都是Hessenberg阵,且$Ze_1=Z_1e_1$,由隐式Q定理知$Z^THZ$与$Z_1^THZ_1$本质上相等.
+
+由$H$隐式确定$H_2$首先是Francis(1961)<cite>Fra61</cite>提出的,我们称之为Francis $QR$步.完整的一个Francis $QR$步需要$10n^2$个flop,如果要把$Z$显式计算成一个正交阵,则还需额外$10n^2$个flop.
+
+** 完整的$QR$迭代算法
+
+<algorithm  name="QR算法">
+给定矩阵$A\in \mathbb{R}^{n\times n}$和比单位舍入误差大的允许误差$\epsilon_{\text{tol}}$.本算法计算实Schur分解$Q^TAQ=T$.$A$用Hessenberg分解覆盖.如果需要求出$Q$和$T$,那么$T$储存在$H$中.如果只是需求特征值,则$T$的对角块存在$H $中相应位置.
+
+首先计算Hessenberg归约$H=U_0^TAU_0$,其中$U_0=P_1\cdots P_{n-2}$.
+
+然后进行以下步骤,直到$q=n$:
+
+令所有满足$|h_{i,i-1}|\leqslant \epsilon_{\text{tol}} (|h_{ii}|+|h_{i-1,i-1}|)$的次对角元素为$0$,找到最大的非负$q$和最小的非负$p$使得
+<latex>
+\begin{equation*}
+  H=
+  \begin{bmatrix}
+    H_{11}& H_{12}& H_{13}\\
+    O& H_{22}& H_{23}\\
+    O& O& H_{33}
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    p\\
+    n-p-q\\
+    q
+  \end{array},
+\end{equation*}
+</latex>其中$H_{33}$是拟上三角阵且$H_{22}$是不可约的.
+<latex>
+\begin{align*}
+  &\text{if}~q<n\\
+  &~~~~\text{对}H_{22}\text{构造Francis}QR\text{步:}H_{22}\leftarrow Z^TH_{22}Z,\\
+  &\text{if 要求}Q,\\
+  &~~~~Q\leftarrow \mathrm{diag} (I_p,Z,I_q),\\
+  &~~~~~~~~H_{22}\leftarrow H_{12}Z,\\
+  &~~~~~~~~H_{23}\leftarrow Z^TH_{23}.\\
+  &~~~~\text{end}\\
+  &\text{end}\\
+\end{align*}
+</latex>
+
+最后,将$H$中所有特征值为实的$2\times 2$的对角块化为上三角,如有必要累积正交变换相似矩阵.
+</algorithm>
+
+如需计算$Q$和$T$,此算法需要$25n^3$个flop.如只需算特征值,则只需$10n^3$个flop.这种估计是基于如下经验:平均每做一次低阶$1\times 1$或$2\times 2$矩阵解耦,仅需约两次Francis迭代.
+
+以下考虑$QR$算法的舍入性质.计算得到的实Schur型$\hat{T}$正交相似于靠近$A$的矩阵,即$Q^T (A+E)Q=\hat{T}$,其中$Q^TQ=I$且$\|E\|_2\simeq \mu\|A\|_2$.求得的$\hat{Q}$几乎是正交的:$\hat{Q}^T\hat{Q}=I+F$,其中$\|F\|_2\simeq \mu$.
+
+* 不变子空间计算
+
+一旦实Schur分解$Q^TAQ=T$已算出,几个重要的不变子空间问题就能解决.
+
+** 由逆迭代计算选定的特征向量
+
+<algorithm  name="逆迭代">
+令$q^{(0)}\in \mathbb{C}^n$是给定的2-范数下单位向量,并设$A-\mu I\in \mathbb{R}^{n\times n}$非奇异.进行如下迭代:
+<latex>
+\begin{align*}
+  &\text{for}~k=1,2,\cdots\\
+  &~~~~\text{解} (A-\mu I)z^{(k)}=q^{(k-1)}.\\
+  &~~~~q^{(k)}=\frac{z^{(k)}}{\|z^{(k)}\|_2}.\\
+  &~~~~\lambda^{(k)}=q^{(k)T}Aq^{(k)}.\\
+  &\text{end}
+\end{align*}
+</latex>
+</algorithm>
+
+逆迭代就是应用到$(A-\mu I)^{-1}$上的幂方法.只要$\mu$比其他特征值更靠近$\lambda_j$,则只要$q^{(0)}$在特征向量$x_j$方向上的分量不为$0$,则$q^{(k)}$含$x_j$方向成分就非常多.以上迭代终止的条件是只要余量$r^{(k)}\equiv (A-\mu I)q^{(k)}$满足$\|r^{(k)}\|_{\infty}\leqslant c\mu\|A\|_{\infty}$,其中$c$为量级为$1$的常数.
+
+逆迭代可以与$QR$算法一起用.在计算得$U_0^TAU_0=H$ (Hessenberg归约)及$A$的特征值$\lambda$后,令$A=H$,$\mu=\lambda$产生一个向量$z$使$Hz\simeq \mu z$.随后令$x=U_0z$即相应于$\lambda$的特征向量.
+
+我们只需$O (n^2)$个flop就能得到$H-\lambda I$的分解矩阵,且一般只需一次迭代就能产生一个足够近似的特征向量.
+
+** 特征值排序与不变子空间的计算
+
+实Schur分解可给出不变子空间的信息.如果
+<latex>
+\begin{equation*}
+  Q^TAQ=T=
+  \begin{bmatrix}
+    T_{11}& T_{12}\\
+    O& T_{22}
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    p\\
+    q
+  \end{array},
+\end{equation*}
+</latex>且$\lambda (T_{11})\cap \lambda (T_{22})=\varnothing$,则$Q$的前$p$列张成一个与$\lambda (T_{11})$相对应的唯一不变子空间.但对于指定的若干特征值,我们需要一种方法来计算正交矩阵$Q_D$使得$Q_D^TT_FQ_D$是特征值按适当顺序排列的拟上三角阵.
+
+以$2\times 2$的情形来说明我们的算法.设
+<latex>
+\begin{equation*}
+  Q_F^TAQ_F=T_F=
+  \begin{bmatrix}
+    \lambda_1& t_{12}\\
+    o& \lambda_2
+  \end{bmatrix}
+,(\lambda_1\neq \lambda_2).
+\end{equation*}
+</latex>注意到
+<latex>
+\begin{equation*}
+T_Fx=\lambda_2x,
+\end{equation*}
+</latex>其中$x=\left[\begin{smallmatrix}t_{12}\\\lambda_2-\lambda_1\end{smallmatrix}\right]$.令$Q_D$是Givens变换使$Q_D^Tx$的第2个分量为$0$.记$Q=Q_FQ_D$,则
+<latex>
+\begin{equation*}
+  Q^TAQ=
+  \begin{bmatrix}
+    \lambda_2& \pm t_{12}\\
+    o& \lambda_1
+  \end{bmatrix}.
+\end{equation*}
+</latex>
+
+当$T$的对角线上有$2\times 2$阶块时,变换变得稍微复杂,但没有本质的困难,此处不详细给出.可参见<cite>Ruh70</cite><cite>Ste71</cite>.
+
+通过进行实Schur分解来计算不变子空间是非常稳定的.
+
+** 块对角化
+
+在得到矩阵的实Schur标准型之后,可以通过形如$Y_{ij}^{-1}TY_{ij}$的相似变换化为对角块形,其中$Y_{ij}\equiv I_n+E_iZ_{ij}E_j^T$,$I_n=[E_1,\cdots,E_q]$为适当分划,$Z_{ij}$满足$T_{ii}Z_{ij}-Z_{ij}T_{jj}=-T_{ij}$的Sylvester方程组.
+
+Bartels和Stewart (1972)<cite>BarSte72</cite>设计了求解Sylvester方程
+<latex>
+\begin{equation*}
+  FZ-ZG=C
+\end{equation*}
+</latex>的算法,其中$F\in \mathbb{R}^{p\times p}$,$G\in \mathbb{R}^{r\times r}$是给定的拟上三角阵且无公共特征值,$C\in \mathbb{R}^{p\times r}$.
+
+令$C=[c_1,\cdots,c_r]$,$Z=[z_1,\cdots,z_r]$按列分块.如果$g_{k+1,k}=0$,则通过比较各列得到
+<latex>
+\begin{equation*}
+  Fz_k-\sum\limits_{i=1}^kg_{ik}z_i=c_k.
+\end{equation*}
+</latex>从而若已知$z_1,\cdots,z_{k-1}$,则我们可解出拟三角阵系统
+<latex>
+\begin{equation*}
+  (F-g_{kk}I)z_k=c_k+\sum\limits_{i=1}^{k-1}g_{ik}z_i
+\end{equation*}
+</latex>得到$z_k$.若$g_{k+1,k}\neq 0$,则通过解$2p\times 2p$方程组
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    F-g_{kk}I& -g_{mk}I\\
+    -g_{km}I& F-g_{mm}I
+  \end{bmatrix}
+  \begin{bmatrix}
+    z_k\\
+    z_m
+  \end{bmatrix}
+=
+\begin{bmatrix}
+  c_k\\
+  c_m
+\end{bmatrix}
++\sum\limits_{i=1}^{k-1}
+\begin{bmatrix}
+  g_{ik}z_i\\
+  g_{im}z_i
+\end{bmatrix},
+\end{equation*}
+</latex>同时求得$z_k$和$z_{k+1}$,上式中$m\equiv k+1$.按照$(1,p+1,2,p+2,\cdots,p,2p)$重新排列可得到一个只用$O(p^2)$个flop就可求解的带状方程组.
+
+但要指出,不当的分块可能造成精度丢失.
+
+* $Ax=\lambda Bx$的$QZ$方法
+
+令$A$和$B$是两个$n\times n$矩阵.所有形如$A-\lambda B,\lambda\in \mathbb{C}$的矩阵集合称为束 (pencil).束的特征值是集$\lambda (A,B)$的元素,定义为
+<latex>
+\begin{equation*}
+  \lambda (A,B)=\{z\in \mathbb{C}:\det (A-zB)=0\}.
+\end{equation*}
+</latex>若$\lambda\in\lambda (A,B)$且$Ax=\lambda Bx,x\neq 0$,则$x$称为$A-\lambda B$的特征向量.
+
+关于以上的广义特征值,有如下的定理:
+
+<theorem  name="广义Schur分解">
+如果$A,B\in\mathbb{C}^{n\times n}$,则存在酉阵$Q$和$Z$使得$T\equiv Q^HAZ$和$S\equiv Q^HBZ$是上三角阵.若对某个$k$,$t_{kk}$和$s_{kk}$都为零,则
+<latex>
+\begin{equation*}
+\lambda (A,B)=\mathbb{C},
+\end{equation*}
+</latex>否则
+<latex>
+\begin{equation*}
+  \lambda (A,B)=\left\{\frac{t_{ii}}{s_{ii}}:s_{ii}\neq 0\right\}.
+\end{equation*}
+</latex>
+</theorem>
+<proof>
+令$\{B_k\}$是收敛于$B $的一列非奇异矩阵,对每个$k $,令$Q_k^H (AB_k^{-1})Q_n=R_k$为$AB_k^{-1}$的Schur分解.令$Z_k$是使$Z_k^H (B_k^{-1}Q_k)\equiv S_k^{-1}$为上三角阵的酉阵.由此可见,$Q_k^HAZ_k=R_kS_k$和$Q_k^HB_kZ_k$都是上三角阵.
+
+运用Bolzano-Weierstrass定理,我们知道有界列$\{(Q_k,Z_k)\}$有收敛子列,记$(Q,Z)\equiv \lim (Q_{ki},Z_{ki})$.易证明$Q$和$Z$都是酉阵且$Q^HAZ$和$Q^HBZ$都是上三角.从等式
+<latex>
+\begin{equation*}
+  \det (A-\lambda B)=\det (QZ^H)\prod\limits_{i=1}^n (t_{ii}-\lambda s_{ii})
+\end{equation*}
+</latex>即得到关于$\lambda (A,B)$的断言.
+</proof>
+
+若$A$,$B$是实矩阵,则对应实Schur分解的下列分解很重要,其证明可参见<cite>Ste72b</cite>.
+
+<theorem  name="推广的实Schur分解">
+如果$A$和$B$是$\mathbb{R}^{n\times n}$阵,则存在正交阵$Q$和$Z$使得$Q^TAZ$是拟上三角阵,且$Q^TBZ$是上三角阵.
+</theorem>
+
+** Hessenberg三角型
+
+计算矩阵对$(A,B)$的广义Schur分解的第一步是通过正交变换化$A$为上Hessenberg型,$B$为上三角型.
+
+ 1. 计算$Q^TB=R$并覆盖$B$,其中$Q$为正交阵,且$R$为上三角阵.$A\leftarrow Q^TA$.
+ 2. 分别用左右两个Givens变换$Q_{ij},Z_{ij}$逐个把$A$次对角线下方元素消去.其中$Q_{ij}^TA$消去$a_{ij}$而$(Q_{ij}^TB)Z_{ij}$用来使$B$恢复上三角形.
+
+本算法共需$8n^3$个flop.要把$Q$,$Z$明显算出来还要$4n^3$和$3n^3$个flop.
+
+** 降阶
+
+在描述$QZ$迭代时,我们可以假定$A$是不可约的上Hessenberg矩阵,$B$为非奇异上三角矩阵.否则,若$a_{k+1,k}=0$,则
+<latex>
+\begin{equation*}
+  A-\lambda B=
+  \begin{bmatrix}
+    A_{11}-\lambda B_{11}& A_{12}-\lambda B_{12}\\
+    O& A_{22}-\lambda B_{22}
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    k\\
+    n-k
+  \end{array}.
+\end{equation*}
+</latex>从而我们只需要处理两个较小的问题$A_{11}-\lambda B_{11}$和$A_{22}-\lambda B_{22}$.若$b_{kk}=0$,则通过合适的Givens变换,可以把$A$的$(n,n-1)$位置及$b_{nn}$化为零,从而实现降阶.
+
+** $QZ$步骤
+
+$QZ$步骤的基本思想是把$A$,$B$做如下变换:
+<latex>
+\begin{equation*}
+  (\bar{A}-\lambda\bar{B})=\bar{Q}^T (A-\lambda B)\bar{Z},
+\end{equation*}
+</latex>其中,$\bar{A}$是上Hessenberg型,$\bar{B}$是上三角型,$\bar{Q}$和$\bar{Z}$是正交阵.我们通过"巧妙的"零追逐技巧并求助于隐式Q定理可以做到这一点.
+
+令$M=AB^{-1}$ (上Hessenberg型)且令$v= (M-aI) (M-bI)e_1$,其中$a$,$b$是$M$下方$2\times 2$子矩阵的特征值.球Householder矩阵$P_0$使$P_0v$为$e_1$的倍数,之后确定一系列Householder阵$Z_i$,$P_i$使$P_0A$,$P_0B$分别恢复到上Hessenberg型与上三角型.注意到$Q=P_0P_1\cdots P_{n-2}$与$P_0$从而与$M$有相同的第一列,于是由隐式Q定理,$AB^{-1}= Q^T (AB^{-1})Q$"本质上"与直接将Francisco$QR$迭代步骤用于$M=AB^{-1}$所得为同一矩阵.
+
+该算法共需$22n^2$个flop,累积$Q$和$Z$还需要$8n^2$和$13n^2$个flop.
+
+** 完整$QZ$过程
+
+综合以上讨论,我们可以得到类似$QR$迭代的$QZ$迭代:
+
+<algorithm  name="QZ迭代">
+给定$A,B\in \mathbb{R}^{n\times n}$,本算法计算正交阵$Q$和$Z$使得$Q^TAZ=T$为拟上三角阵且$Q^TBZ=S$是上三角阵,$T$,$S$分别覆盖$A$,$B$.
+
+ 1. 计算$Q^TAZ$(上Hessenberg阵)并覆盖$A$和$Q^TBZ$ (上三角阵)覆盖$B$.
+ 2. 执行如下步骤,直到$q=n$:
+<latex>
+\begin{align*}
+  &\text{令所有满足}|a_{i,i-1}|\leqslant \epsilon (|a_{i,i}|+|a_{i-1,i-1}|)\text{的次对角元素为}0.\\
+  &\text{找到最大值}q\text{和最小值}p\text{使如果}\\
+  &A=
+  \begin{bmatrix}
+    A_{11}& A_{12}& A_{13}\\
+    O& A_{22}& A_{23}\\
+    O& O& A_{33}
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    p\\
+    n-p-q\\
+    q
+  \end{array},\\
+  &\text{则}A_{33}\text{是拟上三角阵,且}A_{22}\text{不可归约为上Hessenberg阵.将}B\text{适当分划为}\\
+  &B=
+  \begin{bmatrix}
+    B_{11}& B_{12}& B_{13}\\
+    O& B_{22}& B_{23}\\
+    O& O& B_{33}
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    p\\
+    n-p-q\\
+    q
+  \end{array}.\\
+  &\text{if}~q<n\\
+  &~~~~\text{if}~B_{22}\text{奇异,则通过适当的Givens变换化}a_{n-q,n-q-1}\text{为}0.\\
+  &~~~~\text{else}\\
+  &~~~~\text{在}A_{22}\text{和}B_{22}\text{上用}QZ\text{步骤}.\\
+  &~~~~A=\mathrm{diag} (I_p,Q,I_q)^TA\mathrm{diag} (I_p,Z,I_q).\\
+  &~~~~B=\mathrm{diag} (I_p,Q,I_q)^TB\mathrm{diag} (I_p,Z,I_q).\\
+  &~~~~\text{end}\\
+  &\text{end}
+\end{align*}
+</latex>
+</algorithm>
+
+本算法约需$30n^3$个flop,这是基于每个特征值约需$2$次$QZ$迭代的经验.$QZ$算法的速度不受$B$秩亏损的影响.
+
+可以证明,在
+<latex>
+\begin{align*}
+  Q_0^T (A+E)Z_0&=T,\\
+  Q_0^T (B+F)Z_0&=S,
+\end{align*}
+</latex>而$Q_0,Z_0$是精确正交阵,
+<latex>
+\begin{align*}
+  \|E\|_2&\simeq \mu\|A\|_2,\\
+  \|F\|_2&\simeq \mu\|B\|_2
+\end{align*}
+</latex>意义下该算法稳定.

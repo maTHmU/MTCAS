@@ -1,0 +1,879 @@
+#title 一元多项式的最大公因子
+
+<contents>
+设$D$为UFD(即唯一析因整环,例如$\mathbb{Z}$),$F$为域(例如$\mathbb{R}$)，则$D[x],F[x]$也是UFD，对其上两多项式可讨论最大公因子(GCD)问题.最古典的方法即是Euclid算法。然而，在上世纪六十年代末一些试验中(参见<cite>mca</cite>注记 6.1)发现这种算法在$D[x]$或$F[x]$中的系数增长很快，甚至于指数阶增长。本书开头即展示了这样的“中间表示膨胀”的例子.
+; Collins怎么没出现在文章作者里？
+为了解决计算过程中系数膨胀的问题,Collins,Brown发现了UFD上的多项式模最大公因子算法,并首先由Brown<cite>wsb71</cite>于1971年提出。对于多元情形，Mozes和Yun<cite>jmdyyy73</cite>于1973年提出了基于Hensel提升方法的模因子算法。下面对经典的Euclid算法和改进算法进行论述。
+
+本章假设读者具有一定的代数知识,对UFD,PID（主理想整环）,多项式及其GCD以及Euclid算法等有一定的了解.关于基本的代数知识,可参考高等代数学方面的书,如<cite>ZhaXu04</cite>.
+
+* Euclid算法
+
+在Euclid整环$F[x]$中,我们有如下的<index>Euclid除法</index>:
+
+<definition name="Euclid除法">
+设$f,g\in F[x]$,其中$g\neq 0$,则存在唯一的$q,r\in F[x]$使得
+$$f=qg+r,$$
+其中$\deg r<\deg g$.我们称此除法过程为Euclid除法,并以$f\quo g$记商$q$,$f\rem g$记余式$r$.
+</definition>
+
+在一般高等代数教材(如<cite>ZhaXu04</cite>)中都证明了如下定理.
+
+<theorem>
+在Euclid整环$F[x]$中,若$h=\gcd(f,g)$,则有唯一的非平凡多项式$s,t$使得
+$$sf+tg=h$$
+且$\deg s<\deg g,\deg t<\deg f$.等式$sf+tg=h$称为<index>Bezout等式</index>,$s,t$称为Bezout系数.
+</theorem>
+
+对于Euclid整环$F[x]$，我们熟知有以下的扩展<index sub="多项式!扩展Eucliad算法">Euclid算法</index>##al:EEA .注意到将算法中的$s,t$等计算舍去即为普通的<index sub="多项式">Euclid算法</index>.
+
+<algorithm label="al:EEA" name="扩展Euclid算法">
+
+输入：$F[x]$上多项式$f$,$g$,
+
+输出：$f$,$g$的最大公因子$u$,Bezout等式中的系数$S=(s,t)$使得$sf+tg=u$.
+
+ 1. $u=f,v=g,S=(1,0),T=(0,1)$,
+
+ 2. 如果$v=0$,则转到第4步,
+
+ 3. $r=u\rem v,q=u\quo v,L=S-qT,u=v,v=r,S=T,T=L$,并转回第2步,
+
+ 4. 输出$u$，$S$.
+</algorithm>
+
+由于我们要讨论的是“精确”的符号计算,所以多项式的系数一般为整数或有理数.而对于$\mathbb{Q}[x]$中的多项式,我们总可以找到整数乘以该多项式使其化为$\mathbb{Z}[x]$中的问题.因此,后面关于多项式的符号运算集中讨论$\mathbb{Z}[x]$中的情形.
+
+为了引出$\mathbb{Z}[x]$中求GCD的算法,我们先引进如下一些定义和定理.
+
+<definition label="def:cont" name="本原多项式">
+<index>容度</index>$\mathrm{cont}(f)$定义为：$$\mathrm{cont}(f)=\mathrm{sgn}(a_n)\gcd (a_0,a_1,\ldots,a_n),$$其中$f=\sum a_ix^i\in\mathbb{Z}[x]$，且gcd对单项的定义为
+$$\gcd (a_0)=a_0,$$
+$f$的<index>本原部分</index>(primitive part)定义为$\mathrm{pp}(f)=f/\mathrm{cont}(f)$，若$f=\mathrm{pp}(f)$,则称其为<index>本原多项式</index>。
+</definition>
+
+<remark>
+定义中关于多个整数的GCD是指取了绝对值之后的最大公因子,之所以在容度的定义中乘上$\mathrm{sgn}(a_n)$一项,是为了使得其后定义的本原多项式的首项系数为正数.
+</remark>
+
+<proposition>
+设$f\in \mathbb{Z}[x],c\in \mathbb{Z}$,我们有$\mathrm{cont}(cf)=\mathrm{cont}(c)\mathrm{cont}(f),\mathrm{pp}(cf)=\mathrm{pp}(c)\mathrm{pp}(f)$.
+</proposition>
+
+<theorem label="th:Gauss' Lemma" name="Gauss引理">
+设$f,g\in \mathbb{Z}[x]$,若$f,g$本原，则$h=fg$也是本原的。
+</theorem>
+
+类似还有以下一些命题，相关内容可参阅相关的高等代数学内容(例如<cite>nlzdss00</cite>).
+
+<proposition>
+设$f,g\in \mathbb{Z}[x],\mathrm{cont}(fg)=\mathrm{cont}(f)\mathrm{cont}(g),\mathrm{pp}(fg)=\mathrm{pp}(f)\mathrm{pp}(g)$.
+</proposition>
+
+<proposition>
+设$f,g\in \mathbb{Z}[x],h=\gcd (f,g)\in \mathbb{Z}[x]$,则$$\mathrm{cont}(h)=\gcd (\mathrm{cont}(f),\mathrm{cont}(g))\in \mathbb{Z},$$
+$$\mathrm{pp}(h)=\gcd (\mathrm{pp}(f),\mathrm{pp}(g))\in \mathbb{Z}[x].$$
+</proposition>
+
+于是有下面的：
+
+<algorithm name="一个整系数多项式的Euclid算法" >
+
+输入：$\mathbb{Z}[x]$上的多项式$f$,$g$,
+
+输出：$f,g$在$\mathbb{Z}[x]$上的最大公因子$h$.
+
+ 1. $h=\gcd (f,g)\in\mathbb{Q}[x]$,
+
+ 2. $b=\gcd (\plc{f},\plc{g})$,
+
+ 3. 输出$bh$.
+</algorithm>
+
+尽管$\mathbb{Z}[x]$不是Euclid整环，但我们可引入$\mathbb{Z}[x]$上的伪除法，来构造类似Euclid余式序列,以此来求总大公因子.当然这里的$\mathbb{Z}$换为一般的UFD也是可以的.
+
+<definition  name="伪除法">
+设$f,g\in \mathbb{Z}[x]$,若有$\alpha,\beta\in\mathbb{Z}$,$q,r\in \mathbb{Z}[x]$使得
+$$\alpha f=qg+\beta r,$$
+其中$\deg r<\deg g$,$r$是本原多项式,我们称此过程为多项式的<index>伪除法</index>,并以$f\pquo g$记伪商$q$,$f\prem g$记伪余式$r$.
+</definition>
+
+<definition  name="多项式余式序列">
+若$f,g\in \mathbb{Z}[x]$,且$\deg (f)\ge\deg (g)$，令$R_0=f,R_1=g$, 依次作伪除法$\alpha_iR_{i-1}=Q_iR_i+\beta_iR_{i+1}$,$i=1,2,\ldots,k$,满足$R_{k-1}\prem R_k=0$,则$R_0,R_1,\ldots,R_k$称为$f,g$的<index>多项式余式序列</index>.
+</definition>
+
+使用伪除法求最大公因子时就会导致余式序列的系数增长很快，我们可以用下面定义的几种多项式余式序列一定程度上减小系数增长速度（参见<cite>zsg05</cite>）。本章稍后介绍的素数模方法能够有效抑制系数膨胀效应。
+
+<definition label="def:quo-series" name="几种多项式余式序列">
+若记$\delta_i=\deg (R_{i-1})-\deg (R_i)$,则有如下定义:
+
+(1)通常的伪余式序列：$\alpha_i=(\plc{R_i})^{\delta_i+1},\beta_i=\mathrm{cont}(R_{i-1}\prem R_i)$.
+
+(2)子结式余式序列：$$\alpha_i=(\plc{R_i})^{\delta_i+1},\beta_1=(-1)^{\delta_1+1},$$
+$$\beta_i=-(\plc{R_{i-1}})\psi_i^{\delta_i},(2\le i\le k),$$
+$$\psi_1=-1,\psi_i=(-\plc{R_{i-1}})^{\delta_{i-1}}\psi_{i-1}^{1-\delta_{i-1}},(2\le i\le k),$$
+
+此方法计算量最小。
+
+(3)约化多项式余式序列：$$\alpha_i=(\plc{R_{i-1}})^{\delta_i+1},$$
+$$\beta_1=1,\beta_i=\alpha_{i-1},(2\le i\le k).$$
+</definition>
+
+* 域上多项式的快速Euclid算法
+
+1938年Lehmer最先提出了<index name="Euclid算法" sub="多项式!快速Euclid算法">快速Euclid算法</index><cite>dhl38</cite>，后来Knuth<cite>dek70</cite>，Sch\"onhage<cite>as71</cite>,Moenck<cite>rtm73</cite>,Schwartz<cite>jts80</cite>,Strassen<cite>vs83</cite>对这些算法也有论述。
+
+在域$F$(例如$\mathbb{F}_p$)上的多项式环中，Euclid算法可表示为（其中各$r_i$均为首一的）:
+$$r_0=f,\quad r_1=g,\quad s_0=t_1=1,\quad s_1=t_0=0,$$及
+<latex>
+\begin{align}
+\rho_2r_2&=r_0-q_1r_1,&\rho_2s_2&=s_0-q_1s_1,&\rho_2t_2&=t_0-q_1t_1,\nonumber\\
+&\ \,\vdots &&\ \,\vdots &&\ \,\vdots @@eq:euclidalg \\
+0&=r_{l-1}-q_lr_l, &\rho_{l+1}s_{l+1}&=s_{l-1}-q_ls_l, &\rho_{l+1}t_{l+1}&=t_{l-1}-q_lt_l,\nonumber
+\end{align}
+</latex>
+
+若设$\rho_{l+1}=1,r_{l+1}=0$，记$$Q_i=\begin{pmatrix}0 &1\\ \rho_{i+1}^{-1} &-q_i\rho_{i+1}^{-1}\end{pmatrix},$$则有$$\begin{pmatrix}r_i \\ r_{i+1}\end{pmatrix}=Q_i\begin{pmatrix}r_{i-1}\\r_i\end{pmatrix}.$$记$R_i=Q_iQ_{i-1}\cdots Q_1$,则有$$R_i=\begin{pmatrix}s_i & t_i\\s_{i+1}& t_{i+1}\end{pmatrix},\quad\begin{pmatrix}r_i\\r_{i+1}\end{pmatrix}=R_i\begin{pmatrix}r_0\\r_1\end{pmatrix}.$$
+
+在随机情况下，可证明域$\mathbb{F}_p$中$\deg r_2<\deg r_1-1$的概率$\mathrm{P}(\deg r_2<\deg r_1 - 1)=\displaystyle\frac{1}{p}$，当素数$p$很大时，可认为$r_i$序列的下降速度很慢。如果是有理数域上的多项式,可以想到,余式次数下降得应该更慢。引入快速Euclid算法能在一定程度上补偿次数下降过慢导致的计算代价.为了说明快速Euclid算法，我们先引入下面一些定义和定理。该算法的基本原理在于利用多项式的前若干项系数来计算余式序列.
+
+以下我们简记多项式系数域为$F$,当然,它可以是$\mathbb{F}_p$或者$\mathbb{Q}$.
+
+<definition  name="截式">
+对于$f=\sum_{i=0}^{n} f_ix^i\in F[x],k\in\mathbb{Z},k$-截式($k$-truncated polynomial)定义为$$f \upharpoonright k=f_nx^k+f_{n-1}x^{k-1}+\cdots+f_{n-k},$$当$i<0$我们约定$f_i=0$。因此当$k\ge0$时，$f\upharpoonright k$即取$f$的前$k+1$个系数作一个新的$k$次多项式,而当$k<0$时$f\upharpoonright k=0$.
+</definition>
+
+<remark>
+当$k\le n$时,有$f\upharpoonright k=f \quo x^{n-k}$,而当$k>n$时有$f\upharpoonright k=fx^{k-n}$.
+</remark>
+
+<remark>
+$\forall i\ge 0,(fx^i)\upharpoonright k=f\upharpoonright k$.
+</remark>
+
+<definition  name="$k$-度重合">
+设非零多项式$f,g,f^*,g^*\in F[x]$,且$\deg f\ge\deg g,\deg f^*\ge\deg g^*,k\in\mathbb{Z}$，则称$(f,g)$与$(f^*,g^*)$ $k$-度重合(coincide up to $k$)，如果$$f\upharpoonright k=f^*\upharpoonright k$$且<latex>\begin{equation} @@eq:ggstar g\upharpoonright(k-\deg f+\deg g)=g^*\upharpoonright(k-\deg f^*+\deg g^*),\end{equation}</latex>
+此时记为$(f,g)\overset{k}{\sim}(f^*,g^*)$,可验证$\sim$为一等价关系。
+</definition>
+
+根据式##eq:ggstar ，此等价关系有如下性质：
+
+<proposition  label="pr:ksimpro">
+若$(f,g)\overset{k}{\sim}(f^*,g^*)$且$k\ge\deg f-\deg g$,则$\deg f-\deg g=\deg f^*-\deg g^*$.
+</proposition>
+
+关于$k$-度重合，有如下重要的命题：
+
+<theorem  label="th:baseforFEEA">
+对于$k\in\mathbb{Z}$，若非零多项式$f,g,f^*,g^*$满足$(f,g)\overset{2k}{\sim}(f^*,g^*)$,且$k\ge\deg f-\deg g\ge 0$,若有Euclid除法$$f=qg+r,\quad f^*=q^*g^*+r^*,$$则
+ 1. $q=q^*$,
+ 2. $(g,r)\overset{2(k-\deg q)}{\sim}(g^*,r^*)$或者$r=0$或者$k-\deg q<\deg g-\deg r$.
+</theorem>
+
+<proof>
+对$(f,g)$和$(f^*,g^*)$乘以$x$的适当幂次后，可使$\deg f=\deg f^*> 2k$成立，不妨设命题中的多项式已满足此式，则由命题##pr:ksimpro 有$\deg g=\deg g^*$及$k\ge\deg q=\deg f-\deg g=\deg f^*-\deg g^*=\deg q^*$.下面分两部分证明本定理。
+
+(1)首先我们有如下三个不等式:<latex>
+\begin{align*}
+\deg (f-f^*)&<\deg f-2k\le\deg g-k\text{(注意}k\text{-截式取多项式的前}k+1\text{项)},\\
+\deg (g-g^*)&<\deg g-(2k-(\deg f-\deg g)) \\
+&=\deg f-2k\le\deg g-k\le\deg g-\deg q,\\
+\deg (r-r^*)&\le\max\{\deg r,\deg r^*\}<\deg g,
+\end{align*}
+</latex>
+根据上面的不等式,由$f-f^*=q(g-g^*)+(q-q^*)g^*+(r-r^*)$可知$\deg [(q-q^*)g^*]<\deg g$,故$q=q^*$.
+
+(2)假定$r\neq 0$且$k-\deg q\ge\deg g-\deg r$，则由$(f,g)\overset{2k}{\sim}(f^*,g^*)$有$$g\upharpoonright 2(k-\deg q)=g^*\upharpoonright 2(k-\deg q),$$
+另外，<latex>
+\begin{align}
+\deg (r-r^*)&\le\max\{\deg (f-f^*),\deg q+\deg (g-g^*)\}\notag\\
+&<\deg q+\deg f-2k\notag\\
+&=\deg g-2(k-\deg q)\notag\\
+&=\deg r-[2(k-\deg q)-(\deg g-\deg r)],\notag
+\end{align}
+</latex>
+
+又由假设有$\deg r\ge\deg q+\deg g-k\ge\deg q+\deg f-2k\Rightarrow\deg r=\deg r^*$, 于是$r\upharpoonright[2(k-\deg q)-(\deg g-\deg r)]=r^*\upharpoonright[2(k-\deg q)-(\deg g^*-\deg r^*)]$,
+故$(g,r)\overset{2(k-\deg q)}{\sim}(g^*,r^*)$.
+</proof>
+
+下面考虑两个首一的多项式Euclid余式序列：<latex>
+\begin{align*}
+r_0&=q_1r_1+\rho_2r_2 &r_0^*&=q_1^*r_1^*+\rho_2^*r_2^*\\
+&\ \,\vdots &&\ \,\vdots\\
+r_{l-1}&=q_lr_l &r_{l^*-1}^*&=q_{l^*}^*r_{l^*}^*
+\end{align*}
+</latex>
+分别令$m_i=\deg q_i,m_i^*=\deg q_i^*,n_i=\deg r_i=n_0-m_1-\cdots-m_i$,对$k\in\mathbb{N}$,定义$\eta(k)=\max\{0\le j\le l\mid\sum_{1\le i\le j}m_i\le k\}$,则我们有$$n_0-n_{\eta(k)}=\sum_{1\le i\le \eta(k)}m_i\le k<\sum_{1\le i\le\eta(k)+1}m_i=n_0-n_{\eta(k)+1}.$$
+
+下面的定理是快速Euclid算法的基础：
+<theorem>
+对于$k\in\mathbb{N},h=\eta(k),h^*=\eta^*(k)$,若$$(r_0,r_1)\overset{2k}{\sim}(r_0^*,r_1^*),$$则$h=h^*,且q_i=q_i^*,\rho_{i+1}=\rho_{i+1}^*$对$1\le i\le h$成立。
+</theorem>
+
+<proof>
+只需对$0\le j\le h$的$j$进行归纳，证明如下命题：$j\le h^*,q_i=q_i^*,\rho_{i+1}=\rho_{i+1}^*$对于$1\le i\le j$成立，且$j=h$或$$(r_j,r_{j+1})\overset{s}{\sim}(r_j^*,r_{j+1}^*),\text{其中}s=2(k-\displaystyle\sum_{1\le i\le j}m_i).$$
+
+$j=0$时命题无须论证，由定理##th:baseforFEEA 可以证明归纳过程。另外$$\sum_{1\le i\le j}\deg q_i^*=\sum_{1\le i\le j}\deg q_i\le\sum_{1\le i\le h}\deg q_i\le k$$可知$j\le\eta^*(k)=h^*,$证毕。
+</proof>
+
+由此我们可以得到下面的算法：
+
+<algorithm label="al:FEEA" name="快速扩展Euclid算法">
+
+输入：首一多项式$r_0,r_1\in F[x],k\in\mathbb{N}(0\le k\le n)$,其中$n=n_0=\deg r_0>n_1=\deg r_1$,
+
+输出：$h=\eta(k)$以及$R_h\in M_{2\times 2}(F[x])$.
+
+ 1. 如果$r_1=0$或$k<n_0-n_1$,则输出$0,\begin{pmatrix}1\quad 0\\0\quad 1\end{pmatrix}$,
+
+ 2. $d=\lfloor k/2\rfloor$,
+
+ 3. 递归调用本算法，输入$r_0\upharpoonright 2d,r_1\upharpoonright (2d-(n_0-n_1)),d$,并将结果输出至$j-1=\eta(d),R=Q_{j-1}\cdots Q_1$,
+
+ 4. 赋值$\begin{pmatrix}r_{j-1}\\r_j\end{pmatrix}=R\begin{pmatrix}r_0\\r_1\end{pmatrix}$,$\begin{pmatrix}n_{j-1}\\n_j\end{pmatrix}=\begin{pmatrix}\deg r_{j-1}\\ \deg r_j\end{pmatrix}$,
+
+ 5. 如果$r_j=0$或者$k<n_0-n_j$则输出$j-1,R$,
+
+ 6. 赋值$q_j=r_{j-1}\quo r_j$,$\rho_{j+1}=\plc{r_{j-1}\rem r_j}$,$r_{j+1}=\mathrm{monic}(r_{j-1}\rem r_j)$,$n_{j+1}=\deg r_{j+1}$,$d^*=k-(n_0-n_j)$,
+
+ 7. 递归调用本算法，输入$r_j\upharpoonright 2d^*,r_{j+1}\upharpoonright(2d^*-(n_j-n_{j+1})),d^*$,并将结果输出至$h-j=\eta(d^*),S=Q_h\cdots Q_{j+1}$,
+
+ 8. 赋值$Q_j=\begin{pmatrix}0 &1\\ \rho_{j+1}^{-1} &-q_j\rho_{j+1}^{-1}\end{pmatrix}$,
+
+ 9. 输出$h,SQ_jR$.
+
+</algorithm>
+
+<remark>
+理论上每次取$k$时应当使恰好只计算一步，这样可以达到最高的效率，即既不多取了不必要的系数进行计算，又不致于系数取得不够。当余式序列的次数$n_i$下降得缓慢时，相应的$k$就可以取得比较小。实际中无法根据$n_i$的信息选择，因而有上面的二分递归的策略来选择.
+</remark>
+
+<remark>
+初始进行函数调用时，我们可取$k=n$,根据$\eta(k)$的定义我们知道$\eta(k)=l$,因而算法必将返回$l$和$R_l$,根据$R_l$可以得到$r_l$,即最大公因子.
+</remark>
+
+
+本章稍后将会介绍$\mathbb{Z}[x]$上的素数模公因子算法，由于$\mathbb{F}_p$为域，可利用本节所提到的快速Euclid算法提高计算效率。
+
+* 结式性质及其计算
+
+** 结式
+
+对于多项式最大公因子问题，<index>结式</index>理论纯粹是一个概念上的工具，并没有直接用于实际算法中。但结式理论对后面的GCD算法理论有重要的作用. 另外结式的计算在某些问题中也十分重要,如符号积分中的Rothstein-Trager结式等等.本小节先介绍结式的定义及一些相关性质,后面将会介绍利用多项式余式序列（PRS）来计算它的方法.
+
+<lemma label="le:resultant1">
+设$F$是域，非零多项式$f$,$g\in F[x]$。那么$\gcd(f,g)\neq 1$当且仅当$\exists s,t\in F[x]\setminus\{0\}$使得$sf+tg=0$，且$\deg s<\deg g$,$\deg t<\deg f$.
+</lemma>
+
+<proof>
+令$h=\gcd(f,g)$，若$f\neq 1$,则$\deg h\ge 1$，令$s=-g/h$,$t=f/h$则满足。
+
+反过来，设存在这样的$s$,$t$，若$f$,$g$互素，则$sf=-tg\Rightarrow f\mid t$，这与$t\neq 0$且$\deg f>\deg t$矛盾，因此$h=1$.
+</proof>
+
+<remark>
+当$F$只是UFD时上面的引理仍成立,不过引理的条件$\gcd(f,g)\neq 1$应理解为$f,g$在该UFD分式域为系数的多项式环中的最大公因子,或者说$\gcd(f,g)$非平凡,即非常数多项式.
+</remark>
+
+为了引出结式的定义,我们仍需给出如下一些定义及定理.
+
+<definition>
+对于$d\in\mathbb{N}$，定义$P_d=\{a\in F[x]|\deg a<d\}$.
+</definition>
+
+<definition>
+对于给定的$n $,$m $次多项式$f$,$g\in F[x]$，定义
+$$\varphi=\varphi_{f,g}:F[x]\times F[x]\rightarrow F[x],\qquad(s,t)\mapsto sf+tg,$$
+并令$\varphi_0:P_m\times P_n\rightarrow P_{n+m}$为$\varphi$在$P_m\times P_n$上的限制。
+</definition>
+
+<theorem>
+设$f$,$g\in F[x]$为$n $,$m $次非零多项式，那么有下面的结论：
+
+ 1. $\gcd(f,g)=1\Leftrightarrow \varphi_0$是同构.
+
+ 2. 若$\gcd(f,g)=1$，则$f$,$g$的Bezout系数$s$,$t$构成$\varphi_0(s,t)=1$的唯一解.
+
+</theorem>
+
+<proof>
+由引理##le:resultant1 知$\gcd(f,g)= 1\Leftrightarrow \varphi_0$是单射.
+; 下行证明与mca不同，是正确的么？（相同维数的线性空间之间的线性映射，单射等价于同构，PID在这里有什么作用？）
+; 由于$F[x]$是PID(主理想整环),则$\gcd(f,g)=1\Leftrightarrow\varphi_0$是满射.
+因为对于相同维数线性空间之间的线性映射,单射等价于同构,所以第一条结论满足。由$\varphi_0$为同构知这样的$s$,$t$也是唯一的。
+</proof>
+
+如果记$(s,t)=(y_{m-1},\ldots,y_0,z_{n-1},\ldots,z_0)^T$，其中$s=\sum_{0\le j<m}y_jx^j$,$t=\sum_{0\le j<n}z_jx^j$,则线性映射$\varphi_0$可在自然基$\{(x^j,0)\}_{0\le j\le m-1},\{(0,x^j)\}_{0\le j\le n-1}$下表示为如下矩阵$S$，称为$f$,$g$的<index>Sylvester矩阵</index>：
+
+$$S=\begin{pmatrix}f_n&\qquad &\qquad &\qquad  &g_m& \qquad &\qquad &\qquad &\qquad &\qquad  \\
+f_{n-1} &f_n & & &g_{m-1} &g_m & & & &\\
+\vdots &\vdots &\ddots & &\vdots &\vdots &\ddots & & &\\
+\vdots &\vdots & &f_n &g_1 &\vdots & &\ddots & &\\
+\vdots &\vdots & &f_{n-1} &g_0 &\vdots & & &\ddots &\\
+\vdots &\vdots & &\vdots & &g_0 & & & &g_m\\
+f_0 &\vdots & &\vdots & & &\ddots & & &\vdots\\
+&f_0 & &\vdots & & & &\ddots & &\vdots\\
+& &\ddots &\vdots & & & & &\ddots &\vdots\\
+& & &f_0 & & & & & &g_0
+\end{pmatrix}.$$
+
+上面的定理用矩阵语言描述即为:
+<corollary>
+设$S$为$f$,$g$的Sylvester矩阵，则有
+ 1. $\gcd(f,g)=1\Leftrightarrow \det S\neq 0$,
+ 2. 若$\gcd(f,g)=1$,且$y_0,y_1,\ldots,y_{m-1},z_0,\ldots,z_{n-1}\in F$满足
+$$S(y_{m-1},\ldots,y_0,z_{n-1},\ldots,z_0)^T=(0,0,\ldots,0,1)^T,$$
+那么$s=\sum_{i=0}^{m-k} y_ix^i$,$t=\sum_{i=0}^{n-k} z_ix^i$为$f$,$g$的Bezout系数,使得$sf+tg=1$.
+</corollary>
+
+到此,我们可以给出结式的定义了.
+
+<definition>
+设$R$为UFD，$f,g\in R[x]$，$S=\mathrm{Syl}(f,g)$为它们的Sylvester矩阵，我们称行列式$\det S$为<index>结式</index>,记作$\mathrm{res}(f,g)$.
+</definition>
+
+<remark>
+当$n=m=0$时$S$是空矩阵，我们约定结式为1。若$f$为0或非常数多项式，我们约定$\mathrm{res}(f,0)=\mathrm{res}(0,f)=0$，若$f$是非零常数则约定$\mathrm{res}(f,0)=\mathrm{res}(0,f)=1$.前面定理在这些情形下仍然成立.
+</remark>
+
+下面是一些关于结式的性质,对于以后的算法分析是很有用的.
+
+<corollary label="cor:resultant1">
+设$F$为域，非零多项式$f,g\in F[x] $，则下面各条件等价：
+
+ 1. $\gcd(f,g)=1$,
+ 2. $\mathrm{res}(f,g)=\deg S\neq 0$,
+ 3. 不存在非零多项式$s,t\in F[x]$使得$$sf+tg=0,\quad\deg s<\deg g,\quad\deg t<\deg f.$$
+
+</corollary>
+
+<corollary label="cor:resultantforeq">
+设$R$为UFD,非零多项式$f,g\in R[x]$.则$\gcd(f,g)$非平凡当且仅当$\mathrm{res}(f,g)=0$.
+</corollary>
+
+<corollary label="cor:resultant3">
+若$R$为UFD,非零多项式$f,g\in R[x]$，则存在非零多项式$s,t\in R[x]$使得$sf+tg=\mathrm{res}(f,g)$且$\deg s<\deg g,\deg t<\deg f$.
+</corollary>
+
+<proof>
+令$F$是$R$的分式域。若$r=\mathrm{res}(f,g)=0$，则由推论##cor:resultant1 知存在满足要求的$s,t\in F[x]$，再将其乘一个公分母即可。若$r\neq 0$，则$f,g$互素，于是存在$s^*,t^*\in F[x]$满足$\deg s^*<\deg g,\deg t^*<\deg f$且$s^*f+t^*g=1$,由线性方程组的Cramer法则知$s=rs^*,t=rt^*$满足所需要求。
+</proof>
+
+<lemma label="le:resultant2">
+设$R$为UFD，非零多项式$f,g\in R[x]$，$r=\mathrm{res}(f,g)\in R$，$I\subset R$为一理想，记$R$中元素$a$模$I$的像为$\overline{a}$,设$\overline{\plc{f}}\neq 0$.则
+
+ 1. $\overline{r}=0\Leftrightarrow \mathrm{res}(\overline{f},\overline{g})=0$,
+ 2. 若$R/I$是UFD，则$\overline{r}=0\Leftrightarrow\gcd(\overline{f},\overline{g})$非平凡。
+</lemma>
+
+<proof>
+由$\overline{\plc{f}}\neq 0$可知$\mathrm{Syl}(\overline{f},\overline{g})$的"尺寸"并不会减小,因此有$\overline{r}=0\Leftrightarrow\mathrm{res}(\overline{f},\overline{g})=0$.
+
+再假设$\overline{g}\neq 0$,令$i$为最小的指标使得$\overline{g_{m-i}}\neq 0$,此时将Sylvester矩阵分块，去掉左$i$列和上$i$行，只留下右下$(m+n-i)\times(m+n-i)$的方阵$M$，显然$M=\mathrm{Syl}(\overline{f},\overline{g})$,于是$\overline{r}=\overline{f_n^i\det M}=\overline{f_n^i}\mathrm{res}(\overline{f},\overline{g})$，可知第一条成立。再由推论##cor:resultantforeq 可知第二条成立。
+</proof>
+
+** Euclid算法计算结式
+@@sec:prsalg
+
+下面我们将要介绍用Euclid辗转相除算法计算结式的方法,即<index>多项式余式序列算法</index>(PRS).
+
+我们先对Euclid辗转相除求最大公因子的过程作一些细致的考虑.设$F$为域，$f$,$g$是$F[x] $上非零多项式，$\deg f=n>m=\deg g$. 我们仍采用式##eq:euclidalg 中的记号,将Euclid算法的过程表示为
+$$\rho_0r_0=f,\quad\rho_1r_1=g,\quad\rho_0s_0=\rho_1t_1=1,\quad\rho_1s_1=\rho_0t_0=0,$$及
+<latex>
+\begin{align}
+\rho_2r_2&=r_0-q_1r_1,&\rho_2s_2&=s_0-q_1s_1,&\rho_2t_2&=t_0-q_1t_1,\nonumber\\
+&\ \,\vdots &&\ \,\vdots &&\ \,\vdots \nonumber \\
+0&=r_{l-1}-q_lr_l, &\rho_{l+1}s_{l+1}&=s_{l-1}-q_ls_l, &\rho_{l+1}t_{l+1}&=t_{l-1}-q_lt_l,\nonumber
+\end{align}
+</latex>
+
+<remark>
+注意此时各$r_i$均为首一的,由于我们没有假设$f,g$是首一的,因此$\rho_0,\rho_1$的出现是使得$f,g$首一化.
+</remark>
+
+<definition>
+$n_i=\deg r_i(0\le i\le l+1)$称为次数序列.
+</definition>
+
+<theorem>
+设$0\le k\le m\le n$,则$k$不出现在次数序列当且仅当存在$s$,$t\in F[x]$,满足$$t\neq 0,\quad\deg s<m-k,\quad\deg t<n-k,\quad\deg(sf+tg)<k.$$
+</theorem>
+
+<proof>
+必要性:若$k$不在次数序列中，则存在$i(2\le i\le l+1)$使得$n_i<k<n_{i-1}$,于是$s_if+t_ig=r_i,\deg r_i=n_i<k$,且$\deg s_i=m-n_{i-1}<m-k$,$\deg t_i=n-n_{i-1}<n-k$.最后两个不等式可以用Euclid辗转相除的过程归纳证明.这样的$s_i,t_i$即可当作满足定理条件的$s,t$.而当$i=l+1$时,情况稍有不同,此时令$s=g/r_l,t=-f/r_l,k<n_l$则$sf+tg=r_{l+1}=0$,于是$\deg r_{l+1}=-\infty<k$仍然满足定理条件.
+
+充分性:由<cite>mca</cite>引理5.15可知$\exists i(1\le i\le l+1)$和$\alpha\in F[x]\setminus\{0\}$使得$t=\alpha t_i,$,$s=\alpha s_i$,$r=sf+tg=\alpha r_i$,于是<latex>
+\begin{align*}
+n-n_{i-1}&\le\deg\alpha+n-n_{i-1}=\deg(\alpha t_i)=\deg t<n-k, \\
+n_i&\le\deg \alpha+n_i=\deg(\alpha r_i)=\deg r<k,
+\end{align*}
+</latex>
+故$n_i<k<n_{i-1}$. 
+</proof>
+
+为了将上面的内容翻译成一种代数语言,我们考虑上一节定义的线性映射$\varphi$在$P_{m-k}\times P_{n-k}$上的限制.容易知道,$\varphi$的象是在空间$P_{n+m-k}$中,为了使得其成为同构,我们要使两个空间维数相等.进而我们考虑了如下的线性映射:$$\varphi_k:P_{m-k}\times P_{n-k}\rightarrow P_{n+m-2k},\quad (s,t)\mapsto (sf+tg)\ \mathrm{quo}\ x^k.$$
+
+我们有如下的推论:
+
+<corollary>
+记号同前,我们有：
+
+ 1. $k$在次数序列$\{n_i\}$中当且仅当$\varphi_k$是同构.
+
+ 2. 若$k=n_i$,则$s_i,t_i$是$\varphi_k(s_i,t_i)=1$的唯一解.
+</corollary>
+
+我们记$\varphi_k$的在自然基下的矩阵为$S_k$,则$S_k$为Sylvester矩阵的子矩阵:
+
+<latex>
+\begin{equation}
+@@eq:subresultant
+\begin{pmatrix}
+f_n & & & &g_m & & &\\
+f_{n-1} &f_n & & &g_{m-1} &g_m & &\\
+\vdots & &\ddots & &\vdots & &\ddots &\\
+f_{n-m+k+1} &\cdots &\cdots &f_n & g_{k+1} &\cdots &\cdots &g_m\\
+\vdots & & &\vdots &\vdots & & &\vdots\\
+f_{k+1} &\cdots &\cdots &f_m &g_{m-n+k+1} & & &\vdots\\
+\vdots & & &\vdots &\vdots & & &\vdots\\
+f_{2k-m+1} &\cdots &\cdots &f_k &g_{2k-n+1} &\cdots &\cdots &g_k
+\end{pmatrix}.
+\end{equation}
+</latex>
+
+<corollary label="cor:subres">
+记号同前,我们有
+ 1. $k$在次数序列中当且仅当$\det S_k\neq 0$.
+
+ 2. 若$k=n_i$,且$y_0,\ldots,y_{m-k-1},z_0,\ldots,z_{n-k-1}\in F$是下面的线性方程$$S_k(y_{m-k-1},\ldots,y_0,z_{n-k-1},\ldots,z_0)^T=(0,\ldots,0,1)^T$$的唯一解,则$s_i=\sum y_jx^j$,$t_i=\sum z_jx^j$.
+</corollary>
+
+<definition>
+记$\sigma_k=\det S_k$.
+</definition>
+
+现在我们来逐步推导$\sigma_k$的计算方法,注意到求出$\sigma_0$即是求出了结式.首先我们有如下引理:
+
+<lemma>
+设$f,g,r\in F[x]$首一且次数分别为$n,m,d$,其中$n\ge m$,且$$\rho r=f\rem g,\rho\in F\setminus\{0\},$$则对于$k(0\le k\le d)$有$$\sigma_k(f,g)=(-1)^{(n-k)(m-k)}\rho^{m-k}\sigma_k(g,r).$$
+</lemma>
+
+<proof>
+设$f=qg+\rho r$,$q$为$(n-m)$次多项式,于是
+$$\begin{pmatrix}
+1\\f_{n-1}\\ \vdots\\ f_0
+\end{pmatrix}-\begin{pmatrix}
+1 & &\\g_{m-1} &\ddots &\\ \vdots & &1\\ g_0 & &\vdots\\ &\ddots &\vdots\\ & &g_0
+\end{pmatrix}\begin{pmatrix}
+q_{n-m}\\ \vdots\\ q_0
+\end{pmatrix}=\begin{pmatrix}
+0\\ \vdots\\ 0\\ \rho r_d\\ \vdots\\ \rho r_0
+\end{pmatrix}.
+$$
+
+对$\det S_k$作初等列变换,并交换一些列的顺序,以式##eq:subresultant 为例,将左边$(m-k)$列$f$的系数依照上式减去$g$系数列的倍数,可以消为$\rho r$的系数列,将$\rho r$的$(m-k)$个系数列向右平移$(n-k)$列,移动到右边,与$g$的系数列交换.于是我们可得到
+$$\sigma_k=\det S_k=(-1)^{(n-k)(m-k)}\det\begin{pmatrix}
+1 & & & & &\\
+g_{m-1} &\ddots & &\rho r_d & &\\
+\vdots & &1 &\vdots &\ddots &\\
+\vdots & &\vdots &\vdots & &\rho r_d\\
+g_{2k-n+1} &\cdots &g_k &\rho r_{2k-m+1} &\cdots &\rho r_k
+\end{pmatrix}.
+$$
+上面的矩阵用分块可表示为如下形式:
+$$\begin{pmatrix}
+\Lambda &0\\ * &S_k(g,\rho r)
+\end{pmatrix},$$
+其中$\Lambda$为下三角阵,且对角元均为1,从而$\det\Lambda=1$.因此,$\sigma_k=(-1)^{(n-k)(m-k)}\sigma_k(g,\rho r)=(-1)^{(n-k)(m-k)}\rho^{m-k}\sigma_k(g,r)$.
+</proof>
+
+进而我们有下面的定理:
+
+<theorem>
+设$f=\rho_0r_0,g=\rho_1r_1\in F[x]$,$\deg f=n\ge\deg g=m$,且$r_0,r_1$首一,则:
+
+ 1. 对于$k(0\le k\le m)$,有
+<latex>
+\begin{equation*}
+\sigma_k=\det S_k=\begin{cases}
+(-1)^{\tau_i}\rho_0^{m-n_i}\prod_{1\le j\le i}\rho_j^{n_{j-1}-n_j},\quad &k=n_i,\\
+0,&k\not\in\{n_i\},
+\end{cases}
+\end{equation*}
+</latex>
+其中$\tau_i=\sum_{1\le j< i}(n_{j-1}-n_i)(n_j-n_i)$.
+
+ 2. $\sigma_m=\rho_1^{n-m}$,$\sigma_{n_{i+1}}=(-1)^{(n_i-n_{i+1})(n-n_{i+1}+i+1)}(\rho_0\cdots\rho_{i+1})^{n_i-n_{i+1}}\sigma_{n_i}$.
+
+</theorem>
+
+<proof>
+对于1中第一种情况,只需归纳证明并且注意$\sigma_k(r_{i-1},r_i)=1$.根据推论##cor:subres 可得第二种情况.
+
+对于2,只需化简$\tau_{i+1}-\tau_i\pmod{2}$,我们有
+<latex>
+\begin{align*}
+\tau_{i+1}-\tau_i&\equiv\sum_{1\le j<i+1}(n_{j-1}-n_{i+1})(n_j-n_{i+1})-\sum_{1\le j<i}(n_{j-1}-n_i)(n_j-n_i)\\
+&\equiv n_{i-1}n_i-n_0n_{i+1}-n_in_{i+1}+in_{i+1}^2+n_0n_i+n_{i-1}n_i-(i-1)n_i^2\\
+&\equiv n(n_i-n_{i+1})-n_in_{i+1}+in_{i+1}^2-(i-1)n_i^2\\
+&\equiv (n-n_{i+1})(n_i-n_{i+1})+(i+1)(n_{i+1}^2-n_i^2)\\
+&\equiv (n-n_{i+1}+i+1)(n_i-n_{i+1})\pmod{2},
+\end{align*}
+</latex>
+于是可以得到(2)中的递推式.
+</proof>
+
+取$k=0$,则$\sigma_k$即为结式,因此我们很自然地得到如下计算结式的方法:
+
+<corollary>
+若$\deg\gcd(f,g)\ge 1$,则$\mathrm{res}(f,g)=0$,否则
+$$\mathrm{res}(f,g)=(-1)^{\tau}\rho_0^{n_1}\prod_{1\le j\le l}\rho_j^{n_{j-1}},$$
+其中$\tau=\sum_{1\le j<l}n_{j-1}n_j$.
+</corollary>
+
+事实上,对于$F$是UFD的情况,若在该UFD的分式域为系数的多项式环中计算,上面推论一般也是成立的.我们举一个$F=\mathbb{R}[y]$的例子作为说明,计算时,我们在$\mathbb{R}(y)[x]$中计算.
+
+<problem>
+考虑$f=x^2-y$,$g=yx+1$,二者的结式为:$$\mathrm{res}_x(f,g)=1-y^3.$$
+
+当用上面的推论来计算时,我们有
+<latex>
+\begin{align*}
+&n_0=2&& r_0=x^2-y&& \rho_0=1,\\
+&n_1=1&& r_1=x+\frac{1}{y}&& \rho_1=y,\\
+&n_2=0&& r_2=1&& \rho_2=\frac{1}{y^2}-y.
+\end{align*}
+</latex>
+
+于是结式为$\mathrm{res}(f,g)=(-1)^{2\cdot 1}1^1\times y^2\times(1/y^2-y)^1=1-y^3$.
+</problem>
+
+* $\mathbb{Z}[x]$中的模GCD算法
+
+模算法基于的思想是将整数环中的运算化为有限域上的运算,通过中国剩余定理算法将有限域中结果还原到整数环中.设$f,g\in\mathbb{Z}[x]$,$p$为素数,令$h=\gcd(f,g),h_p=h\bmod p,v_p=\gcd(f_p,g_p)$,若有$h=h_p=v_p$,那么就可以用有限域中的计算结果$v_p$来代替$h$.我们需要Mignotte界条件来保证$h=h_p$,而对于$h_p=v_p$成立的条件,我们后面也会在每个算法后面具体给出理论上的分析.
+
+** Mignotte界
+
+首先我们简要说明一下为什么我们需要对多项式系数的上界作出估计.根据前面的分析,利用模算法求最大公因子需要保证$h=h_p( = h\bmod p)$.很自然地,在取对称表示时,只需要$h$的系数绝对值的上界比$p/2$小即可.Mignotte界即是关于整系数多项式任一非平凡因子的系数绝对值上界的一个估计.读者可以选择跳过本小节只接阅读模算法,只需要记住定理##th:MignotteBound 的结论即可.
+
+<definition  label="def:norm" name="多项式的范数">
+设$f=\sum\limits_{i=0}^{n} f_ix^i\in\mathbb{C}[x]$,定义其$k$-范数为：
+$$\lVert f\rVert_k=\left(\sum\limits_{i=0}^{n}|f_i|^k\right)^{\frac{1}{k}}.$$
+</definition>
+
+<remark>
+由线性赋范空间的相关内容,我们熟知有如下结论：$$\lVert f\rVert_{\infty}\le\lVert f\rVert _2\le\lVert f\rVert _1\le(n+1)\lVert f\rVert _{\infty}.$$
+</remark>
+
+首先我们有如下的引理：
+
+<lemma  label="le:forLandauIneq">
+设$f\in\mathbb{C}[x]$,$z\in\mathbb{C}$,我们有$\lVert (x-z)f\rVert _2=\lVert(\overline{z}x-1)f\rVert_2$.
+</lemma>
+
+<proof>
+设$\deg f=n$，并记$f_{-1}=f_{n+1}=0$，则
+<latex>
+\begin{align*}
+\lVert (x-z)f\rVert _2^2=&\sum\limits_{i=0}^{n+1}|f_{i-1}-zf_i|^2=\sum\limits_{i=0}^{n+1}(f_{i-1}-zf_i)(\overline{f_{i-1}}-\overline{z}\overline{f_i})\\
+&=\lVert f\rVert_2^2(1+|z|^2)-\sum\limits_{i=0}^{n+1}(z\overline{f_{i-1}}f_i+\overline{z}f_{i-1}\overline{f_i})\\
+&=\sum\limits_{i=0}^{n+1}(\overline{z}f_{i-1}-f_i)(z\overline{f_{i-1}}-\overline{f_i})\\
+&=\sum\limits_{i=0}^{n+1}|\overline{z}f_{i-1}-f_i|^2\\
+&=\lVert(\overline{z}x-1)f\rVert_2^2,
+\end{align*}
+</latex>
+证毕.
+</proof>
+
+<remark>
+对于上面的引理,我们可以给出如下更加巧妙的证明:
+</remark>
+
+<proof>
+我们给出断言,$\forall f\in\mathbb{C}[x]$,$$\|f\|_2^2=\frac{1}{2\pi}\int_0^{2\pi}|f(e^{i\phi})|^2\mathrm{d}\phi.$$
+
+此由三角函数系的正交归一性显然可以看出.于是
+<latex>
+\begin{align*}
+\|(x-z)f\|_2^2&=\frac{1}{2\pi}\int_0^{2\pi}|(e^{i\phi}-z)f(e^{i\phi})|^2\mathrm{d}\phi=\frac{1}{2\pi}\int_0^{2\pi}|(ze^{-i\phi}-1)f(e^{i\phi})|^2\mathrm{d}\phi\\
+&=\frac{1}{2\pi}\int_0^{2\pi}|(\overline{z}e^{i\phi}-1)f(e^{i\phi})|^2\mathrm{d}\phi\\
+&=\|(\overline{z}x-1)f\|_2^2,
+\end{align*}
+</latex>
+证毕.
+</proof>
+
+<definition>
+设$f\in\mathbb{C}[x]$, $z_1,z_2,\ldots,z_n$是$f(x)=0$的$n $个复根，定义$M(f)=|f_n|\prod\limits_{i=1}^n\max\{1,|z_i|\}$.
+</definition>
+
+由定义可知$M(f)\ge|f_n|$且$f=gh\Rightarrow M(f)=M(g)M(h)$.关于$M(f)$，还有下面的Landau不等式成立.
+
+<index name="Landau不等式"></index>
+<theorem label="th:Landauineq" name="Landau不等式">
+$\forall f\in\mathbb{C}[x]$,$M(f)\le\lVert f\rVert_2$.
+</theorem>
+
+<proof>
+不妨设$|z_1|,|z_2|,\ldots,|z_k|>1$且$|z_{k+1}|,\ldots,|z_n|\le 1$,则$$M(f)=|f_nz_1z_2\cdots z_k|.$$
+令$g=f_n\prod\limits_{i=1}^{k}(\overline{z_i}x-1)\prod\limits_{k+1}^n(x-z_i)=g_nx^n+\cdots+g_0\in\mathbb{C}[x]$，则由引理##le:forLandauIneq 有
+<latex>
+\begin{align*}
+  M^2(f)&=|f_n\overline{z_1}\overline{z_2}\cdots\overline{z_k}|^2=|g_n|^2\le\lVert g\rVert_2^2\\
+&=\left\lVert\frac{g}{(\overline{z_1}x-1)}(x-z_1)\right\rVert_2^2\\
+&=\cdots=\left\lVert\frac{g}{(\overline{z_1}x-1)(\overline{z_2}x-1)\cdots(\overline{z_k}x-1)}(x-z_1)(x-z_2)\cdots(x-z_k)\right\rVert_2^2\\
+&=\lVert f\rVert_2^2,
+\end{align*}
+</latex>
+证毕.
+</proof>
+
+由Landau不等式易得出下面的命题.
+
+<lemma label="le:forMignotte">
+若$h=\sum\limits_{i=0}^mh_ix^i\in\mathbb{C}[x]$整除$f=\sum\limits_{i=0}^nf_ix^i\in\mathbb{C}[x]$,$n\ge m$，则$\lVert h\rVert_2\le\lVert h\rVert_1\le 2^mM(h)\le \displaystyle\left|\frac{h_m}{f_n}\right|2^m\lVert f\rVert_2$.
+</lemma>
+
+<proof>
+设$h=h_m\prod\limits_{i=1}^m(x-u_i)$,则由韦达定理，$$h_i=(-1)^{m-i}h_m\sum\limits_{\substack{S\subset\{1,2,\ldots,m\}\\\#S=m-i}}\prod\limits_{j\in S}u_j,$$
+于是$|h_i|\le|h_m|\sum\limits_{S}\prod\limits_{j\in S}|u_j|\le|h_m|\binom{m}{i}\prod\limits_{i=1}^m|u_j|\le\binom{m}{i}M(h)$,
+故有$$\lVert h\rVert_2\le\lVert h\rVert_1=\sum\limits_{i=0}^m|h_i|\le 2^mM(h)\le\left|\frac{h_m}{f_n}\right|2^mM(f)\le\left|\frac{h_m}{f_n}\right|2^m\lVert f\rVert_2.$$
+证毕.
+</proof>
+
+由此,我们可以得到<index>Mignotte界</index>.
+
+<theorem label="th:MignotteBound" name="Mignotte界">
+设$f,g,h\in\mathbb{Z}[x]$且$\deg f=n\ge 1$,$\deg g=m$,$\deg h=k$,$gh\mid f$,则：
+ 1. $\lVert g\rVert_{\infty}\lVert h\rVert_{\infty}\le\lVert g\rVert_2\lVert h\rVert_2\le\lVert g\rVert_1\lVert h\rVert_1\le 2^{m+k}\lVert f\rVert_2\le (n+1)^{1/2}2^{m+k}\lVert f\rVert_{\infty}$,
+ 2. $\lVert h\rVert_{\infty}\le\lVert h\rVert_2\le 2^k\lVert f\rVert_2\le 2^n\lVert f\rVert_1$,
+ 3. $\lVert h\rVert_{\infty}\le\lVert h\rVert_2\le (n+1)^{1/2}2^k\lVert f\rVert_{\infty}$.
+
+</theorem>
+
+<proof>
+由引理##le:forMignotte ,我们有$$\lVert g\rVert_1\lVert h\rVert_1\le 2^{m+k}M(g)M(h)\le 2^{m+k}M(f)\le 2^{m+k}\lVert f\rVert_2,$$
+此即第一式。再令$g=1$可得后两式。
+</proof>
+
+** 大素数模公因子算法
+
+如不作特殊说明，本小节中$\mathbb{F}_p$域取对称代表元$\mathbb{F}_p=\left\{i\in\mathbb{Z}\mid \displaystyle -\frac{p}{2}<i<\frac{p}{2}\right\}$.大素数模算法要用到$\mathbb{F}_p$中Euclid算法，但是素数$p$一般会很大,尤其对于次数较高的多项式,其Mignotte界会变得很大,这样在大素数有限域中的计算未必那么划算.事实上,我们采用的一般都是小素数模方法,该方法将在下一小节介绍.尽管如此,我们还是要介绍一下大素数模方法,以使读者能对模方法的基本思路有一个直观的认识,便于后面理解小素数模方法.
+
+我们先给出<index name="最大公因子" sub="大素数模算法" >大素数模算法</index>,再对其进行分析.
+
+<algorithm label="al:BPMGA" name="大素数模公因子算法">
+
+输入：$\mathbb{Z}[x]$中本原式$f$,$g$,且$\deg f=n\ge\deg g\ge 1$,$\|f\|_{\infty}\le A$,$\|g\|_{\infty}\le A$,
+
+输出：$h=\gcd (f,g)\in\mathbb{Z}[x]$.
+
+ 1. 赋值$b=\gcd (\plc{f},\plc{g})$,$B=(n+1)^{1/2}2^nAb$,
+
+ 2. 任取素数$p\in(2B,4B]$,
+
+ 3. $f_p=f \bmod{p}$,$g_p=g \bmod{p}$,
+
+ 4. $v_p=\gcd (f_p,g_p)\in\mathbb{F}_p[x]$,
+
+ 5. 计算$w,f^*,g^*\in\mathbb{F}_p[x]$使得$$w\equiv bv_p\pmod{p},\quad f^*w\equiv bf\pmod{p},\quad g^*w\equiv bg\pmod{p},$$
+
+ 6. 若$\|f^*\|_1\|w\|_1\le B$且$\|g^*\|_1\|w\|_1\le B$则继续下步，否则跳回第2步,
+
+ 7. 输出$\mathrm{pp}(w)$.
+
+</algorithm>
+
+<remark>
+之所以在$(2B,4B]$任取素数,可以参考<cite>mca</cite>18.4节有关内容.该处提供了在此区间中随机生成素数的方法并且作了相关复杂度的分析.
+</remark>
+; 此段似用于复杂度计算，但下文又没有提到复杂度
+; 设$h=\gcd(f,g)\in\mathbb{Z}[x]$,且$\plc{h}>0$,则$r=\mathrm{res}(f/h,g/h)$是一非零常数，且满足$|r|\le (n+1)^nA^{2n}$.此由Hadamard不等式
+; $$|\mathrm{res}(f,g)|\le\|f\|_2^m\|g\|_2^n\le (n+1)^{m/2+n/2}\|f\|_{\infty}^m\|g\|_{\infty}^n$$
+; 可知,见<cite>mca</cite>.
+
+下面的定理保证了算法##al:BPMGA 中判定条件的正确性.
+
+<theorem label="th:conditionforbigprimemodulargcd">
+算法##al:BPMGA 中给定的条件$$\|f^*\|_1\|w\|_1\le B,\quad\|g^*\|_1\|w\|_1\le B$$
+等价于$p\nmid r$,且此时算法##al:BPMGA 输出正确的最大公因子。
+</theorem>
+
+<proof>
+若条件满足，则$$\|f^*w\|_{\infty}\le\|f^*w\|_1\le\|f^*\|_1\|w\|_1\le B<p/2.$$
+同理$\|bf\|_{\infty}<p/2$,由于$f^*w\equiv bf\pmod{p}$,可知$f^*w=bf$,同样我们也可证明$g^*w=bg$.
+于是$\deg w=\deg\gcd(bf,bg)\Rightarrow \mathrm{pp}(w)=\gcd(f,g)$.
+
+另一方面，若$\mathrm{pp}(w)=\gcd(f,g)$,则由定理##th:MignotteBound 可推出所需条件。
+</proof>
+
+定理中所说的条件即是用来保证本节开始提到的$h_p=v_p$的条件,这从定理##th:conditionforbigprimemodulargcd 的证明可以看出.我们还可以用试除法来代替这一条件,算法及其说明见下:
+
+<algorithm label="al:BPMGA1" name="大素数模公因子算法">
+可将算法##al:BPMGA 第6步中条件改为$\mathrm{pp}(w_p)\mid f$且$\mathrm{pp}(w_p)\mid g$,第5步只计算$w$。
+</algorithm>
+
+<proof name="算法有效性">
+在$\mathbb{Q}[x]$中首一多项式的意义下,由试除条件有$v_p\mid \gcd(f,g)$.其次，由$\gcd(f,g)\mid f$知$\gcd(f,g)=\gcd(f,g)_p\mid f_p$,同样地，$\gcd(f,g)\mid g_p$.于是,$\gcd(f,g)\mid \gcd(f_p,g_p)=v_p$,因而$v_p=\gcd(f,g)$.
+</proof>
+
+算法中是随机从区间$(2B,4B]$中选取一个素数，这种随机性是否保证我们能较快地得到正确的结果呢？下面的定理作出了回答。
+
+<theorem  label="th:sdsf">
+使得算法##al:BPMGA1 条件满足的素数$p$是素数集中仅除了有限个素数后的集合。
+</theorem>
+
+<proof>
+设$h=\mathrm{monic}(\gcd(f,g)),h_p=h\bmod p$.只需证若$p$不同时整除$\plc{f}$,$\plc{g}$,且$p\nmid \mathrm{res}(f/h,g/h)$,则$h=h_p=v_p$.
+首先显然有$h_p\mid v_p$.若$\deg v_p=\deg h_p=0$,则由首一性知$v_p=h_p$,否则$\deg v_p\ge 1$,此时由$p\nmid \gcd(\plc{f},\plc{g})$可得$h_p\neq 0$.而存在$s,t$使
+<latex>
+\begin{align*}
+&\quad sf/h+tg/h=\mathrm{res}(f/h,g/h)\\
+\Rightarrow&\quad sf+tg=\mathrm{res}(f/h,g/h)h\\
+\Rightarrow&\quad s_pf_p+t_pg_p=\mathrm{res}(f/h,g/h)_ph_p\\
+\Rightarrow&\quad v_p\mid h_p,
+\end{align*}
+</latex>
+故有$h_p=v_p$.
+</proof>
+
+** 小素数模公因子算法
+
+小素数阶有限域上的多项式计算实现起来显然要比大素数高效很多.本节将要提到的算法基于的思想很简单.考虑$h=\gcd(f,g)$,我们随机选取一系列的小素数$p_1,p_2,\ldots,p_k$,在诸有限域$\mathbb{Z}_{p_i}(1\le i\le k)$上计算$v_{p_i}=\gcd(f_{p_i},g_{p_i})$,由定理##th:sdsf ,我们可以期望$h_{p_i}=v_{p_i}$有很大概率是成立的.命$m=\prod_{1\le i\le k}p_i$,利用中国剩余定理,可以由诸多$v_{p_i}$求出$h_m=h \bmod m$,它满足$h_m\equiv v_{p_i}\pmod{p_i}$.当$m$大于Mignotte界时,即有$h=h_m$.
+
+下面仅给出<index name="最大公因子" sub="小素数模算法">小素数模算法</index>的两种实现。其中算法##al:SPMGA 参考<cite>mca</cite>,算法##al:SPMGA1 参考<cite>zsg05</cite>,两者的思想基本上是一样的.两个算法中任取素数时都加上了限制$p<2k\ln k$,此参看<cite>mca</cite>生成素数的有关章节.从算法的实现细节上来说,第二个算法比第一个算法略优,其能减少很多不必要的计算.
+
+<algorithm label="al:SPMGA" name="小素数模公因子算法">
+
+输入：$\mathbb{Z}[x]$上本原多项式$f$,$g$,且$\deg f=n\ge\deg g\ge 1$,$\|f\|_{\infty}\le A$,$\|g\|_{\infty}\le A$,
+
+输出：$h=\gcd(f,g)\in\mathbb{Z}[x]  $.
+
+ 1. 赋值$b=\gcd(\plc{f},\plc{g})$,$k=\lceil 2\log_2((n+1)^nbA^{2n})\rceil$,$B=(n+1)^{1/2}2^nAb$,$l=\lceil\log_2(2B+1)\rceil$,
+
+ 2. 任取含$2l$个不同的素数的集合$S$,且$\forall p\in S,p<2k\ln k$,
+
+ 3. $S=\{p\in S\mid p\nmid b\}$,
+
+ 4. $\forall p\in S$,$v_p=\gcd(f_p,g_p)\in\mathbb{F}_p[x]$,
+
+ 5. $e=\min\{\deg v_p\mid p\in S\}$,$S=\{p\in S\mid \deg v_p=e\}$,
+
+ 6. 若$|S|>l$则去掉$S$中$(|S|-l)$个元素,只保留$l$个,否则转到第2步,
+
+ 7. 用中国剩余定理计算$w$,$f^*$,$g^*\in\mathbb{Z}[x]$使得(对三者取对称表示)
+$$\|w\|_{\infty},\|f^*\|_{\infty},\|g^*\|_{\infty}\le\frac{1}{2}\prod\limits_{p\in S}p=:\frac{m}{2},$$
+且$\forall p\in S$有
+$$w\equiv bv_p\pmod{p},\quad f^*w\equiv bf\pmod{m},\quad g^*w\equiv bg\pmod{m},$$
+
+ 8. 若$\|f^*\|_1\|w\|_1\le B$且$\|g^*\|_1\|w\|_1\le B$则继续下一步，否则转到第2步,
+
+ 9. 输出$\mathrm{pp}(w)$.
+
+</algorithm>
+
+<remark>
+$l$的选取使得$2^l>2B$,因而可见$S$中$l$个元素相乘之积必大于$2B$, 于是$m/2>B$.
+</remark>
+
+<proof  name="算法有效性">
+由$\|f^*\|_1\|w\|_1\le B$可知$\|f^*w\|_{\infty}\le B<m/2$.另一方面,由算法第1步计算$B$的方法可知$\|bf\|_{\infty}\le B<m/2$.于是
+$$f^*w\equiv bf\pmod{m}\Rightarrow f^*w=bf,$$
+同理我们也有$g^*w=bg$,由此$w|\gcd(bf,bg)=b\gcd(f,g)$.如果取多项式的本原部分,很容易得到$\mathrm{pp}(w)|\gcd(f,g)$.我们已假定对于所取的$p$有$v_p=h_p=h\bmod p$,其中$h=\gcd(f,g)$,则$\deg w=\deg v_p=\deg h$,因而$\mathrm{pp}(w)=h$.
+
+反过来我们假设$\mathrm{pp}(w)=\gcd(f,g)$时,易知算法也会因为第8步中的条件满足而输出.
+</proof>
+
+<algorithm label="al:SPMGA1" name="小素数模公因子算法">
+输入：$\mathbb{Z}[x]$中本原多项式$f$,$g$,且$\deg f=n\ge\deg g\ge 1$,$\|f\|_{\infty}\le A$,$\|f\|_{\infty}\le A$,
+
+输出：$h=\gcd(f,g)\in\mathbb{Z}[x]  $.
+
+ 1. $b=\gcd(\plc{f},\plc{g})$,$B=(n+1)^{1/2}2^nAb$,$k=\lceil 2\log_2((n+1)^nbA^{2n})\rceil$,
+
+ 2. 任取素数$p>b$(实际上$p\nmid b$即可),且$p<2k\ln k$,
+
+ 3. $v_p=\gcd(f_p,g_p)\in\mathbb{F}_p[x]$,
+
+ 4. 若$\deg v_p=0$则输出1,
+
+ 5. $p_1=p$,$v_1=v_p$,
+
+ 6. 若$p_1\le 2B$，则执行下一步，否则跳转第12步,
+
+ 7. 再取素数$p>b$(或者$p\nmid b$),且$p<2k\ln k$,$p\nmid p_1$,令$v_p=\gcd(f_p,g_p)\in\mathbb{F}_p[x]$,
+
+ 8. 若$\deg v_p=0$则输出1,
+
+ 9. 若$\deg v_p<\deg v_1$,则$p_1=p$,$v_1=v_p$,并跳至第6步,
+
+ 10. 若$\deg v_p=\deg v_1$则由中国剩余定理计算$V$使得$$V\equiv v_1\pmod{p_1},\quad V\equiv v_p\pmod{p},$$并赋值$p_1=p_1p$,$v_1=V$,
+
+ 11. 转回第6步,
+
+ 12. 计算$w=bv_1\bmod p_1$,若$w\mid bf$且$w\mid bg$则继续，否则转回第2步,
+
+ 13. 输出$\mathrm{pp}(w)$.
+
+</algorithm>
+
+算法的有效性同样可由$w\mid b\gcd(f,g)$且$\deg w=\deg\gcd(f,g)$看出,可见前面小素数模方法和上一节大素数模方法的证明,这里不再详细叙述了.
+
+<remark>
+对于大素数和小素数模算法的复杂度,可见<cite>mca</cite>第6章的相关分析,在该文献6.13节给出了具体实现之后算法复杂度的比较,其中大素数模方法的复杂度为$n^4$,而小素数模方法的复杂度为$n^3$(<cite>mca</cite>表6.4).
+</remark>
+
+<remark>
+关于大、小素数模方法的扩展算法(即同时计算Bezout系数),这里就不再加以介绍了,因为在后文的因子分解算法中一般只需要求最大公因子即可.有兴趣的读者可以参考<cite>mca</cite>6.11等章节.
+</remark>
+
+* 多项式组的概率算法
+
+下面引进又一个概率性的一元多项式GCD算法。对于多项式组来说，我们当然可以一步一步求每两个多项式的最大公因子得到整个多项式组的最大公因子，然而下面介绍概率算法虽然得到的是可能解,效率却更高。首先,我们给出:
+
+<lemma label="le:gcdpro1">
+设$R$为UFD，$n\in\mathbb{N}$,$S\subset R$为有限集且令$s=\#S$,$r\in R[x_1,\ldots,x_n]$次数不超过$d$,那么
+
+ 1. 若$r$非零，则$r$在$S^n$中最多有$ds^{n-1}$个零点.
+
+ 2. 若$s>d$且$r$在$S^n$上取值为零，则$r=0$.
+
+</lemma>
+
+<proof>
+先证第一条,$n=1$情形显然。将$r$写成$x_n$的多项式$r=\sum_{0\le i\le k}r_ix_n^i$，其中$r_i\in R[x_1,\ldots,x_{n-1}]$且$r_k\neq 0$,由于$\deg r_k\le d-k$，则由归纳假设，$r_k$在$S^{n-1}$中至多有$(d-k)s^{n-2}$个零点，于是$r$和$r_k$至多在$S^n$中有$(d-k)s^{n-1}$个零点。并且$\forall a\in S^{n-1}(r_k(a)\neq 0)$，$r_a=\sum_{0\le i\le k}r_i(a)x_n^i\in R[x_n]$至多有$k$个零点，因此零点数目上限可估为：$$(d-k)s^{n-1}+ks^{n-1}=ds^{n-1}.$$
+
+而由第一条可以直接得到第二条的结论.
+</proof>
+
+根据引理##le:gcdpro1 可知，若从$S^n$中随机选取$a$,则有概率$\mathrm{P}\{r(a)=0\mid a\in S^n\}\le d/\#S$.假设我们有一个有限集$S\subset F$和一个$S$上随机数发生器，则有下面的：
+
+<algorithm name="多项式组最大公因子的概率算法" label="al:polysgcd">
+
+输入：$f_1,\ldots,f_n\in F[x]$，$F$是域,
+
+输出：首一多项式$h$，且$h=\gcd(f_1,\ldots,f_n)$可能正确.
+
+ 1. 任取$a_3,\ldots,a_n\in S$,
+
+ 2. 令$g=f_2+\sum_{3\le i\le n}a_if_i$,
+
+ 3. 输出$\gcd(f_1,g)$.
+
+</algorithm>
+
+<remark>
+实践中使用快速Euclid算法来提高效率。
+</remark>
+
+<theorem>
+设$h$为算法##al:polysgcd 中的输出结果,$h^*=\gcd(f_1,\ldots,f_n)$.则$h^*\mid h$，且$\mathrm{P}\{h\neq h^*\}\le d/\#S$.
+</theorem>
+
+<proof>$h^*\mid h$显然。通过将$f_i$除以$h^*$我们可以假设整个函数组最大公因子为1，设$f_1\neq 0$，令$A_3,\ldots,A_n$为$F[x] $上新的未定元，令$R=F[A_3,\ldots,A_n]$,再令$K=F(A_3,\ldots,A_n)$为$R$的分式域，命$G=f_2+\sum_{3\le i\le n}A_if_i\in R[x]$,$r=\mathrm{res}_x(f_1,G)\in R$，则$r$是关于$A_3,\ldots,A_n$的次数不超过$d$的多项式。令理想$I=\idea{A_3-a_3,\ldots,A_n-a_n}$,有$R/I\cong F$,由引理##le:resultant2 有
+$$\overline{r}=r(a_3,\ldots,a_n)\neq 0\Leftrightarrow\mathrm{res}_x(f_1,g)\neq 0\Leftrightarrow\gcd(f_1,g)=1,$$
+设$u$为$f_1$,$G$在$R[x]$中的公因子，由于$u\mid f_1$，知它的系数都属于$f_1$在$F$的分裂域$  E $，但是$E[x]\cap K[x]=F[x]$,因此$u\in F[x]$.于是由$u\mid G$推知$u\mid f_i$ ($i=1,\ldots,n$)，又由于$\gcd(f_1,\ldots,f_n)=1$,知$u\in F$，因此$\gcd(f_1,G)$为一常数，$r$是$R$中一非零元.由引理##le:gcdpro1 可得定理中对于概率的估计。
+</proof>
+
+实际过程中，可以取$f_1$为最小次数的多项式，以使错误概率降低，并且在算法结束后检验$h$是否为所求的最大公因子，若不是，则重新选取随机数计算，直至输出正确结果。

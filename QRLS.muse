@@ -1,0 +1,811 @@
+#title 正交化与最小二乘法
+
+<contents>
+
+本章主要讨论超定方程组与不定方程组的最小二乘解,即$\|Ax-b\|_2$的最小化,其中$A\in \mathbb{R}^{n\times n}$.解此问题的可靠方法是通过正交变换将$A$约化为各种典型形式.我们在以下的讨论中主要考虑实矩阵.但容易看出,复矩阵的$QR$分解完全可以仿照实矩阵进行.
+
+* Householder反射
+
+通过正交变换将矩阵约化为典型形式 (如Hessenberg形式)的典型方法是通过一系列正交变换,逐个地将矩阵列向量的某些指定分量化为$0$.下面我们就先讨论这一过程的两种实现:Householder反射与Jacobi-Givens旋转.
+
+Householder反射的几何意义是取向量$x$关于指定超平面$S\equiv\mathrm{span}\{v\},\quad v\neq 0$的反射.$v^Tx/||v||$为向量$x$关于平面$S$的法线的投影,从而$x-2\frac{v^Tx}{||v||^2}v=x-2\frac{vv^T}{v^Tv}x$为$x$关于该平面的投影.因此,设$v\in \mathbb{R}^n$是非零向量,称形如$P=I-\frac{2}{v^Tv}vv^T$的$n\times n$矩阵$P$为Householder反射.如果用$P$去乘向量$x$,则得到$Px$是$x$关于超平面$\mathrm{span}\{v\}^{\bot}$的反射.
+
+利用Householder反射可将一个向量的某些选定分量变为$0$.设给定$0\neq x\in \mathbb{R}^n$,欲使$Px$沿$e_1$的方向.由几何直观容易知道
+<latex>
+\begin{equation*}
+  v=x\pm \|x\|_2e_1 \Longrightarrow Px= \left(I-\frac{2vv^T}{v^Tv}\right)x=\mp \|x\|_2e_1.
+\end{equation*}
+</latex>
+有一些细节需要注意:
+
+ 1. 由于$v_1=x-\|x\|_2e_1$使得$Px$是$e_1$的正倍数,故常常采用.但当$x$接近$e_1$的一个正倍数时,则会出现严重的相消.由$v_1=x_1-\|x\|_2=\frac{x_1^2-\|x\|_2^2}{x_1+\|x\|_2}=\frac{- (x_2^2+\cdots +x_n^2)}{x_1+\|x\|_2}$在$x_1>0$的情况下则可避免相消.
+ 2. 实际中常常将Householder向量规范化使得$v(1)=1$,这就允许将$v(2:n)$存储到$x$已化零的位置,即$x(2:n)$,而无需增加额外的存储开销.在这种情况下,我们将$v(2:n)$称为Householder向量的基本部分.
+ 3. 在进行Householder矩阵与向量的乘法运算时,我们并不直接采用矩阵-向量乘法,而是采用$Px=x-2v(v^Tx)/(v^Tv)$的运算顺序,可以显著减少运算量.
+ 4. 在基于Householder反射的矩阵分解算法中,常用到形如$Q=Q_1Q_2\cdots Q_r$,$Q_j=I-\beta_jv^{(j)}v^{(j)T}$的若干个Householder矩阵的乘积,其中$v^{(j)}=\left(\underbrace{0,\cdots,0 }_{j-1\text{个}},1,v_{j+1}^{(j)},\cdots,v_n^{(j)}\right)^T$.通常我们并不显式地求出$Q$,而是将其保持因子形式,逐个作用到给定矩阵上去,在不需显式求出变换矩阵时可显著减少运算量.
+ 5. 若要将$Q$显式求出(或部分求出),则采用向后累积的形式,即先将$Q$赋值为单位矩阵,依次计算$Q\leftarrow Q_jQ, j=r,r-1,\cdots,1$.这样可以减少运算所需的flop数.
+
+* Jacobi-Givens旋转
+
+Jacobi-Givens旋转是指在特定二维坐标坐标平面内进行的旋转,其一般形式为
+<latex>
+\begin{equation*}
+  G (i,k,\theta)=
+  \begin{pmatrix}
+    1& \\
+     & \ddots& \\
+     &       & c& \cdots& s& \\
+     &       & \vdots& \ddots&\vdots& \\
+     & & -s&\cdots&c&\\
+     & & & & &\ddots&\\
+     & & & & & &1
+  \end{pmatrix}.
+\end{equation*}
+</latex>其中$c=\cos\theta$,$s=\sin\theta$,$c$和$s$等分别位于第$i $行和第$k $行.
+
+用$G (i,j,\theta)^T$左乘即产生在$(i,k)$坐标平面的$\theta$角的旋转.运用Givens旋转可有选择地消去一些矩阵元素.
+
+若$x\in\mathbb{R}^n$,$y=G (i,k,\theta)^T$,则
+<latex>
+\begin{equation*}
+  y_j=
+  \begin{cases}
+    cx_i-sx_k& j=i,\\
+    sx_i+cx_k& j=k,\\
+    x_j& j\neq i,k.
+  \end{cases}
+\end{equation*}
+</latex>若令
+<latex>
+\begin{align*}
+  c=\frac{x_i}{\sqrt{x_i^2+x_k^2}},\\
+  s=-\frac{x_k}{\sqrt{x_i^2+x_k^2}},
+\end{align*}
+</latex>则可将$y_k$化为$0$.通过合理运算顺序安排,可以避免计算中溢出发生.本算法共需$5$个flop和$1$次平方根运算.
+
+在应用Givens旋转时,同样有一些细节问题需要特别注意:
+
+ 1. 当用Givens矩阵进行左乘或右乘修正时,应注意到它只影响矩阵的两行或两列.
+ 2. 同Householder变换类似,多个Givens矩阵的乘积通常并不显式地出现.
+ 3. 可将每一个旋转变换对应于一个浮点数$\rho$,从而将其存储在向量已消元的位置,通常在正弦较小时存储$\mathrm{sgn}(c) s/2$,余弦较小时存储$\mathrm{sign} (s) 2/c$.可以由$\rho$重新构造Givens矩阵.
+
+除标准Givens变换外,还有所谓快速Givens变换,又称"免平方根 (square root-free) Givens变换".将在应用时介绍.
+
+* $QR$分解
+
+一个$m\times n$矩阵$A$的$QR$分解为$A=QR$,其中$Q\in \mathbb{R}^{m\times m}$是正交矩阵,$R\in \mathbb{R}^{n\times n}$是上三角矩阵.本节将讨论$m\geqslant n$且$A$为列满秩情形下的$QR$分解,主要工具为Householder变换,Givens变换以及Gram-Schmidt正交化方法.
+
+** Householder $QR$分解
+
+利用Householder变换进行$QR$分解是直截了当的,可给出算法描述如下:
+
+<algorithm  name="Householder QR分解">
+给定$A\in \mathbb{R}^{m\times m}$,$m\geqslant n$.在算法的第$j $步,我们计算Householder矩阵$H_j$满足:左乘$A\leftarrow H_j^TA$使$A(j+1:m,j)$部分化为$0$.如果$Q=H_1\cdots H_n$,则$Q^TA=R$是上三角阵.特别地,$A$的上三角部分被$R $的上三角部分覆盖,第$j $个Householder向量的基本部分存储于$A(j+1:m,j)$,$\forall j<m$.
+</algorithm>
+本算法共需要$2n^2 (m-n/3)$个flop.
+
+** Givens $QR$方法
+
+选择一个合适的消去的顺序,Givens $QR$分解也是简单有效的.如通过自左而右逐列考察,每一列中通过自下而上地进行Givens变换对$A(j+1:m,j)$引入零元,共需$3n^2 (m-n/3)$个flop即可将$A$化为上三角形式.Givens变换矩阵累积起来即得到正交变换矩阵$Q$.我们也可以将$(c,s)$用单个浮点数$\rho$表示,从而将其存储在已化零的$A(i,j)$中.
+
+下面讨论快速Givens $QR$方法.
+
+快速Givens方法思想就是当$Q$是一系列Givens旋转的乘积时巧妙地表达它.具体地说,$Q $用一个矩阵对$(M,D)$来表示,其中$M^TM=D=\mathrm{diag} (d_i)$且$d_i>0,\forall{i}$.矩阵$Q $,$M $和$D $通过公式$Q=MD^{-1/2}$联系起来.易知$Q $是正交的.若$F $使$F^TDF\equiv D_{\text{new}}$是对角阵,则取$M_{\text{new}}=MF$满足$M_{\text{new}}^TM_{\text{new}}=D_{\text{new}}$.从而由快速Givens的表示形式$(M,D)$做变换即可得到$(M_{\text{new}},D_{\text{new}})$.
+
+以$2$维的情形来说明以上思想.令$x= (x_1,x_2)^T$,给定$D=\mathrm{diag} (d_1,d_2),(d_1,d_2>0)$.定义$F_1=\left[\begin{smallmatrix}\beta_1& 1\\1& \alpha_1\end{smallmatrix}\right]$,则
+<latex>
+\begin{align*}
+F_1^Tx&=\begin{bmatrix}
+\beta_1x_1+x_2\\
+x_1+\alpha_1x_2
+\end{bmatrix},\\
+F_1^TDF_1&=
+\begin{bmatrix}
+  d_2+\beta_1^2d_1& d_1\beta_1+d_2\alpha_1\\
+  d_1\beta_1+d_2\alpha_1& d_1+\alpha_1^2d_2
+\end{bmatrix}
+\equiv D_1.
+\end{align*}
+</latex>若$x_2\neq 0$,取$\alpha_1=-x_1/x_2$,$\beta_1=-\alpha_1\alpha_2/d_1$,则
+<latex>
+\begin{align*}
+  F_1^Tx&=
+  \begin{bmatrix}
+   x_2 (1+\gamma_1)\\
+   0
+  \end{bmatrix},\\
+F_1^TDF_1&=
+\begin{bmatrix}
+  d_2 (1+\gamma_1)\\
+ & d_1 (1+\gamma_1)
+\end{bmatrix}.
+\end{align*}
+</latex>其中$\gamma_1\equiv -\alpha_1\beta_1= (d_2/d_1) (x_1/x_2)^2$.
+
+类似地,如果$x_1\neq 0$,则可定义$F_2=\left[\begin{smallmatrix}1& \alpha_2\\ \beta_2& 1\end{smallmatrix}\right]$,其中$\alpha_2\equiv -x_2/x_1,\beta_2 \equiv - (d_1/d_2)\alpha_2$.则
+<latex>
+\begin{align*}
+  F_2^Tx&=
+  \begin{bmatrix}
+    x_1 (1+\gamma_2)\\
+    0
+  \end{bmatrix},\\
+F_2^TDF_2&=
+\begin{bmatrix}
+  d_1(1+\gamma_2)\\
+  & d_2 (1+\gamma_2)
+\end{bmatrix}.
+\end{align*}
+</latex>其中$\gamma_2=-\alpha_2\beta_2= (d_1/d_2) (x_2/x_1)^2$.
+
+这样,我们就完成了对该算法思想的描述.实际中选择变化类型使矩阵元素的"增长因子"$(1+\gamma_i)$以$2$为界.
+
+借助快速Givens变换,我们可以计算非奇异的$M\in\mathbb{R}^{m\times m}$和正的$d(1:m)$使得$M^TA=T$为上三角阵,且$M^TM=\mathrm{diag} (d_1,\cdots,d_m)$.则$A= (MD^{-1/2}) (D^{1/2}T)$是$A$的$QR$分解.这种算法需要$2n^2 (m-n/3)$个flop,且不涉及平方根运算.
+
+Givens方法对于稀疏矩阵问题,尤其是带状矩阵问题有特别的优势,例如对Hessenberg矩阵进行$QR$分解只需要$3n^2$个flop.
+
+** Gram-Schmidt方法
+
+经典Gram-Schmidt方法(CGS)是我们熟知的,通过对$A $的各列施行正交化手续,每步求出$Q $和$R $的一列.但CGS的数值特性非常差,$Q $的正交性经常会严重损失.通过改变计算次序,得到修正Gram-Schmidt方法(MGS),则可靠得多.
+
+在MGS的第$k $步,求出$Q $的第$k $列$q_k$和$R $的第$k $行$r_k^T$.定义矩阵$A^{(k)}\in\mathbb{R}^{m\times(n-k+1)}$为
+<latex>
+\begin{equation*}
+  A-\sum\limits_{i=1}^{k-1}q_ir_i^T=\sum\limits_{i=k}^nq_ir_i^T\equiv (0, A^{(k)}).
+\end{equation*}
+</latex>因此,如果$A^{(k)}= (z,B)$,则有
+<latex>
+\begin{align*}
+  r_{kk}&=\|z\|_2,\\
+  q_k&=z/r_{kk},\\
+  (r_{k,k+1},\cdots,r_{kn})&=q_k^TB.
+\end{align*}
+</latex>随后计算外积
+<latex>
+\begin{equation*}
+  A^{(k+1)}=B-q_k (r_{k,k+1},\cdots,r_{kn})
+\end{equation*}
+</latex>并进行下一步.这样我们就完成了对MGS算法第$k $步的描述.这一算法共需$2mn^2$个flop.但MGS的缺点在于$A$病态时,不能保证良好的正交性.故仅当在被正交化的向量独立性很强时,才可用MGS求正交基.
+
+* 满秩的最小二乘问题
+
+要求找到向量$x\in \mathbb{R}^n$使$Ax=b$,其中$A\in\mathbb{R}^{m\times n}$和$b\in\mathbb{R}^m$.若$m\geqslant n$,即方程个数多于未知数个数,则称方程组$Ax=b$是超定 (overdeterminant) 的,通常这样的方程组没有严格解.在实际中,我们考虑对适当选取的$p $,极小化$\|Ax-b\|_p$.不同的范数给出不同的最优解,其中应用较多的是$p=1,2,\infty$的情形.其中,2-范数情形便于解析求解.此时,该问题称为最小二乘(Least Square,LS)问题.
+
+容易证明,若$A$是列满秩的,则存在唯一的LS解$x_{\text{LS}}$,它是对称正定线性方程组$A^TAx_{\text{LS}}=A^Tb$的解,这一方程组称为法方程组.称$r_{\text{LS}}=b-Ax_{\text{LS}}$为最小剩余,用$L_{\text{LS}}\equiv \|b-Ax_{\text{LS}}\|_2$表示其大小.
+
+当评估一个LS解$\hat{x}_{\text{LS}}$的质量时,常考虑两方面的问题:
+
+ 1. $\hat{x}_{\text{LS}}$有多靠近$x_{\text{LS}}$?
+ 2. 与$L_{\text{LS}}$相比,$\hat{L}_{\text{LS}}\equiv \|\hat{r}_{\text{LS}}\|_2=\|b-A\hat{x}_{\text{LS}}\|_2$有多小?
+
+这两条标准在实际应用中常要考虑.
+
+** 法方程组方法
+
+<algorithm  name="法方程组方法">
+给定$A\in \mathbb{R}^{m\times n}$具有性质$\mathrm{rank} (A)=n$和$b\in \mathbb{R}^m$.本算法计算LS问题$\min\|Ax-b\|_2$的解$x_{\text{LS}}$.
+
+ 1. 计算$C=A^TA$的下三角部分.
+ 2. 计算$d=A^Tb$.
+ 3. 计算Cholesky分解$C=GG^T$.
+ 4. 解$Gy=d$和$G^Tx_{\text{LS}}=y$.
+</algorithm>
+这一算法基于许多标准算法,共需要$(m+n/3)n^2$个flop.经过分析,该算法计算解的精度依赖于$A$的条件数的平方:
+<latex>
+\begin{equation*}
+  \frac{\|\hat{x}_{\text{LS}}-x_{\text{LS}}\|_2}{\|x_{\text{LS}}\|_2}\simeq \mu\kappa_2 (A)^2,
+\end{equation*}
+</latex>其中$\kappa_2 (A)$为$A $的条件数.
+
+** 用$QR$分解求解LS问题
+
+设$A\in \mathbb{R}^{m\times n}$,$m\geqslant n$且$b\in \mathbb{R}^m$给定.若以计算得到$A$的$QR$分解
+<latex>
+\begin{equation*}
+  Q^TA=R=
+  \begin{bmatrix}
+    R_1\\
+    O
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    \}n\\
+    \}m-n
+  \end{array},
+\end{equation*}
+</latex>
+其中$R_1$是$n\times n$上三角阵.记
+<latex>
+\begin{equation*}
+\begin{bmatrix}
+  c\\
+  d
+\end{bmatrix}
+\begin{array}[c]{l}
+  \}n\\
+  \}m-n
+\end{array}
+\end{equation*}
+</latex>则
+<latex>
+\begin{equation*}
+  \|Ax-b\|_2=\|Q^TAx-Q^Tb\|_2=\|R_1x-c\|_2^2+\|d\|_2^2.
+\end{equation*}
+</latex>于是,$\hat{x}_{\text{LS}}$由三角方程组$R_1x_{\text{LS}}=c$定义,且$L_{\text{LS}}=\|d\|_2$.于是,只要求得$A$的$QR$分解,LS问题就很容易了.如采用Householder算法求得$A$的$QR$分解,则求解满秩LS问题,共需$2n^2 (m-n/3)$个flop.
+
+经分析,这种方法在$\kappa_2 (A)\simeq 1/u$时失败.事实上,其解的灵敏性大致与$\kappa_2 (A)+\rho_{\text{LS}}\kappa_2 (A)^2$成正比.因此,$QR$分解的方法适用范围比法方程组方法大一些.
+
+基于MGS以及快速Givens方法的$QR$分解也可用于求解LS问题,且解的稳定性相当.
+
+* 病态矩阵的正交分解
+
+如果$A $是秩亏损的,则$QR$分解不一定能给出$\mathrm{span} (A)$的一组正交基.这问题可通过计算经过置换后的$A $的$QR$分解来解决,即$A\Pi=QR$,其中$\Pi$是置换阵.
+
+如果右乘一个一般正交阵$Z $,$A $中的数据可被进一步压缩$Q^TAZ=T$.$Q $和$Z $的选取以及相应的列主元的$QR$分解正是本节要讨论的.
+
+** 选主列的$QR$分解
+
+设$A\in\mathbb{R}^{m\times n},(m\geqslant n)$且$r\equiv\mathrm{rank} (A)<n$,则$QR$分解不一定产生$\mathrm{span}(A)$的一组正交基.但通过简单的修改,即计算分解
+<latex>
+\begin{equation*}
+Q^TA\Pi=
+\begin{bmatrix}
+  R_{11}& R_{12}\\
+  O& O
+\end{bmatrix}.
+\end{equation*}
+</latex>其中$Q$为正交矩阵,$R_{11}$为$r\times r$非奇异的上三角矩阵.于是$Q $的前$r $列给出$\mathrm{span} (A)$的正交基.
+
+$Q$和$\Pi$分别是Householder矩阵和初等置换阵之积.假定对某个$k $,我们已计算了Householder矩阵$H_1,\cdots,H_{k-1}$和置换阵$\Pi_1,\cdots,\Pi_{k-1}$使得
+<latex>
+\begin{equation*}
+  (H_{k-1}\cdots H_1)A (\Pi_1\cdots\Pi_{k-1})=R^{(k-1)}=
+  \begin{bmatrix}
+    R_{11}^{(k-1)}& R_{12}^{(k-1)}\\
+    O& R_{22}^{(k-1)}
+  \end{bmatrix}_{m\times n},
+\end{equation*}
+</latex>其中$R_{11}^{(k-1)}$为$(k-1)\times (k-1)$阶非奇异上三角阵.假定
+<latex>
+\begin{equation*}
+  R_{22}^{(k-1)}=
+  \begin{bmatrix}
+    z_k^{(k-1)},\cdots,z_n^{(k-1)}
+  \end{bmatrix},
+\end{equation*}
+</latex>且令$z_p$为其中2-范数最大者.注意若$k-1=\mathrm{rank} (A)$,则该最大模是$0$,计算至此结束.否则,令$\Pi_k$是互换第$p $列和第$k $列的置换阵,并确定Householder矩阵$H_k$使$R^{(k)}=H_kR^{(k-1)}\Pi_k$有$R^{(k)} (k+1:m,k)=0$.换句话说,$\Pi_k$把最大列移到前面,$H_k$把它的非对角元化为$0$.
+
+利用对正交阵$Q\in \mathbb{R}^{s\times s}$
+<latex>
+\begin{equation*}
+  Q^Tz=
+  \begin{bmatrix}
+    \alpha\\
+    w
+  \end{bmatrix}
+\Longrightarrow \|w\|_2^2=\|z\|_2^2-\alpha^2
+\end{equation*}
+</latex>的性质,我们只需修正旧的列范数得到新的列范数,即
+<latex>
+\begin{equation*}
+  \|z^{(j)}\|_2^2=\|z^{(j-1)}\|_2^2-r_{kj}^2.
+\end{equation*}
+</latex>从而使选主列的工作量从$O(mn^2)$减少到$O(mn)$.这样,我们就完成了对该算法的描述.
+
+本算法共需$4mnr-2r^2 (m+n)+4r^3/3$个flop,其中$r=\mathrm{rank} (A)$.正交矩阵$Q$可以以因子形式存储与$A$的对角线之下.
+
+** 完全正交分解
+
+如果对上述算法产生的$R$,从右边用一组适当的Householder矩阵相乘,则它可以进一步缩小.具体地说,我们可通过列满秩的$QR$分解来计算
+<latex>
+\begin{equation*}
+  Z_r\cdots Z_1
+  \begin{bmatrix}
+    R_{11}^T\\
+    R_{12}^T
+  \end{bmatrix}
+=
+\begin{bmatrix}
+  T_{11}^T\\
+  O
+\end{bmatrix}
+\begin{array}[c]{l}
+  \}r\\
+  \}n-r
+\end{array}.
+\end{equation*}
+</latex>其中,$Z_i$为Householder变换,$T_{11}^T$是上三角矩阵,于是有
+<latex>
+\begin{equation*}
+  Q^TAZ=T=
+  \begin{bmatrix}
+    T_{11}& O\\
+    O& O
+  \end{bmatrix},
+\end{equation*}
+</latex>其中,$Z=\Pi Z_1\cdots Z_r$.我们称其为完全正交分解.在这种情况下,$\mathrm{null} (A)=\mathrm{span} (Z (1:n,r+1:n))$.
+
+* 双对角化
+
+矩阵的双对角化即通过正交变换将矩阵化为上双对角形 (上带宽为一的带状阵).$A$的双对角化与$A^TA$的三对角化密切相关.通过对双对角阵$B$的迭代运算,可以得到$A$的奇异值分解(SVD).我们将其放在"对称特征值问题"一章中讨论.
+
+假定$A\in \mathbb{R}^{m\times n}$且$m\geqslant n$.我们要计算正交阵$U_B\in \mathbb{R}^{m\times m}$和$V_B\in\mathbb{R}^{n\times n}$使
+<latex>
+\begin{equation*}
+  U_B^TAV_B=
+  \begin{bmatrix}
+    F\\
+    O
+  \end{bmatrix},
+\end{equation*}
+</latex>其中,$F\in\mathbb{R}^{n\times n}$为上双对角阵,即上带宽为$1$.很容易通过直接的Householder变换,使
+<latex>
+\begin{align*}
+  U_B&=U_1\cdots U_n,\\
+  V_B&=V1\cdots V_{n-2}.
+\end{align*}
+</latex>其中,算法进行的第$k $步,$U_k$将$A (k+1:m,k)$化为$0$,而$V_k$将$A (k,k+2:n)$化为$0$.本算法共需$4mn^2-4n^3/3$个flop.
+
+当$m\gg n$时,若在进行双对角化之前先进行上三对角化,则可得到一个更为快速的双对角化算法,称为R双对角化.具体地说,假定我们计算一个正交阵$Q\in \mathbb{R}^{m\times m}$使得
+<latex>
+\begin{equation*}
+  Q^TA=
+  \begin{bmatrix}
+    R_1\\
+    O
+  \end{bmatrix}
+\end{equation*}
+</latex>是上三角阵.然后对$R_1$进行双对角化
+<latex>
+\begin{equation*}
+  U_R^TR_1V_B=B_1,
+\end{equation*}
+</latex>则
+<latex>
+\begin{equation*}
+  U=Q
+  \begin{bmatrix}
+    U_R\\
+    & I_{m-n}
+  \end{bmatrix},
+\end{equation*}
+</latex>而
+<latex>
+\begin{equation*}
+U^TAV=
+\begin{bmatrix}
+  B_1\\
+  O
+\end{bmatrix}
+\equiv B
+\end{equation*}
+</latex>是$A$的双对角化.它需要$2mn^2+2n^3$个flop.可以看出,$m\geqslant \frac{5}{3}n$时,它的计算量要少一些.
+
+* 秩亏损的LS问题
+
+当$A$是秩亏损的,则LS问题就有无穷多个解.可以证明,所有极小解的集合:$\chi \equiv\{x\in \mathbb{R}^n:\|Ax-b\|_2\text{极小}\}$是凸集,从而存在唯一元素具有极小2-范数,记为$x_{\text{LS}}$.
+
+** 完全正交分解,SVD与$x_{\text{LS}}$
+
+任何完全正交分解都可用来计算$x_{\text{LS}}$.设
+<latex>
+\begin{equation*}
+  Q^TAZ=
+  \begin{bmatrix}
+    T_{11}& O\\
+    O& O
+  \end{bmatrix}\in \mathbb{R}^{n\times n}
+\end{equation*}
+</latex>为$A$的完全正交分解,其中$T_{11}$为$r\times r$上三角矩阵,$r$为$A$的秩.则
+<latex>
+\begin{equation*}
+  \|Ax-b\|_2^2=\| (Q^TAZ)Z^Tx-Q^Tb\|_2^2=\|T_{11}w-c\|_2^2+\|d\|_2^2,
+\end{equation*}
+</latex>其中
+<latex>
+\begin{align*}
+  Z^Tb&=
+  \begin{bmatrix}
+    w\\
+    y
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    \}r\\
+    \}n-r
+  \end{array},\\
+Q^Tb&=
+\begin{bmatrix}
+  c\\
+  d
+\end{bmatrix}
+\begin{array}[c]{l}
+  \}r\\
+  \}m-r
+\end{array}.
+\end{align*}
+</latex>于是
+<latex>
+\begin{equation*}
+  x_{\text{LS}}=Z
+  \begin{bmatrix}
+    T_{11}^{-1}c\\
+    O
+  \end{bmatrix}.
+\end{equation*}
+</latex>
+
+SVD是非常"显露"的完全正交分解,当然可以用它来计算$x_{\text{LS}}$,并有以下定理,它提供了$x_{\text{LS}}$的一个简洁表达式和最小剩余量的范数$L_{\text{LS}}$.
+<theorem>
+假定$U^TAV=\Sigma$是$A\in R^{m\times n}$的SVD,且$r=\mathrm{rank} (A)$.如果$U=[u_1,\cdots,u_m]$,$V=[v_1,\cdots,v_n]$是按列划分的,$b\in \mathbb{R}^m$.则
+<latex>
+\begin{equation*}
+  x_{\text{LS}}=\sum\limits_{i=1}^r\frac{u_i^Tb}{\sigma_i}v_i
+\end{equation*}
+</latex>使$\|Ax-b\|_2$极小化,且是所有极小值点中2-范数最小的.而且
+<latex>
+\begin{equation*}
+  L_{\text{LS}}^2\equiv \|Ax_{\text{LS}}-b\|_2^2=\sum\limits_{i=r+1}^m (u_i^Tb)^2.
+\end{equation*}
+</latex>
+</theorem>
+LS问题的极小2-范数解$x_{\text{LS}}$与$A$的广义逆矩阵有如下关系:
+
+设
+<latex>
+\begin{equation*}
+U^TAV=\Sigma=\mathrm{diag} (\sigma_1,\cdots,\sigma_r,0,\cdots,0)
+\end{equation*}
+</latex>是$A\in \mathbb{R}^{m\times n}$的SVD,则$A$的广义逆(又称Moore-Penrose广义逆或加号广义逆)$A^+\in \mathbb{R}^{n\times m}$为
+<latex>
+\begin{equation*}
+A^+=V\Sigma^+U^T,
+\end{equation*}
+</latex>其中
+<latex>
+\begin{equation*}
+\Sigma^+\equiv \mathrm{diag} (1/\sigma_1,\cdots,1/\sigma_r,0,\cdots,0)\in \mathbb{R}^{n\times m}.
+\end{equation*}
+</latex>则
+<latex>
+\begin{equation*}
+x_{\text{LS}}=A^+b,
+\end{equation*}
+</latex>且
+<latex>
+\begin{equation*}
+\rho_{\text{LS}}=\|(I-AA^+)b\|_2.
+\end{equation*}
+</latex>
+
+$A^+$是$\min\limits_{X\in \mathbb{R}^{n\times m}}\|AX-I_m\|$的唯一的最小Frobenius范数解.
+
+LS问题在$A$秩亏损时变得相当困难,$x_{\text{LS}}$甚至不是$A$中元素的的连续函数.$A$和$b $的微小变化可能引起$x_{\text{LS}}=A^+b$的任意大的变化.
+
+** 选主列的$QR$分解与基本解
+
+假定$A\in \mathbb{R}^{m\times n}$秩为$r $,选主列的$QR$分解给出
+<latex>
+\begin{equation*}
+  A\Pi=QR,
+\end{equation*}
+</latex>其中
+<latex>
+\begin{equation*}
+  R=
+  \begin{bmatrix}
+    R_{11}& R_{12}\\
+    O& O
+  \end{bmatrix}\in \mathbb{R}^{m\times n},
+\end{equation*}
+</latex>$R_{11}$为$r\times r$满秩上三角阵.则对任意$x\in \mathbb{R}^n$有
+<latex>
+\begin{equation*}
+  \|Ax-b\|_2^2=\| (Q^TA\Pi) (\Pi^Tx)- (Q^Tb)\|_2^2=\|R_{11}y- (c-R_{12}z)\|_2^2+\|d\|_2^2,
+\end{equation*}
+</latex>其中
+<latex>
+\begin{align*}
+  \Pi^Tx=
+  \begin{bmatrix}
+    y\\
+    z
+  \end{bmatrix}
+  \begin{array}[c]{l}
+    \}r\\
+    \}n-r
+  \end{array},\\
+Q^Tb=
+\begin{bmatrix}
+  c\\
+  d
+\end{bmatrix}
+\begin{array}[c]{l}
+  \}r\\
+  \}m-r
+\end{array}.
+\end{align*}
+</latex>于是,若$x$是一个极小解,则有
+<latex>
+\begin{equation*}
+  x=\Pi
+  \begin{bmatrix}
+    R_{11}^{-1} (c-R_{12}z)\\
+    z
+  \end{bmatrix}.
+\end{equation*}
+</latex>若取$z=0$,则得到所谓基本解
+<latex>
+\begin{equation*}
+  x_B=\Pi
+  \begin{bmatrix}
+    R_{11}^{-1}c\\
+    O
+  \end{bmatrix}.
+\end{equation*}
+</latex>可以看到,$x$至多只有$r$个非零分量.但除非$R_{12}=0$,基本解一般不是最小2-范数解.
+
+* 欠定方程组的LS解
+
+当$m<n$时,我们称线性方程组$Ax=b,A\in\mathbb{R}^{m\times n},b\in \mathbb{R}^m$是欠定的(underdetermined),它要么无解,要么有无穷多解.我们希望求出它的最小2-范数解.以下我们先讨论系数矩阵$A$行满秩情形的算法,随后对秩亏损(但非矛盾)的情形加以考察.本节的讨论主要来自<cite>CliPle76</cite>.
+
+** 广义逆
+
+设欠定方程组$Ax=y$,其中$A\in\mathbb{R}^{m\times n},(m<n)$为行满秩的系数矩阵.于是$m\times m$矩阵$AA^T$非奇异,且$x=A^T (AA^T)^{-1}y$正是方程组的最小2-范数解,其中$A^T (AA^T)^{-1}$是$A$的Moore-Penrose广义逆$A^+$.
+
+一个直接的算法是显式形成$AA^T$,用Cholesky分解或$QR$分解求解得到$(AA^T)^{-1}y$.但误差理论指出,若显式计算$AA^T$,因条件数增大 ($\kappa (AA^T)=\kappa (A)^2$) 可能会造成精度的严重丢失.因而这种方法并不可取.
+
+** $LU$分解
+
+<algorithm>
+设通过全选主元的$LU$分解得到$P_1AP_2=LDU$,其中$P_1$,$P_2$为置换矩阵,$L$为$m\times m$的单位下三角阵,$D$为$m\times m$的的非奇异对角阵,$U$为$m\times n$的单位上梯形阵.则$Ax=y$的最小2-范数解可由以下步骤求出:
+
+ 1. 计算$LU$分解$P_1AP_2=LDU$.
+ 2. 由向前消去法求下三角方程$Lw=P_1y$的解.
+ 3. 计算$DUz=w$的最小2-范数解,其详细做法将随后叙述.
+ 4. 取$\tilde{x}=P_2\tilde{z}$,即要求的最小2-范数解.
+</algorithm>
+
+在计算$LU$分解时,只借助行选主元也能保证计算的稳定性,同时能够大大减少比较的次数.
+
+$\tilde{z}$的计算可以通过显式形成$UU^T$来进行,因$U$是单位上梯形阵,其条件数会小于$\kappa (A)$.以下还会介绍其他的方法.
+
+** 正交分解法
+
+通过运用Householder变换或MGS对系数矩阵$A$进行选主元的$LQ$分解 (即$QR$分解的列形式,其中$Q$是正交列),得到
+<latex>
+\begin{equation*}
+  PA=LQ,
+\end{equation*}
+</latex>其中$L$为$m\times m$单位下三角阵,$Q$为$m\times n$的矩阵满足$QQ^T=D$为非奇异的对角阵.则最小2-范数解
+<latex>
+\begin{equation*}
+  \tilde{z}=Q^TD^{-1}w,
+\end{equation*}
+</latex>其中$w$满足$Lw=P_1y$.
+
+** 消去法
+
+最小二乘解$\tilde{z}$也可通过如下的正交分解过程得到.
+<algorithm>
+借助右乘Householder变换或行MGS计算行正交的矩阵$Q$,满足$UQ=R$为$m\times m$的单位下三角阵,且$QQ^T=D_1$为$m\times m$的非奇异对角阵.随后按如下步骤计算$\tilde{z}$:
+
+ 1. 用向后消去法求解$Rz=D_1^{-1}w$.
+ 2. 令$\tilde{z}=Q^TD_1^{-1}z$.
+</algorithm>
+
+** 消去与投影法
+
+我们考虑一个直接构造欠定方程组的最小2-范数解的方法.注意到方程组的所有解的$w$都可表为
+<latex>
+\begin{equation*}
+w=u+v,
+\end{equation*}
+</latex>其中$u\in \mathrm{span} (A^T)$,$v\in \mathrm{null} (A)$且$\mathrm{span} (A^T)$与$\mathrm{null} (A)$互为正交补.故
+<latex>
+\begin{equation*}
+  \|w\|_2^2=\|u\|_2^2+\|v\|_2^2\geqslant \|u\|_2^2.
+\end{equation*}
+</latex>从而
+<latex>
+\begin{equation*}
+  \tilde{x}\equiv u
+\end{equation*}
+</latex>是$w$到$\mathrm{span} (A^T)$的正交投影.于是我们采用下述步骤就可得到$\tilde{x}$:
+
+ 1. 求出方程组的任意非零解$w$.
+ 2. 求得$\mathrm{null} (A)$的一组正交基$\{s_1,\cdots,s_{n-m}\}$.记$S\equiv (s_1,\cdots,s_{n-m})$.
+ 3. 做正交投影
+<latex>
+\begin{equation*}
+  \tilde{x}=\left[I-S (S^T S)^{-1}S^T\right]w.
+\end{equation*}
+</latex>
+
+下面具体说明:
+
+ 1. 做$LU$分解
+<latex>
+\begin{equation*}
+  \hat{A}\equiv P_1AP_2=LDU,
+\end{equation*}
+</latex>记$U= [U_1,U_2]$,其中$U_1$为$m\times m$上三角阵.令
+<latex>
+\begin{equation*}
+  z=
+  \begin{bmatrix}
+    U_1^{-1}D^{-1}L^{-1}P_1y\\
+    O
+  \end{bmatrix},
+\end{equation*}
+</latex>则$w\equiv P_2z$为方程组的一个解,$z$可通过两次消去法得到.
+ 2. 由于$\mathrm{null} (A)=\mathrm{null} (UP_1^T)$,故向量$s\in \mathrm{null} (A)$当且仅当$P_2s\in \mathrm{null} (U)$.于是我们只要计算$\mathrm{null} (U')$的一组正交基.首先注意到通过对
+<latex>
+\begin{equation*}
+  U_1s_1^{(1)}=-U_2s_1^{(2)}
+\end{equation*}
+</latex>实施向后消去法,即可得到
+<latex>
+\begin{equation*}
+  s_1=
+  \begin{bmatrix}
+    s_1^{(1)}\\
+    s_1^{(2)}
+  \end{bmatrix}
+\in \mathrm{null} (U),
+\end{equation*}
+</latex>其中$s_1^{(2)}$为任意取定的$n-m$维非零向量.得到$s_1$后,通过(非选主元的)Gauss消去法将
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    U\\
+    s_1^T
+  \end{bmatrix}
+\end{equation*}
+</latex>化为上梯形阵(实际只要对最后一行实施初等变换)
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    U\\
+    s_1'^T
+  \end{bmatrix}.
+\end{equation*}
+</latex>
+而后求得
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    U\\
+    s_1'^T
+  \end{bmatrix}s_2=0
+\end{equation*}
+</latex>的解$s_2$.类似可依次由$s_1',\cdots,s_k'$得到$s_{k+1}'$.在此过程中一般地要进行后$n-m$列的交换$Q$.记
+<latex>
+\begin{equation*}
+  Q_1=
+  \begin{bmatrix}
+    I\\
+    & Q^T
+  \end{bmatrix},
+\end{equation*}
+</latex>则
+<latex>
+\begin{gather*}
+  \mathrm{null} (U')=\mathrm{span} (Q_1S),\\
+  \tilde{x}=P_2Q_1\left[I-S (S^T S)^{-1}S^T\right]z.
+\end{gather*}
+</latex>
+ 3. 计算
+<latex>
+\begin{equation*}
+  w=z-\sum\limits_{i=1}^{n-m}\frac{s_i^T z}{\|s_i\|^2}s_i.
+\end{equation*}
+</latex>令
+<latex>
+\begin{equation*}
+  \tilde{z}=P_2Q_1w.
+\end{equation*}
+</latex>
+
+* 秩亏损情形
+
+在$A$为行不满秩且方程组不矛盾时,我们称之为秩亏损情形.设$A$为$r $秩的$m\times n$矩阵,且有分解
+<latex>
+\begin{equation*}
+  \hat{A}\equiv P_1AP_2 =LDU.
+\end{equation*}
+</latex>其中$L$为$m\times r$单位下梯形阵,$D $为$r\times r$对角阵,$U $为$r\times n$单位上梯形阵.记
+<latex>
+\begin{equation*}
+  L=
+  \begin{bmatrix}
+    L_1\\
+    L_2
+  \end{bmatrix},
+\end{equation*}
+</latex>其中$L_1$为$r\times r$下三角阵,则$Ax=y$可化为等价的
+<latex>
+\begin{equation*}
+  UP_2^Tx=D^{-1} (L_1^{-1},O)P_1y,
+\end{equation*}
+</latex>其中$y ' = D^{-1} (L_1^{-1},O)P_1y$可通过向后消去法求解
+<latex>
+\begin{equation*}
+  L_1 w= \hat{y}
+\end{equation*}
+</latex>得到
+<latex>
+\begin{equation*}
+  y'=D^{-1}w.
+\end{equation*}
+</latex>其中$\hat{y}$表示$y $的前$r $维分量.这样原方程组就化为
+<latex>
+\begin{equation*}
+  Ux'=y',
+\end{equation*}
+</latex>可通过之前的方法求解.
+
+综合考虑算法的稳定性与复杂度,一般认为基于Householder变换的正交分解法较好,而投影方法在$m$略小于$n$时较为快速.
+
+* 广义最小二乘问题
+
+若已知$A\in \mathbb{R}^{m\times n}$,$B\in \mathbb{R}^{m\times m}$,$b\in\mathbb{R}^m$,要求$v_{\text{LS}}\in \mathbb{R}^m$使
+<latex>
+\begin{equation*}
+\|v_{\text{LS}}\|_2^2=\min\limits_{b=Ax+Bv}v^Tv.
+\end{equation*}
+</latex>其中$x\in \mathbb{R}^n$,这一类问题通常称为广义最小二乘问题.Paige (1979)<cite>Pai79</cite>在假定$A$,$B$为满秩的情况下,提出了如下算法:
+
+<algorithm>
+首先计算$A$的$QR$分解
+<latex>
+\begin{equation*}
+  Q^TA=
+  \begin{bmatrix}
+    R_1\\
+    O
+  \end{bmatrix},
+\end{equation*}
+</latex>其中,$Q=[Q_1,Q_2]$.
+
+然后确定正交阵$Z\in \mathbb{R}^{m\times m}$使得
+<latex>
+\begin{equation*}
+  Q_2^TBZ=
+  \begin{bmatrix}
+    O& S
+  \end{bmatrix},
+\end{equation*}
+</latex>其中$S\in \mathbb{R}^{n\times (m-n)}$是上三角阵.记$Z=[Z_1\quad Z_2]$.于是约束条件化为
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    Q_1^T& b\\
+    Q_2^T& b
+  \end{bmatrix}
+=
+\begin{bmatrix}
+  R_1\\
+  O
+\end{bmatrix}
++
+\begin{bmatrix}
+  Q_1^TBZ_1& Q_1^TBZ_2\\
+  O& S
+\end{bmatrix}
+\begin{bmatrix}
+  Z_1^T& O\\
+  Z_2^T& O
+\end{bmatrix}.
+\end{equation*}
+</latex>方程下半部分可解出$v$:
+<latex>
+\begin{gather*}
+  Su=Q_2^T,\\
+  v=Z_2u.
+\end{gather*}
+</latex>而其上半部确定了$x$:
+<latex>
+\begin{equation*}
+  R_1x=Q_1^Tb- (Q_1^TBZ_1Z_1^T+Q_1BZ_2Z_2^T)v=Q_1^Tb-Q_1^TBZ_2u.
+\end{equation*}
+</latex>
+</algorithm>
+这种方法将"潜在的"病态集中在三角形方程组中,从而是数值稳定的.

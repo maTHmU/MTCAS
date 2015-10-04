@@ -1,0 +1,831 @@
+#title 一元多项式求根算法
+
+<contents>
+
+<index>一元多项式求根</index>是计算机代数中一个重要的问题，同时,它也是代数方程组求解以及代数数表示和运算的基础.本章将围绕这一问题,从数值解和符号解两个方面进行阐述.
+
+<index name="一元多项式求根" sub="数值">一元多项式方程的数值求根</index>所采用的方法同大部分数值算法一样,都是用迭代的方法.对于一般的方程$f(x)=0$的求解($f$可导),我们熟知有<index name="一元多项式方程的数值求根" sub="Newton迭代">Newton迭代</index>算法:
+$$x_{\lambda+1}=x_{\lambda}-\frac{f(x_{\lambda})}{f'(x_{\lambda})},$$
+多项式求根也可采用此迭代算法,并且其收敛阶数可以利用Taylor公式进行估计.设$x$为方程的一根,由于
+<latex>
+\begin{align*}
+f(x_{\lambda})&=f(x)+f'(x)(x_{\lambda}-x)+O((x_{\lambda}-x)^2)\\
+&=(f'(x_{\lambda})+f''(x_{\lambda})(x-x_{\lambda})+O((x_{\lambda}-x)^2))(x_{\lambda}-x)+O((x_{\lambda}-x)^2)\\
+&=f'(x_{\lambda})(x_{\lambda}-x)+O((x_{\lambda}-x)^2),
+\end{align*}
+</latex>
+我们有
+$$x_{\lambda+1}-x=x_{\lambda}-x-\frac{f(x_{\lambda})}{f'(x_{\lambda})}=\frac{O((x_{\lambda}-x)^2)}{f'(x_{\lambda})},$$
+当$f'(x)\neq 0$,即$x$是单重根时,由上式可知迭代是二阶收敛的.若$f'(x)=0$,即$x$是多重根时,我们有
+<latex>
+\begin{align*}
+x_{\lambda+1}-x&=x_{\lambda}-x-\frac{f(x_{\lambda})}{f'(x_{\lambda})}\\
+&=x_{\lambda}-x-\frac{O((x_{\lambda}-x)^2)}{O(x_{\lambda}-x)}\\
+&=O(x_{\lambda}-x),
+\end{align*}
+</latex>
+可知其为一阶线性收敛的.
+
+本章我们将着重介绍Jenkins-Traub数值求根算法,简单介绍Laguerre等算法.
+
+关于<index name="一元多项式求根" sub="符号">一元多项式方程的符号求根</index>,大致上我们采取这样一种思路:将复杂的多项式通过函数复合的解和因子分解化为较为简单的可精确求解的多项式.目前我们已知的可精确求解的多项式有不高于四次的多项式以及分圆多项式.对于前者,我们利用求根公式可以将解用根式表达出来,对于后者利用1的单位根也可以表示出来.
+
+在本章中间,我们也会插入有限域上多项式求根以及根的区间隔离算法.区间隔离算法可以帮助数值算法的迭代初始点的选取,并且可用于多元多项式组求根以及代数数的运算.
+
+* 多项式<index>零点模估计</index>
+
+在后面的数值算法以及区间隔离等算法中,我们均需要对多项式零点的模估计其上界或下界,因此本节介绍若干对零点模的估计.首先下面的Cauchy不等式给出了$\mathbb{C}[x]$上多项式根的模的一个估计.
+
+<theorem label="th:zerobound1">
+设$f=\sum_{0\le i\le n}f_ix^i\in\mathbb{C}[x]$,$r_1,\ldots,r_n$是它的根,则对任何一个根$r$均有$$r<1+\displaystyle\frac{\max(|f_0|,|f_1|,\ldots,|f_{n-1}|)}{|f_n|}.$$
+</theorem>
+
+<proof>
+若$|r|\le 1$,则无需证明.下面假设$|r|>1$,由$\sum_{0\le i\le n}f_ir^i=0$可得
+<latex>
+\begin{align*}
+|f_nr^n|&=\left|\sum_{0\le i\le n-1}f_ir^i\right|\le\max_{0\le i\le n-1}|f_i|\cdot (1+|r|+\cdots+|r|^{n-1})\\
+&=\max_{0\le i\le n-1}|f_i|\cdot \frac{|r|^n-1}{|r|-1}<\max_{0\le i\le n-1}|f_i|\frac{|r|^n}{|r|-1},
+\end{align*}
+</latex>
+因此得到估计$|r|<1+\displaystyle\frac{\max_{0\le i\le n-1}|f_i|}{|f_n|}$.
+</proof>
+
+考虑多项式$r^nf(1/r)$很容易得到:
+
+<corollary>
+各记号同定理##th:zerobound1 ,对任何$f$的根$r$,我们均有
+$$r>\left(1+\displaystyle\frac{\max(|f_1|,|f_2|,\ldots,|f_n|)}{|f_0|}\right)^{-1}.$$
+</corollary>
+
+我们再对多项式零点模的大小做一估计,首先有下面的引理:
+
+<lemma>
+设$a_{k-1},\ldots,a_0$均非负,且$a_{k-1},\ldots,a_l$不全为零,$a_{l-1},\ldots,a_0$不全为零,则方程$$P(z)=z^k+a_{k-1}z^{k-1}+\cdots+a_lz^l-a_{l-1}z^{l-1}-\cdots-a_1z-a_0=0$$有唯一正根$r_0$,且$P(r)<0(\forall 0<r<r_0)$,$P(r)>0(\forall r>r_0)$.
+</lemma>
+
+<proof>
+考虑函数$$Q(z)=\frac{P(z)}{z^l}=z^{k-l}+a_{k-1}z^{k-l-1}+\cdots+a_{l+1}z+a_l-\frac{a_{l-1}}{z}-\cdots-\frac{a_0}{z^l},$$ 易知其在$(0,+\infty)$上单调递增,且$$\lim_{z\rightarrow 0}Q(z)=-\infty,\quad \lim_{z\rightarrow +\infty}Q(z)=+\infty,$$ 故$Q(z)$有唯一正实根$r_0$,从而也是$P(z)$的唯一正根,且由单调性可知$\{r|r>0\wedge P(r)>0\}=(r_0,+\infty)$.
+</proof>
+
+<theorem label="th:zerobound2">
+设$a_{k-1},\ldots,a_0\in\mathbb{C}$,$r$为多项式方程$$P(z)=z^k+a_{k-1}z^{k-1}+\cdots+a_1z+a_0=0$$的任一根,并设$r_0$是方程$$Q(z)=z^k-|a_{k-1}|z^{k-1}-\cdots-|a_1|z-|a_0|=0$$的唯一正根,则$|r|\le r_0$.
+
+再设$r_1$是方程$$R(z)=z^k+|a_{k-1}|z^{k-1}+\cdots+|a_1|z-|a_0|=0$$的唯一正根,则$|r|\ge r_1$.
+</theorem>
+
+<proof>
+首先由$P(r)=0$可知
+<latex>
+\begin{align*}
+|r|^k&=|-a_{k-1}r^{k-1}-\cdots-a_1r-a_0|\\
+&\le |a_{k-1}||r|^{k-1}+\cdots+|a_1||r|+|a_0|,
+\end{align*}
+</latex>
+即$Q(|r|)\le 0$,故$|r|\le r_0$.
+
+由$r$和$r_1$的定义知道$1/r$,$1/r_1$分别是方程$$z^k+\frac{a_1}{a_0}z^{k-1}+\cdots+\frac{a_{k-1}}{a_0}z+\frac{1}{a_0}=0$$和$$z^{k}-\frac{|a_1|}{|a_0|}z^{k-1}-\cdots-\frac{|a_{k-1}|}{|a_0|}-\frac{1}{|a_0|}$$的根,则根据上面的证明我们有$1/|r|\le 1/r_1$,亦即$|r|\ge r_1$.
+</proof>
+
+* <index name="一元多项式方程的数值求根" sub="Jenkins-Traub算法">Jenkins-Traub算法</index>
+
+** 算法引入
+
+Traub最初在一系列论文中提出一种两步骤的迭代算法用以数值求解一元多项式方程,之后Jenkins和Traub<cite>jt70</cite>在此基础上发展出一种三步骤的迭代算法,下面我们就来对此进行介绍.该算法收敛比二阶要快.
+
+为了方便起见,首先我们引入下面一些记号：
+
+<definition>
+对于我们考虑的多项式$P(z)=\prod_{j=1}^k(z-\alpha_j)^{m_j}\in\mathbb{C}[x]$,记$P_j(z)=P(z)/(z-\alpha_j)$,易知$P'(z)=\sum_{j=1}^km_jP_j(z)$.
+</definition>
+
+<definition>
+定义多项式序列$\{H^{(\lambda)}(z)|\lambda\in\mathbb{N}\}$满足$$\exists c_j^{(\lambda)}\in\mathbb{C}\left(H^{(\lambda)}(z)=\sum_{j=1}^kc_j^{(\lambda)}P_j(z)\right).$$
+
+且$H^{(0)}(z)=P'(z)$.我们具体构造时可任取某一特定的复数序列$\{s_{\lambda}\}$,使得多项式序列由下面递推关系生成:$$H^{(\lambda+1)}(z)=\frac{1}{z-s_{\lambda}}\left[H^{(\lambda)}(z)-\frac{H^{(\lambda)}(s_{\lambda})}{P(s_{\lambda})}P(z)\right].$$
+</definition>
+
+为了说明用序列$\{s_{\lambda}\}$来构造多项式序列$\{H_{\lambda}\}$的合理性,我们考虑如下关系:
+
+<latex>
+\begin{align*}
+H^{(\lambda+1)}&=\frac{P(z)}{z-s_{\lambda}}\left[\sum_{j=1}^k\frac{c_j^{(\lambda)}}{z-\alpha_j}-\sum_{j=1}^k\frac{c_j^{(\lambda)}}{s_{\lambda}-\alpha_j}
+\right]\\
+&=\sum_{j=1}^{k}\frac{c_j^{(\lambda)}P(z)}{(z-\alpha_j)(\alpha_j-s_{\lambda})}\\
+&=\sum_{j=1}^kc_j^{(\lambda+1)}P_j(z).
+\end{align*}
+</latex>
+由此可以看出$H_{\lambda}$确实如定义所说的那样,能写成$P_j(z)$的线性组合,于是这样定义是合理的.我们顺便得到了系数$c_j^{(\lambda)}$的递推关系:
+$$c_j^{(\lambda+1)}=\frac{c_j^{(\lambda)}}{\alpha_j-s_{\lambda}}=\cdots=\frac{m_j}{\prod_{t=0}^{\lambda}(\alpha_j-s_t)}.$$
+
+Jenkins和Traub给出如下算法,其中一些具体的细节如$M$,$L$,$\beta$的选取等参见下一节有关注记.
+
+<definition>
+多项式$f\in\mathbb{C}[x]$的首一化多项式定义为$\overline{f}=f/\mathrm{lc}(f)$.
+</definition>
+
+<algorithm label="al:JT1" name="Jenkins-Traub算法">
+
+步骤1:No-shift process
+
+$$H^{(0)}(z)=P'(z),$$
+
+$$H^{(\lambda+1)}(z)=\frac{1}{z}\left[H^{(\lambda)}(z)-\frac{H^{(\lambda)}(0)}{P(0)}P(z)\right]\quad(\lambda=0,1,\ldots,M-1).$$
+
+步骤2:Fixed-shift process
+
+取正数$\beta$满足$\beta\le\min_{1\le j\le k}|\alpha_j|$,随机选取复数$s$满足$|s|=\beta$,且$|s-\alpha_1|\le|s-\alpha_j|(j=2,3,\ldots,k)$,即$\alpha_1$取为离所选$s$最近的根.再做如下迭代：
+
+$$H^{(\lambda+1)}(z)=\frac{1}{z-s}\left[H^{(\lambda)}(z)-\frac{H^{(\lambda)}(s)}{P(s)}P(z)\right],\quad(\lambda=M,M+1,\ldots,L-1).$$
+
+步骤3:Variable-shift process
+
+记$s_L=s-\frac{P(s)}{\overline{H^{(L)}}(s)}$,再做如下迭代：
+
+$$H^{(\lambda+1)}(z)=\frac{1}{z-s_{\lambda}}\left[H^{(\lambda)}-\frac{H^{(\lambda)}(s_{\lambda})}{P(s_{\lambda})}P(z)\right],$$
+
+$$s_{\lambda+1}=s_{\lambda}-\frac{P(s_{\lambda})}{\overline{H^{(\lambda+1)}}(s_{\lambda})},\quad(\lambda=L,L+1,\cdots).$$
+
+我们得到$s_{\lambda}\rightarrow\alpha_1$.
+</algorithm>
+
+<theorem>
+记$R=\min_{2\le j\le k}|\alpha_1-\alpha_j|$,若$|s_L-\alpha_1|<R/2$,$c_1^{(L)}\neq 0$,$D_L=\sum_{j=2}^k|c_j^{(L)}|/|c_1^{(L)}|<1/3$,则$s_{\lambda}\rightarrow\alpha_1$.
+</theorem>
+
+<proof>
+若记$\displaystyle r_j^{(\lambda)}=\frac{s_{\lambda}-\alpha_1}{s_{\lambda}-\alpha_j}$,$\displaystyle d_j^{(\lambda)}=\frac{c_j^{(\lambda)}}{c_1^{(\lambda)}}$,$T_{\lambda}=\left|\displaystyle\frac{s_{\lambda+1}-\alpha_1}{s_{\lambda}-\alpha_1}\right|$,则我们只需要证明存在$\tau$使得$\forall\lambda\ge L(T_{\lambda}\le\tau<1)$即可证明收敛性.
+
+而
+<latex>
+\begin{align*}
+\frac{s_{\lambda+1}-\alpha_1}{s_{\lambda}-\alpha_1}=&\frac{s_{\lambda}-\frac{P(s_{\lambda})}{\overline{H^{(\lambda+1)}}(s_{\lambda})}-\alpha_1}{s_{\lambda}-\alpha_1}\\
+&=1-\frac{P(s_{\lambda})}{\overline{H^{(\lambda+1)}}(s_{\lambda})(s_{\lambda}-\alpha_1)}\\
+&=1-\frac{P(s_{\lambda})\sum_{1\le j\le k}c_j^{(\lambda)}/(\alpha_j-s_{\lambda})}{P(s_{\lambda})\sum_{1\le j\le k}\frac{c_j^{(\lambda)}}{(\alpha_j-s_{\lambda})(s_{\lambda}-\alpha_j)}(s_{\lambda}-\alpha_1)}\\
+&=1-\frac{\sum_{1\le j\le k}c_j^{(\lambda)}(s_{\lambda}-\alpha_1)/(s_{\lambda}-\alpha_j)}{\sum_{1\le j\le k}c_j^{(\lambda)}(s_{\lambda}-\alpha_1)^2/(s_{\lambda}-\alpha_j)^2}\\
+&=1-\frac{1+\sum_{2\le j\le k}d_j^{(\lambda)}r_j^{(\lambda)}}{1+\sum_{2\le j\le k}d_j^{(\lambda)}[r_j^{(\lambda)}]^2}\\
+&=\frac{\sum_{2\le j\le k}[r_j^{(\lambda)}]^2d_j^{(\lambda)}-\sum_{2\le j\le k}r_j^{(\lambda)}d_j^{(\lambda)}}{1+\sum_{2\le j\le k}[r_j^{(\lambda)}]^2d_j^{(\lambda)}},
+\end{align*}
+</latex>
+由于$|r_j^{(L)}|<1$,则$$T_L\le\frac{\sum_{2\le j\le k}|d_j^{(L)}|+\sum_{2\le j\le k}|d_j^{(L)}|}{1-\sum_{2\le j\le k}|d_j^{(L)}|}=\frac{2D_L}{1-D_L}<1,$$
+令$\tau=2D_L/(1-D_L)$,即得$T_L\le\tau<1$.
+
+假设$T_L,T_{L+1},\ldots,T_{\lambda-1}\le\tau<1$,则对$t=L,L+1,\ldots,\lambda$,有$$|s_t-\alpha_1|\le|s_L-\alpha_1|<R/2,$$ $$|s_t-\alpha_j|\ge|\alpha_1-\alpha_j|-|s_t-\alpha_1|>R/2,$$ 即仍有$|r_j^{(t)}|<1(t=L,L+1,\ldots,\lambda)$,又由于$$d_j^{(\lambda)}=\frac{c_j^{(\lambda)}}{c_1^{(\lambda)}}=\frac{c_j^{(\lambda-1)}}{\alpha_j-s_{\lambda-1}}\frac{\alpha_1-s_{\lambda-1}}{c_1^{(\lambda-1)}}=r_j^{(\lambda-1)}d_j^{(\lambda-1)},$$ 则$\sum_{2\le j\le k}|d_j^{(\lambda)}|\le D_L$,于是$T_{\lambda}\le\tau<1$,从而我们归纳证明了$T_{\lambda}\le\tau<1(\forall\lambda\ge L)$.
+
+为了说明迭代的合理性,我们仍要证明$H^{(\lambda)}(s_{\lambda})\neq 0$,因为
+<latex>
+\begin{align*}
+\overline{H^{(\lambda)}}(s_{\lambda})&=\frac{\sum_{1\le j\le k}c_j^{(\lambda)}/(\alpha_j-s_{\lambda})\cdot P_j(s_{\lambda})}{\sum_{1\le j\le k}c_j^{(\lambda)}/(\alpha_j-s_{\lambda})}\\
+&=P_1(s_{\lambda})\left[\frac{1+\sum_{2\le j\le k}d_j^{(\lambda)}[r_j^{(\lambda)}]^2}{1+\sum_{2\le j\le k}d_j^{(\lambda)}r_j^{(\lambda)}}\right],
+\end{align*}
+</latex>
+我们假定$P(s_{\lambda})\neq 0$,且又由$|\sum_{2\le j\le k}d_j^{(\lambda)}[r_j^{(\lambda)}]^2|<1/3$知$|\overline{H^{(\lambda+1)}}(s_{\lambda})|>0$.
+</proof>
+
+有了上面的定理,下面证明收敛性:
+
+<theorem>
+令$s$为满足算法##al:JT1 步骤2中条件的复数,则当迭代步数$L$足够大时,步骤3中迭代是收敛的.
+</theorem>
+
+<proof>
+很容易知道:$$H^{(L)}(z)=\sum_{1\le j\le k}m_j\alpha_j^{-M}(\alpha_j-s)^{-(L-M)}P_j(z)=\sum_{1\le j\le k}c_j^{(L)}p_j(z),$$
+于是$$\sum_{2\le j\le k}d_j^{(L)}=\sum_{2\le j\le k}\frac{m_j}{m_1}\left(\frac{\alpha_1}{\alpha_j}\right)^M\left(\frac{\alpha_1-s}{\alpha_j-s}\right)^{L-M},$$
+固定$M$后,取$L$充分大,可使上式足够小,故我们可以取到$L$使得$D_L<1/3$.
+
+我们再取$L$足够大使$2D_L/(1-D_L)$足够小使$|s_L-\alpha_1|=|s-\alpha_1|\frac{2D_L}{1-D_L}<R/2$,则前述定理条件均满足,由是,$s_{\lambda}\rightarrow\alpha_1$.
+</proof>
+
+** 收敛速度和一些细节说明
+
+下面给出对收敛速度的估计,
+
+<theorem>
+设$D_L<1/3$,$c_1^{(L)}\neq 0$,$|s_L-\alpha_1|<R/2$,则$$C(\lambda)=\frac{|s_{L+\lambda+1}-\alpha_1|}{|s_{L+\lambda}-\alpha_1|^2}\le\frac{2}{R}\tau^{\lambda(\lambda-1)/2}.$$
+</theorem>
+
+<proof>
+首先$$\frac{s_{L+\lambda+1}-\alpha-1}{s_{L+\lambda}-\alpha-1}=\frac{\sum_{2\le j\le k}\frac{r_j^{(L+\lambda)}d_j^{(L+\lambda)}}{s_{L+\lambda}-\alpha_j}-\sum_{2\le j\le k}\frac{d_j^{(L+\lambda)}}{s_{L+\lambda}-\alpha_j}}{1+\sum_{2\le j\le k}[r_j^{(L+\lambda)}]^2d_j^{(L+\lambda)}},$$
+由于$|s_L-\alpha_1|<R/2$,则$|s_{L+\lambda}-\alpha_1|<\tau^{\lambda}R/2$,又$|s_{L+\lambda}-\alpha_j|>R/2$,则$|r_j^{(L+\lambda)}|<\tau^{\lambda}$.于是$$|d_j^{(L+\lambda)}|=|r_j^{(L+\lambda-1)}||d_j^{(L+\lambda-1)}|=\cdots\le\tau^{\lambda-1}\tau^{\lambda-2}\cdots\tau|d_j^{(L)}|=\tau^{(\lambda-1)\lambda/2}|d_j^{(L)}|,$$
+则$\sum_{2\le j\le k}|d_j^{(L+\lambda)}|\le\tau^{\lambda(\lambda-1)/2}D_L\le\frac{1}{3}\tau^{\lambda(\lambda-1)/2}$.
+且由$\frac{1}{|s_{L+\lambda}-\alpha_j|}\le\frac{2}{R}$,代入前面表达式可得$$C(\lambda)\le\frac{2}{R}\tau^{\lambda(\lambda-1)/2}.$$
+
+证毕.
+</proof>
+
+由此可以看到,Jenkins-Traub算法是至少二阶收敛的,它比普通的Newton迭代法要快.
+
+<corollary>
+当上面定理条件满足时,对于$\lambda\ge 1$有$|s_{L+\lambda}-\alpha_1|\le\frac{1}{2}R\tau^{\eta}$,其中$\eta=\frac{1}{2}[3\cdot 2^{\lambda}-(\lambda^2+\lambda+2)]$.
+</corollary>
+
+对于算法细节的说明：
+
+<remark>
+步骤1中$M$的选取是非必需的,此处只是要强调模较小的零点.计算的经验表明一般取$M=5$较合适.
+</remark>
+<remark>
+关于在步骤2中对于方程$P(z)=z^k+a_{k-1}z^{k-1}+\cdots+a_1z+a_0=0$零点最小模的估计,根据定理##th:zerobound2 ,我们取$\beta$为方程$z^k+|a_{k-1}|z^{k-1}+\cdots+|a_1|z-|a_0|=0$的唯一正根,该根可由Newton迭代求出.
+</remark>
+<remark>
+关于步骤2的终止,即$L$的选取,前面给出的应当来说是一个充分条件,而且在算法实现时我们并不知道所有根的分布情况,因此在实践中取下面的收敛性判别条件：令$t_{\lambda}=s-\frac{P(s)}{\overline{H^{(\lambda)}}(s)}$,若在一定迭代步数(例如20步)内能够满足下面条件：$$|t_{\lambda+1}-t_{\lambda}|\le|t_{\lambda}|/2,\quad |t_{\lambda+2}-t_{\lambda+1}|\le|t_{\lambda+1}|/2,$$ 则终止.
+</remark>
+<remark>
+步骤3终止的条件根据计算精度要求决定.
+</remark>
+步骤3中的迭代事实上是Newton迭代,我们有下面的
+
+<theorem>
+设$w^{(\lambda)}(z)=\frac{P(z)}{H^{(\lambda)}(z)}$,则每一步迭代过程相当于$$s_{\lambda+1}=s_{\lambda}-\frac{P(s_{\lambda})}{\overline{H^{(\lambda+1)}}(s_{\lambda})}=s_{\lambda}-\frac{w^{\lambda}(s_{\lambda})}{(w^{\lambda})'(s_{\lambda})}.$$
+</theorem>
+
+<proof>
+定义$v^{(\lambda)}(z)=\frac{H^{(\lambda)}(z)}{P(z)}=1/w^{(\lambda)}(z)$,则由$H^{(\lambda)}(z)$的递推生成式可知:$v^{(\lambda+1)}=(v^{(\lambda)})'$,$\mathrm{lc}(H^{(\lambda+1)}(z))=-v^{(\lambda)}(s_{\lambda})$.
+
+于是
+<latex>
+\begin{align*}
+s_{\lambda+1}&=s_{\lambda}-\frac{P(s_{\lambda})\mathrm{lc}(H^{(\lambda+1)}(z))}{H^{(\lambda+1)}(s_{\lambda})}=s_{\lambda}+\frac{v^{(\lambda)}(s_{\lambda})}{v^{(\lambda+1)}(s_{\lambda})}=s_{\lambda}+\frac{v^{(\lambda)}(s_{\lambda})}{(v^{(\lambda)}(s_{\lambda}))'}\\
+&=s_{\lambda}-\frac{w^{(\lambda)}(s_{\lambda})}{(w^{(\lambda)}(s_{\lambda}))'}.
+\end{align*}
+</latex>
+
+证毕.
+</proof>
+
+对实一元多项式,Jenkins和Traub<cite>jt70real</cite>扩展了已有的迭代算法,发展了一套二次因子的迭代算法,仅仅利用实数运算计算多项式的所有根(包括共轭复根),当将两种Jenkins-Traub算法应用于同一实一元多项式上时,新算法能将效率提高达四倍.
+
+* <index name="一元多项式方程的数值求根" sub="Laguerre算法">Laguerre 算法</index>
+
+一元多项式数值求根的迭代算法有很多,利如Bairstow算法,Graeffe算法,M\"uller算法,Laguerre算法等,<cite>wrm01</cite>对各个算法均有介绍,有兴趣的读者可以参考该文以及文后所引的参考文献.
+
+下面我们简单介绍Laguerre算法,它也是一种比Newton迭代快的算法(<cite>wrm01</cite>2.9节),用到了多项式的二阶导数.考虑复多项式$P(z)$,其有$n$个根$r_1,r_2,\ldots,r_n$,定义如下一些函数:
+$$S_1(z)=\frac{P'(z)}{P(z)}=\sum_{i=1}^n\frac{1}{z-r_i},$$
+$$S_2(z)=-S_1'(z)=\sum_{i=1}^n\frac{1}{(z-r_i)^2},$$
+对于某个固定的$j$,记$$\alpha(z)=\frac{1}{z-r_j},\quad \beta(z)=\frac{1}{n-1}\sum_{1\le i\le n,i\neq j}\frac{1}{z-r_i},\quad \delta_i(z)=\frac{1}{z-r_i}-\beta(z),(i\neq j),$$
+于是$S_1=\alpha+(n-1)\beta$,若定义$\delta^2=\sum_{i\neq j}\delta_i^2$,则还有
+<latex>
+\begin{align*}
+S_2&=\alpha^2+\sum_{i\neq j}(\beta+\delta_i)^2=\alpha^2+(n-1)\beta^2+2\beta\sum_{i\neq j}\delta_i+\sum_{i\neq j}\delta_i^2\\
+&=\alpha^2+(n-1)\beta^2+\delta^2.
+\end{align*}
+</latex>
+若消去$\beta$,可得到关于$\alpha$的二次方程:$$n\alpha^2-2S_1\alpha+S_1^2-(n-1)(S_2-\delta^2)=0$$ 解之得 $$\alpha=\frac{S_1\pm\sqrt{(n-1)(nS_2-S_1^2-n\delta^2)}}{n}.$$
+
+由$\alpha$的定义我们可以得到$$r_j=z-\frac{n}{S_1\pm\sqrt{(n-1)(nS_2-S_1^2-n\delta^2)}},$$ 但若我们令$\delta^2=0$,注意到当$z$接近零点$r_j$时,在$S_1$,$S_2$表达式中各项只有含$r_j$的一项占主导地位,是奇异部分,因此迭代过程中这样的假设是合理的.于是我们得到逼近$r_j$的序列$\{z_j^{(k)}\}$的迭代式,即Laguerre迭代公式：$$z_j^{(k+1)}=z_j^{(k)}-\frac{n}{S_1\pm\sqrt{(n-1)(nS_2-S_1^2)}}.$$
+
+该迭代算法对于单根是三阶收敛,对于多重根是一阶线性收敛.下面的改进算法给出单根时的四阶收敛：
+$$z_j^{(k+1)}=z_j^{(k)}-\frac{n}{S_1\pm\sqrt{(n-1)(nS_2-S_1^2-n\delta_j^2)}},$$
+其中$$\delta_j=\sum_{i\neq j}\left[\frac{1}{z_j^{(k)}-z_i^{(k)}}-\beta_j\right]^2,\quad \beta_j=\frac{1}{n-1}\sum_{i\neq j}\frac{1}{z_j^{(k)}-z_i^{(k)}}.$$
+
+* 代数模方程求解
+
+这一小节我们讨论有限域中的代数方程求解.对于一次模方程,我们可以很简单地直接解出,下面我们先介绍一下<index>有限域中的开平方算法</index>,这些均与数论中的二次剩余理论有联系.
+
+** $\field{p}$中的开平方算法
+
+先看一些比较特殊的情况.我们考虑问题$x^2\equiv a\pmod{p}$,其中$a$是模$p$的二次剩余,其Jacobi符号$\genfrac{(}{)}{}{0}{a}{p}=1$.此时必有$a^{(p-1)/2}\equiv 1\pmod{p}$.
+
+若素数$p\equiv 3\pmod{4}$,则令$x\equiv a^{(p+1)/4}\pmod{p}$即可.
+
+若素数$p\equiv 5\pmod{8}$,此时$a^{(p-1)/4}\equiv\pm 1\pmod{p}$,若取正号,则命$x\equiv a^{(p+3)/8}\pmod{p}$,否则由$p\equiv 5\pmod{8}$有$2^{(p-1)/2}\equiv -1\pmod{p}$,于是命$x\equiv 2a(4a)^{(p-5)/8}\pmod{p}$.
+
+对于一般情况,我们可以尝试有限域上的因子分解算法.Schoof提出了一种多项式时间的非概率性方法,因为它要利用椭圆曲线,过程过于复杂,所以我们介绍另一种概率性的Tonelli $\&$ Shanks算法<cite>cohen</cite>.
+
+首先我们可以将$p-1$中的2的幂次分离出来,即存在$e,q$,$q$是奇数,$e$是自然数使得$p-1=2^eq$.因为乘法群$\field{p}^*$与加群$\mathbb{Z}/(p-1)\mathbb{Z}$同构,则其Sylow 2-子群$G$是一个$2^e$阶的循环群,设$z$是$G$的生成元,则$G$中平方数的阶整除$2^{e-1}$且是$z$的偶数次幂.
+
+当$a$是模$p$中的二次剩余时,我们有$a^{(p-1)/2}=(a^q)^{(2^{e-1})}\equiv 1\pmod{p}$,于是$b=a^q\bmod p$是$G$中的平方数,故存在偶数$k(0\le k<2^e)$使得$a^qz^k=1$.此时若令
+$$x=a^{(q+1)/2}z^{k/2},$$
+则有$x^2=a^{q+1}z^k\equiv a\pmod {p}$.
+
+下面给出求平方根的算法:
+
+<algorithm  name="Shanks算法" label="al:shanks">
+输入:奇素数$p$,$a$,以及$e,q$使得$p-1=2^eq$,$q$是奇数,
+
+输出:$x$满足$x^2\equiv a\pmod{p}$,或者不存在.
+
+ 1. 随机选取$n$使得$\genfrac{(}{)}{}{0}{n}{p}=-1$,令$z=n^q\bmod p$,
+
+ 2. 令$y=z$,$r=e$,$x=a^{(q-1)/2} \bmod p$,$b=ax^2 \bmod p$,$x=ax\bmod p$,
+
+ 3. 若$b\equiv 1\pmod{p}$,则输出$x$并终止,否则找到最小的$m\ge 1$使得$b^{2^m}\equiv 1\pmod{p}$,若$m=r$,则输出$a$非二次剩余并终止,
+
+ 4. 令$t=y^{2^{r-m-1}}\bmod p$,$y=t^2\bmod p$,$r=m\bmod p$,$x=xt\bmod p$,$b=by\bmod p$,并转3步.
+</algorithm>
+
+<remark>
+算法第1步是用随机算法求$G$的生成元$z$.可以看出$z$是生成元当且仅当$n$非模$p$二次剩余.(等价于$z^{2^{e-1}}\equiv -1\pmod{p}$)
+</remark>
+
+<remark>
+显式地找$k$比较困难,因此Shanks提出了上面的算法.注意到在算法开始时,有下面的等式成立:
+$$ab=x^2,\quad y^{2^{r-1}}=-1,\quad b^{2^{r-1}}=1.$$
+记$G_r$是群$G$中阶整除$2^r$的元素组成的子群,则$y$是$G_r$的生成元且$b\in G_{r-1}$,因此$b$是群$G_r$中的二次剩余.
+
+显然每次循环之后,$r$都会严格地减小.设某次循环前各量用下标0表示,循环后各量用下标1表示,则$b_1=b_0y_0^{2^{r-m}}$,$x_1=x_0y_0^{2^{r-m-1}}$,$y_1=y_0^{2^{r-m}}$,于是
+$$ab_1=ab_0y_0^{2^{r-m}}=x_0^2y_0^{2^{r-m}}=x_1^2,$$
+$$y_1^{2^{m-1}}=y_0^{2^{r-1}}=-1,$$
+$$b_1^{2^{m-1}}=b_0^{2^{m-1}}y_0^{2^{r-1}}=(-1)(-1)=1,$$
+从而由归纳可知每次循环后上面三个等式均成立.当$r\le 1$时,我们有$b=1$,于是算法是可终止的.
+</remark>
+
+<problem>
+求$x$使$x^2\equiv 10\pmod{13}$.
+</problem>
+
+<solution>
+$13-1=2^2\times 3$,故$e=2,q=3$.取$n=2$,则$\genfrac{(}{)}{}{0}{2}{13}=-1$,$z=2^3\bmod 13=8$.
+
+首先令$y=8$,$r=2$,$x=10^{(3-1)/2}\bmod 13=10$,$b=10\times 10^2\bmod 13=12$,$x=10\times 10\bmod 13=9$.
+
+因为$b\neq 1$,且使$b^{2^m}=1$的最小的$m$为$m=1$,故$t=8^{2^{2-1-1}}\bmod 13=8$,$y=8^2\bmod 13=12$,$r=1$,$x=9\times 8\bmod 13=7$,$b=12\times 12\bmod 13=1$.故此时输出$x=7$.
+</solution>
+
+** <index>模$p$代数方程求解</index>
+
+实际上在域中解多项式方程时,可以看作是求多项式的因子分解问题.而在有限域上,因子分解算法本身是简单的（见有限域上因子分解有关章节,事实上当时提出了一个$\mathbb{F}_p$上代数方程求根算法）,因此我们期望用因子分解的算法来求根.事实上我们将看到下面给出的求根算法<cite>cohen</cite>就是有限域因子分解算法.我们将在给出算法后再对算法中的每一步进行分析.
+
+<algorithm  name="模$p$代数方程求根算法">
+输入:素数$p\ge 3$,$f\in\field{p}[x]$,
+
+输出:$\field{p}$中$f$的根.
+
+ 1. 求$g=\gcd(x^p-x,f)$,若$g(0)=0$,输出$0$并令$g=g/x$,
+
+ 2. 若$\deg g=0$,则结束,若$\deg g=1$,即$g=g_1x+g_0$,则输出$-g_0/g_1$并终止,若$\deg g=2$,$g=g_2x^2+g_1x+g_0$,则令$d=g_1^2-4g_0g_2$,计算$e=\sqrt{d}$,输出$\displaystyle\frac{-g_1\pm e}{2g_2}$并终止,
+
+ 3. 随机取$a\in\field{p}$,$h(x)=\gcd((x+a)^{(p-1)/2}-1,g)$,若$\deg h=0$或$\deg h=\deg g$,则重新执行此步,
+
+ 4. 递归调用本算法输出$b$和$a/b$的根,注意调用时不必再执行第1步.
+</algorithm>
+
+<remark>
+第1步实际上是将$f$中一次不可约因子的乘积提取出来,只考虑在$\field{p}$中的根,并且将0根做了预处理,从而从$g$中排除掉.
+
+第2步是进行一些平凡的处理,即对于一次和二次的$g$直接由代数运算或求根公式求得其根.
+
+第3步实际上是同次因子分解算法.只不过这里随机取的多项式是$x+a$,因为一次因子的幂次计算起来要容易一些<cite>cohen</cite>.
+</remark>
+<remark>
+该算法与同次因子分解算法不同之处再于对于二次多项式有一个直接处理过程,而不必再通过概率算法分解为两个一次因子.
+</remark>
+
+* 实一元多项式<index>实根隔离</index>算法
+
+** Sturm序列
+
+<index>Sturm序列</index>可用来在实轴上隔离实一元多项式的根,这一节我们先介绍这方面的理论.首先定义(见<cite>wangdongming</cite>170页):
+
+<definition  name="广义Sturm序列">
+我们考虑闭区间$[a,b]$上一无平方因子实多项式$p$,称$p_0(=p),\ldots,p_k$为广义Sturm序列,如果它们满足
+
+ 1. $p(a)p(b)\neq 0$,
+
+; 2. $\mathrm{sgn}(p_k)$在$[a,b]$上是常量,
+ 2. $p_k$在$[a,b]$上不变号,
+
+ 3. 若$p_i(\xi)=0(1\le i\le k-1,\xi\in[a,b])$,则$p_{i-1}(\xi)p_{i+1}(\xi)<0$
+
+ 4. 对于$c\in[a,b]$,若$p(c)=0$,则$p(x)p_1(x)$在$c$的邻域内与$x-c$符号相同.
+
+此时对于$y\in\mathbb{R}$,定义$V(y)$为序列$p_0(y),p_1(y),\ldots,p_k(y)$的变号次数,即$$V(y)=\#\{i|p_i(y)p_{i+1}(y)<0\}.$$ 对于$y=\pm\infty$可在极限意义下类似定义.
+</definition>
+
+<index>广义Sturm序列</index>有如下性质:
+
+<theorem>
+对于$[a,b]$上的广义Sturm序列,$V(a)-V(b)$为$p$在$[a,b]$上实根的个数.
+</theorem>
+
+<proof>
+设$x_1,x_2\in[a,b]$,$x_1<x_2$,若$[x_1,x_2]$中无$p_i(0\le i\le k)$的根,则$V(x_1)=V(x_2)$,此时函数$V(x)$不发生变化.
+
+ 1. 设$a<c<b$且$p(c)=0$,则由定义中第4条知存在$\varepsilon>0$使得$x\in(c-\varepsilon,c)$时,$p(x)p_1(x)<0$,此区间内变一次号,当$x\in(c,c+\varepsilon)$时$p(x)p_1(x)>0$,此区间内不变号,此时若将$V(x)$限定在从$p(x)$到$p_1(x)$的变号,则有$V(x)$会减小1.
+
+ 2. 设$a<c<b$且对某个$i(1\le i\le k-1)$,$p_i(c)=0$,则由定义中第3条知$x\in(c-\varepsilon,c+\varepsilon)$时,$p_{i-1}(x)p_{i+1}(x)<0$,此时若将$V(x)$限定在从$p_{i-1}(x)$到$p_{i+1}(x)$的变号上时,函数$V(x)$在小区间上不变.
+
+证毕.
+</proof>
+
+需要郑重说明的一点是,从上面定理的证明过程来看,实际上我们不仅要求$p$在$a,b$两点上不为零,还要求诸$p_i$在此两点也不为零.因为根据我们对于变号的定义,序列
+$$-1,\pm\varepsilon,1$$
+的变号数为$1$,对于连续函数情形我们可以对$x$进行微小移动使得序列成为
+$$-1+\varepsilon_1,0,1+\varepsilon_2,$$
+则变号数变为$0$.于是对于序列中各个多项式$p_i$,需要满足$p_i(a)p_i(b)\neq 0$.
+
+如何找到一个这样的广义Sturm序列呢？下面的定义给出了一个具体的实例.
+
+<definition  name="Sturm序列">
+对于无平方因子多项式$p\in\mathbb{R}[x]$,其<index>Sturm序列</index>是指多项式序列$p_0(x)=p,p_1(x),\ldots,p_k(x)\in\mathbb{R}[x]$,其中$$p_1=p',p_i=-p_{i-2}\bmod p_{i-1}(2\le i\le k),$$直至$p_k(x)$为一常数多项式.
+</definition>
+
+<theorem>
+Sturm序列是广义Sturm序列.
+</theorem>
+
+<proof>
+第一个条件$p(a)p(b)\neq 0$我们总可以取到,只需要取一组满足条件的$a$,$b$即可.
+
+第二个条件由$p_k\in\mathbb{R}$也可得到.
+
+第三个条件:对于$p_i(\xi)=0(\xi\in[a,b])$,首先$p_{i-1}(\xi)p_{i+1}(\xi)\neq 0$.倘若其中有一个是零,不妨设$p_{i-1}(\xi)=0$,则$(x-\xi)|\gcd(p_{i-1},p_i)=\gcd(p,p')\Rightarrow p$有重因子,矛盾.再由$p_{i+1}=-p_{i-1}\bmod p_i$知$p_{i-1}(\xi)p_{i+1}(\xi)<0$.
+
+第四个条件:对于$p(c)=0(c\in[a,b])$,由于其无平方,$p_1(c)=p'(c)\neq 0$,由导数的定义知$$p_1(c)=\lim_{x\rightarrow c}\frac{p(x)-p(c)}{x-c}=\lim_{x\rightarrow c}\frac{p(x)}{x-c},$$则在$c$的某个去心邻域内有$p(x)/(x-c)$与$p_1(x)$同号.
+</proof>
+
+由上面的定理可以得到如下推论:
+
+<index name="Sturm定理"></index>
+<theorem  name="Sturm定理">
+$p$是无平方多项式,$V(x)$是$p$的Sturm序列在$x$点的变号数,则$p$在区间$[a,b]$上实根的个数为$V(a)-V(b)$.
+
+这里变号数$V(x)$定义为:
+$$V(x)=\#\{i|p_i(x)p_{i+1}(x)<0\}+\#\{i|p_i(x)=0\}.$$
+</theorem>
+
+我们对这里变号数$V(x)$的重新定义做一些说明.前文我们已经说过,对于各个$p_i$也需要它们在$a,b$两点不为零.事实上,假若$p_i$在$a$点值为零,则在$a$的足够小的邻域内是可以得到正确变号数的.其实若根据广义Sturm序列满足的第3个条件可知,此时必有$p_{i-1}(a)p_{i+1}(a)<0$,此处$p_{i-1}(a),p_{i}(a),p_{i+1}(a)$应取为$1$.显然我们可以得到重新定义的$V(x)$的表达式.
+
+** 由Sturm序列给出的<index>实根隔离</index>算法
+
+区间隔离算法本质上是一种分治法的思想.我们利用Sturm序列不断将根的隔离,最终将每个根都隔离开(见<cite>zsg05</cite>).
+
+<algorithm label="al:rootseparate" name="实根隔离算法">
+
+输入:无平方因子多项式$p$,区间$[x_1,x_2]$,且$p(x_1)p(x_2)\neq 0$,
+
+输出:$[x_1,x_2]$上所有根的隔离区间的集合$S=\{[a_1,b_1],[a_2,b_2],\ldots,[a_k,b_k]\}$,其中$[a_i,b_i](1\le i\le k)$中含有且仅含有一个$p$的实根.
+
+ 1. $T=\{[x_1,x_2]\}$,
+
+ 2. 任取区间$[a,b]\in T$,令$T=T\setminus\{[a,b]\}$,若$V(a)-V(b)=1$,则$S=S\bigcup\{[a,b]\}$,转6步,若$V(a)-V(b)=0$则直接转第6步,
+
+ 3. 此时必有$V(a)-V(b)>1$,令$c=(a+b)/2$,$T=T\setminus\{[a,b]\}$,
+
+ 4. 若$p(c)\neq 0$,考虑$V(a)-V(c)$,$V(c)-V(b)$,若$V(a)-V(c)=1$则$S=S\bigcup\{[a,c]\}$,否则$T=T\bigcup\{[a,c]\}$,对于$V(c)-V(b)$和$[c,b]$同样操作,转6步,
+
+ 5. 否则有$p(c)=0$,$S=S\bigcup\{[c,c]\}$,作代换$y=x-c$,并令$p_1(y)=p(y+c)/y$,则$p_1(0)\neq 0$,求其根的绝对值的下界$M$,则对于$p$有$V(c-M)=V(c+M)+1$.若$V(a)-V(c-M)=1$则$S=S\bigcup\{[a,c-M]\}$,否则$T=T\bigcup\{[a,c-M]\}$.同样利用$V(c+M)-V(b)$来决定将$[c+M,b]$放在$S$或$T$中,
+
+ 6. 若$T=\emptyset$则输出$S$,否则转2步.
+
+</algorithm>
+
+接下来我们可以用二分法缩小区间,或用Newton迭代法求根的数值解.
+
+* 分圆多项式
+
+本章开头我们已经提到过,对于“原子”级的多项式,即不可约并且不可进行复合分解的多项式,可以得到根式解或者符号解的只有不高于四次的多项式以及的分圆多项式.对于前者有求根公式,可以参考相关代数书或者数学手册.这里我们着重介绍分圆多项式的检测.
+
+** 分圆多项式的定义及生成
+
+<definition>
+定义多项式$$\Phi_n=\prod_{\substack{1\le k<n\\ \gcd(k,n)=1}}(x-e^{2\pi ik/n})$$为$n$阶<index>分圆多项式</index>($n$th cyclotomic polynomial).
+</definition>
+
+<theorem>
+分圆多项式都是整系数不可约多项式(见<cite>nlzdss00</cite>224-227页).
+</theorem>
+
+很容易看出,$\Phi_n$的次数为$\phi(n)$,$\phi$为Euler函数.分圆多项式与$n$次单位根有很大的联系,我们有下面的引理.
+
+<lemma>
+$\displaystyle x^n-1=\prod_{d|n}\Phi_d$.
+</lemma>
+
+<proof>
+不妨设$\omega$为一$n$次单位根,其阶为$d$,显然$d|n$,并且$\Phi_d(\omega)=1$.由此可以知道欲证等式的两端有相同的根.再由两端均是无平方因子多项式且首一,故等式成立.
+</proof>
+
+引理的等式可以写为$\ln(x^n-1)=\sum_{d|n}\ln\Phi_d$,由Mobius反演变换可得$\ln\Phi_n=\sum_{d|n}\mu(n/d)\ln(x^d-1)$,即$$\Phi_n=\prod_{d|n}(x^d-1)^{\mu(n/d)}.$$
+
+<corollary>
+$\displaystyle\Phi_n=\prod_{d|n}(x^d-1)^{\mu(n/d)}$.
+</corollary>
+
+<lemma>
+设$n,k$是正整数,我们有:
+
+ 1. 若$n$是素数,则$\Phi_n=x^{n-1}+x^{n-2}+\cdots+x+1$,
+
+ 2. 若$n$是奇数,则$\Phi_{2n}=\Phi_n(-x)$,
+
+ 3. 若$\gcd(k,n)=1$,则$\Phi_{kn}\Phi_n=\Phi_n(x^k)$,
+
+ 4. 若$k$的素因子均整除$n$,则$\Phi_{kn}=\Phi_n(x^k)$.
+</lemma>
+
+<proof>
+逐条证明如下:
+
+(1)当$n$是素数时,由$\phi(n)=n-1$即得.
+
+(2)可以验证$\omega$的阶是$n$当且仅当$-\omega$的阶是$2n$.
+
+(3)当$\gcd(k,n)=1$时有$\phi(kn)=\phi(k)\phi(n)=(k-1)\phi(n)$(假设$k$是一素数).若$\omega$的阶是$kn$,则$\omega^k$的阶是$n$.同样地若$\omega$的阶是$n$,则$\omega^k$的阶也是$n$,因此由二者均无平方因子,次数相同且首一可知等号成立.
+
+; (<cite>mca</cite>Exercise 14.45解答)
+
+(4)由条件可知$\phi(kn)=k\phi(n)$.若$\omega$的阶是$kn$,可得$\omega^k$的阶是$n$.同样由二者均无平方因子,次数相同且首一可知等号成立.
+</proof>
+
+引理表明各分圆多项式实际上都是整系数的,并且我们可以构造如下<index>分圆多项式生成算法</index><cite>mca</cite>:
+
+<algorithm name="分圆多项式的生成算法">
+
+输入:正整数$n$和它的互不相同的素因子$p_1,\ldots,p_r$,
+
+输出:$n$阶分圆多项式$\Phi_n$.
+
+ 1. $f_0=x-1$,
+
+ 2. 对$i$从$1$循环到$r$,做$f_i=\displaystyle\frac{f_{i-1}(x^{p_i})}{f_{i-1}}$,
+
+ 3. 输出$f_r(x^{n/(p_1p_2\cdots p_r)})$.
+</algorithm>
+
+** 分圆多项式的Graeffe检测方法
+
+要精确求解多项式方程,我们就要能有效地进行<index>分圆多项式检测</index>.<cite>rjbjhd89</cite>提出了两种有效的检测方法,并给出了有位移的分圆多项式(Shifted cyclotomic polynomial)的检测方法.下面介绍其中一个算法:<index name="分圆多项式检测" sub="Graeffe方法">Graeffe方法</index>.下一节将介绍另一算法:Euler反函数（Inverse $\phi$）方法.我们在以下三个小节中分别介绍.
+
+<algorithm label="al:graeffe1" name="Graeffe过程">
+输入:多项式$f$,
+
+输出:多项式$f_1=\mathrm{graeffe}(f)$,其根的集合为$f$的根的平方的集合.
+
+ 1. 将$f(x)$表达为奇偶两部分和的形式,即$f(x)=g(x^2)+xh(x^2)$,其中$g(x^2)$和$xh(x^2)$分别是$f(x)$的偶和奇函数部分,
+
+ 2. 令$f_1(x)=g(x)^2-xh(x)^2$,
+
+ 3. 乘以适当常数使$\plc{f_1}$为正数并输出.
+</algorithm>
+
+<proof name="算法有效性">
+
+设$f(x)=0$,则$f_1(x^2)=g(x^2)^2-x^2h(x^2)^2=(g(x^2)-xh(x^2))(g(x^2)+xh(x^2))=0$.
+
+设$f_1(x^2)=0$,则我们有$g(x^2)-xh(x^2)=0$或$g(x^2)+xh(x^2)=0$,无论哪种情形,均有$f(x)=0$或$f(-x)=0$.
+
+由证明过程还可以看出,这两者之间是一一对应的.
+</proof>
+
+<algorithm label="al:graeffe2" name="Graeffe检测方法">
+输入:不可约多项式$f\in\mathbb{Z}[x]$,
+
+输出:$f$是否是分圆多项式.
+
+设$f_1=\mathrm{graeffe}(f)$,则:
+
+ 1. 若$f_1(x)=f(x)$,则$f$是分圆多项式.
+
+ 2. 若$f_1(x)=f(-x)$,且$f(-x)$是分圆多项式,则$f$是分圆多项式.
+
+ 3. 若$f_1=f_2^2$,其中$f_2$是分圆多项式,则$f$是分圆多项式.
+
+ 4. 对于其它情况,$f$均不是分圆多项式.
+</algorithm>
+
+<proof name="算法有效性">
+
+(1)任取$f$的一个根$\alpha$,由$f_1=f$可知$\alpha^2,\alpha^4,\ldots,\alpha^{2^k},\cdots$均是$f$的根,故必存在$k\ge 1$使得$\alpha^k=1$.再由$f$的不可约性可知$f$是以$\alpha$为一本原单位根生成的分圆多项式.
+
+(2)若$n$是奇数,则$(-x)^n-1=-(x^n+1)|(x^{2n}-1)$,否则$(-x)^n-1=x^n-1|(x^{2n}-1)$,无论哪种情况均可由$f(-x)$是分圆多项式得到$f(x)$是分圆多项式.
+
+(3)此时$f$的根是一个分圆多项式根的平方根,且$f$不可约,因此$f$也是分圆多项式.
+
+(4)反过来我们设$f$是一个分圆多项式,设$f|x^n-1$,若$n$是奇数,则将2乘到$n$的简化剩余系上仍然是一个简化剩余系,即$f$的根的平方均列出了$f$的根,因此$f_1=f$.若$n=2q$,$q$是奇数,则$f_1$的根是$q$次的本原单位根,故其相反数是$n=2q$次本原单位根.若$4|n$,由于$f_1$的根均是$n/2$次本原单位根,但是$\phi(n)=2\phi(n/4)=2\phi(n/2)$,每个根均出现2次,因而是一分圆多项式的平方.
+</proof>
+
+<remark>
+对Graeffe检测方法我们这里尚需说明一点,由于Graeffe过程产生的多项式$f_1$其首项系数为正,故在算法前3步三个判断中我们需使相应的多项式首项系数也为正,即第1步中的$f$,第2步中的$f(-x)$和第3步中的$f_2$.
+</remark>
+
+下面我们举例说明算法.
+
+<problem>
+考虑$f=x^8-x^7+x^5-x^4+x^3-x+1$.
+</problem>
+
+<solution>
+由于$f=x^8-x^4+1+x(-x^6+x^4+x^2-1)$,则
+$$f_1(x)=(x^4-x^2+1)^2-x(-x^3+x^2+x-1)^2=x^8-x^7+x^5-x^4+x^3-x+1=f(x),$$
+故$f$是分圆多项式.事实上$f=\Phi_{15}$.
+</solution>
+
+<problem>
+我们再举一个例子,取$f=x^8-x^6+x^4-x^2+1$.
+</problem>
+<solution>
+$$f_1(x)=(x^4-x^3+x^2-x+1)^2=f_2^2,$$
+而对于$f_2=(x^4+x^2+1)+x(-x^2-1)$,可得
+$$f_3=(x^2+x+1)^2-x(-x-1)^2=x^4+x^3+x^2+x+1=f_2(-x)$$
+是分圆多项式,综上$f$是分圆多项式.事实上$f=\Phi_{20}$.
+</solution>
+
+** Euler反函数方法
+
+细心的读者可能已经注意到只用上节所说的方法虽然能够检测出多项式是否为分圆多项式,但不能判断其阶数.如果是为了精确求解方程,那么我们仍需知道其阶数$n$.本节介绍的方法可以解决这一问题.
+
+<index name="分圆多项式检测" sub="Euler反函数方法">Euler反函数方法</index>本质上是简单的.假设$f$是一$d$次不可约多项式,倘若其为$n$阶分圆多项式,那么我们有$d=\phi(n)$,且$f|x^n-1$.因此一个比较朴素的想法就是列举可能的$n$,再进行试除.为了列举所有可能的$n$值,我们给出对函数$\phi(n)$的一个估计:
+
+<theorem  name="Euler函数的估计">
+对于函数$\phi(n)$,我们有如下估计(<cite>rjbjhd89</cite>247页):
+
+ 1. $n\le 3\phi(n)^{3/2},\quad\forall n\ge 2$,
+
+ 2. 直接计算可得$n\le 5\phi(n),\quad\forall n<3000$.
+</theorem>
+
+除了利用试除法检测,我们还可以通过提升多项式根的幂次来检测.即对于$n$阶的分圆多项式,其根经过$n$次幂后,必为$1$.由上一小节的Graeffe过程我们可以知道,Graeffe多项式
+$$f_1=\mathrm{graeffe}(f)$$
+的所有根恰为$f$的根的平方.事实上通过下面的定理,我们可以利用结式来计算$n$阶<index>Graeffe多项式</index>
+$$f_1=\mathrm{graeffe}_n(f),$$
+使得其所有的根恰为$f$的根的$n$次幂.
+
+<theorem label="th:nthgraeffe" name="n阶Graeffe多项式">
+$$\mathrm{graeffe}_n(f(x))=\mathrm{res}_y(f(y),y^n-x).$$
+</theorem>
+
+<problem>
+仍然考虑$f=x^8-x^7+x^5-x^4+x^3-x+1$.
+</problem>
+
+<solution>
+$d=\deg f=8$,于是$n<5 d=40$,经检验发现$f|x^{15}-1$,因此$f=\Phi_{15}$.
+
+如果不用试除法,则通过计算$n$阶Graeffe多项式可以知道
+$$\mathrm{graeffe}_{15}(f)=(1-x)^8,$$
+于是也可得到$f=\Phi_{15}$.
+</solution>
+
+** 位移分圆多项式检测
+
+<index name="分圆多项式检测" sub="位移分圆多项式检测"></index>
+设$f(x)$是一个分圆多项式,$m$为一整数,则我们如何才能检测出如$f(x+m)$的形式呢?
+
+首先我们注意到分圆多项式的常数项均为$\pm 1$,因此对于给定的任何一个整系数多项式$f(x)$,若要找到$m$使$f(x+m)$是分圆多项式,则必有$f(m)=\pm 1$.因此我们要求解方程$f(x)\pm 1=0$的整数根,这可以用有限域因子分解算法一章中提到的算法,也可以取$f(x)\pm 1$的常系数的所有整数因子来尝试其是不是该方程的根.
+
+下面给出一个具体的例子来说明这一方法.
+
+<problem>
+考虑$f=x^8+16x^7+111x^6+436x^5+1061x^4+1640x^3+1575x^2+860+205$.
+</problem>
+
+<solution>
+可以求出$f(x)+1=0$无整根,而$f(x)-1=0$有整根$-1$,$-2$,$-3$,其中将$-2$代入可得
+$$f(x-2)=x^8-x^6+x^4-x^2+1,$$
+正是分圆多项式$\Phi_{20}$.
+</solution>
+
+* (一元)复合函数分解
+
+** 复合函数分解算法
+
+这一小节我们来处理一些<index>复合函数分解</index>的问题.函数复合我们已经很了解了,即对于两个多项式$g,h$,我们可以求出它们的复合函数$f=g\circ h=g(h)$.现在我们要考虑的是它的逆问题,即对于给定的$f$,能不能找到这样的$g$和$h$,以及如何找到他们.
+
+为什么要考虑这个问题呢?我们知道,对于代数方程精确求解来说,我们已知能精确求解的有低于4次的多项式以及前面所述的分圆多项式,事实上,某些高于4次的多项式,如$$f=x^6+2x^3+1,$$也可以看作2次方程来精确求解,这里就要用到复合函数分解的算法.我们容易看出$f=g\circ h$,其中$g=x^2+2x+1$,$h=x^3$.
+
+本节内容可参考<cite>jvzg90</cite>.
+
+我们来考虑一元情形.设一元$n$次多项式$f\in F[x]$,对于$n$的一个因子$r>0$,令$s=n/r$,我们要找到多项式$g,h\in F[x]$使得它们的次数分别为$r,s$且$f=g\circ h=g(h)$.我们这里考虑非病态的情形(tame case, 见<cite>jvzg90</cite>),即域$F$的特征$p=\mathrm{char}(F)$不整除$r$.
+
+我们有下面的关于复合函数分解的唯一性定理:
+
+<theorem label="th:ritt" name="Ritt第一定理">
+完全分解(complete decomposition)$f=f_1\circ f_2\circ \cdots\circ f_k$(其中$f_1,\ldots,f_k$均为不可分解的)在不计以下变换的意义下是唯一的:
+
+$\forall f\in F[x]$,$c,d\in F(c\neq 0)$,$r,m\ge 2$,
+
+ 1. $f\circ (cx+d)\circ ((x-d)/c)=f$.
+
+ 2. $(x^m\cdot f^r)\circ x^r=x^r\circ(x^m\cdot f(x^r))$.
+
+ 3. $T_r\circ T_m=T_m\circ T_r=T_{rm}$,其中$T_i$是$i$阶Chebyshev多项式.
+</theorem>
+
+<remark>
+Chebyshev多项式的定义为
+$$T_n(x)=\cos(n\cos^{-1}x),$$
+于是有
+$$T_r\circ T_m=\cos(r\cos^{-1}(\cos(m\cos^{-1}x)))=\cos(rm\cos^{-1}x)=T_{rm}.$$
+</remark>
+
+考虑到分解在上述变换下的不定性,下面我们设$f=g\circ h$,且$a=\plc{f}$,$c=\plc{h}$,于是我们有
+$$\frac{f}{a}=\left(\frac{1}{a}g(cx+h(0))\right)\circ\frac{h-h(0)}{c},$$
+这相当于将一个首一多项式分解为两个首一多项式的复合,并且第二个多项式($h$)常数项为0.考虑下面给出的定义:
+
+<definition>
+记$M$为$F[x]$中所有首一多项式的集合,设有$f\in M$,定义如下集合
+$$\mathrm{DEC}_{n,r}^F=\{(f,(g,h))\in M\times M^2|f=g\circ h,\deg f=n,\deg g=r,h(0)=0\},$$
+称为$f$的分解问题的解.
+</definition>
+
+下面在提出分解算法之前,为了方便先给出一个定义:
+
+<definition name="The reversal of $f$">
+设$f=x^n+a_{n-1}x^{n-1}+\cdots+a_0\in F[x]$,记$\tilde{f}=a_0x^n+\cdots+a_{n-1}x+1=x^nf(1/x)$.
+</definition>
+
+<algorithm label="al:unidec1" name="一元复合函数分解">
+
+输入:首一多项式$f\in F[x]$,其次数$n=rs$,并且$\mathrm{char}(F)\not|r$,
+
+输出:$\mathrm{DEC}_{n,r}^F$.
+
+ 1. 计算$\tilde{h}\in F[x]$,$\deg\tilde{h}<s$且$\tilde{h}^r\equiv \tilde{f}\bmod x^s$,$\tilde{h}(0)=1$,令$h=x^s\tilde{h}(1/x)\in F[x]$,
+
+ 2. 计算"Taylor 展开"的系数$b_0,\ldots,b_r\in F[x]$如下:
+$$f=\sum_{0\le i\le r}b_ih^i,\quad \deg b_i<\deg h(\forall i).$$
+
+ 3. 若$b_0,\ldots,b_r\in F$,令$g=\sum_{0\le i\le r}b_ix^i\in F[x]$,并输出$(f,(g,h))$终止,否则输出$\emptyset$终止.
+</algorithm>
+
+<proof name="算法有效性">
+
+由$\tilde{h}(0)=1$知$\plc{h}=1$,由$\deg\tilde{h}<s$知$h(0)=0$.反过来设$f=g\circ h$,并且满足相应条件,则$f$和$h^r$的最高$s$项相同,即$\deg(f-h^r)\le n-s$.仍记$\tilde{h}=x^sh(1/x)$,于是$x^nh(1/x)^r=(x^sh(1/x))^r=\tilde{h}^r$,且
+$$\deg(f-h^r)\le n-s\Leftrightarrow x^n((f-h^r)(1/x))\equiv 0\pmod{x^s}\Leftrightarrow \tilde{f}-\tilde{h}^r\equiv 0\pmod{x^s}.$$
+
+证毕.
+</proof>
+
+<remark>
+利用相关的快速算法(<cite>jvzg90</cite>283页事实2.1),则整个算法的复杂度为$O(M(n)\log n)$,其中$M(n)$是两个次数为$n$的多项式相乘所需的代数运算.Taylor展开只需由Euclid除法一步步计算即可.算法中要用到的多项式开方算法等一些需要补充的问题将在下一小节介绍.该算法结果的唯一性是由于开方得到的常数项为1的$r$次根$\tilde{h}$唯一.
+</remark>
+
+进而我们有下面的推论:
+
+<corollary>
+ 1. 设有两个分解$f=g_1\circ h_1=g_2\circ h_2$且$\deg g_1=\deg g_2=r$,则两个分解是相似的,即它们之间可以通过三个变换中的仿射变换相联系:$\exists c,d\in F(c\neq 0)$,使得$g_1=g_2(cx+d)$,$h_1=(h_2-d)/c$.
+
+ 2. $\#\mathrm{DEC}_{n,r}^F\le 1$.
+
+ 3. 设$k$是$F$的某个扩域,且$(f,(g,h))\in\mathrm{DEC}_{n,r}^k$,$h=cx^s+\cdots+d\in k[x]$,则$g_1=g(cx+d)\in F[x]$,$h_1=(h-d)/c\in F[x]$,且$(f,(g_1,h_1))\in\mathrm{DEC}_{n,r}^F$.
+</corollary>
+
+利用复合分解算法,我们可以进行一元多项式的完全复合分解.
+
+<algorithm label="al:comdec1" name="完全复合分解">
+
+输入:首一$n$次多项式$f\in M\subset F[x]$,且$\mathrm{char}(F)\not|n$,
+
+输出:$f$的完全复合函数分解.
+
+ 1. 计算整数$n$的因子分解$n=p_1^{e_1}\cdots p_k^{e_k}$,令$d(n)=(e_1+1)\cdots(e_k+1)$为$n$的正因子个数,且记$r_1=1<r_2<\cdots<r_{d(n)}=n$为其正因子,
+
+ 2. 对$j$从$2$循环到$d(n)-1$,求解问题$\mathrm{DEC}_{n,r_j}^F$,对于寻找到的第一个解$(f,(g,h))$,递归调用本算法求解$h$的分解问题,得到分解$h=f_2\circ f_3\circ\cdots\circ f_k$,
+
+ 3. 输出$(f_1,\ldots,f_k)$.
+</algorithm>
+
+** 形式幂级数的一些基本操作
+
+<cite>taocp2</cite>中对<index>形式幂级数</index>的一些基本的算术作了介绍.
+
+<definition>
+$f=a_0+a_1x+a_2x^2+\cdots+a_nx^n+\cdots$称为形式幂级数(formal power series),其中系数$a_i$在域中.
+</definition>
+
+我们可以考虑有限域或复数域上的形式幂级数,这里我们假定都是在$\mathbb{C}$上讨论.虽然一般计算机上是无法表达无穷项的形式幂级数,好似浮点数表示的实数都是有限精度的,但我们仍有讨论它们的必要.一般而言,我们也只考虑形式幂级数的前若干项.这样,问题就化为了在模$x^N(N\in\mathbb{N})$下的多项式算术问题.
+
+首先,我们可以得到形式幂级数的乘法算法:
+
+<algorithm  name="形式幂级数乘法算法">
+
+输入:形式幂级数$g=\sum_{0\le i\le\infty}g_ix^i$,$h=\sum_{0\le i\le\infty}h_ix^i$,
+
+输出:$f=gh$的第$n$次幂的系数$f_n$.
+
+$$f_n=\sum_{k=0}^ng_kh_{n-k}.$$
+</algorithm>
+
+由上面算法,我们可以很方便地得到除法算法:
+
+<algorithm  name="形式幂级数除法算法">
+输入:形式幂级数$g$,$h$,各符号意义同上,其中$h_0\neq 0$,
+
+输出:$f=g/h$.
+
+由$$f_n=\left(g_n-\sum_{k=0}^{n-1}f_kh_{n-k}\right)/h_0$$依次可得$f_0,f_1,\cdots$
+</algorithm>
+
+下面考虑求幂算法,此算法可用于前文复合函数分解中所依赖的开方.考虑一个幂级数$g(x)$,对于某个实数$\alpha$,欲求级数$f(x)=g(x)^{\alpha}$,首先我们可设$g(x)$有如下形式:
+$$g(x)=g_mx^m\left(1+\frac{g_{m+1}}{g_m}x^{m+1}+\cdots\right),$$
+则其$\alpha$次幂为:
+$$f(x)=g_m^{\alpha}x^{m\alpha}\left(1+\frac{g_{m+1}}{g_m}x^{m+1}+\cdots\right)^{\alpha},$$
+由上式可以看出问题归结为一个常数项为$1$的形式幂级数的幂次计算,下面给出两种方法.设$g(x)=1+h(x)$,其中$h(0)=0$,利用二项式定理展开,我们可以可得:
+$$g(x)^{\alpha}=(1+h(x))^{\alpha}=1+\genfrac{(}{)}{0pt}{}{\alpha}{1}h(x)+\cdots+\genfrac{(}{)}{0pt}{}{\alpha}{n}h(x)^n+\cdots.$$
+
+另一种方法由Euler发现,由$f(x)=g(x)^{\alpha}$,我们求其微分可以得到:
+$$f'(x)=\alpha g(x)^{\alpha-1}g'(x),$$
+亦即
+$$f'(x)g(x)=\alpha f(x)g'(x),$$
+若将其系数展开,并取$x^{n-1}$项的系数可得等式:
+$$\sum_{k=0}^nkf_kg_{n-k}=\alpha\sum_{k=0}^n(n-k)f_kg_{n-k},$$
+于是
+<latex>
+\begin{align*}
+f_n&=\sum_{k=1}^n\left(\frac{\alpha+1}{n}k-1\right)g_kf_{n-k}\\
+&=((\alpha+1-n)g_1f_{n-1}+(2\alpha+2-n)g_2f_{n-2}+\cdots+n\alpha g_nf_0)/n.
+\end{align*}
+</latex>
+
+从上式可以看出,Euler给出的算法复杂度为$O(n^2)$,一般地,我们采用上面的二项式展开算法或Euler给出的方法即可,但若要追求效率,<cite>jvzg90</cite>中提到该算法复杂度可达$O(M(n)\log r)$,其中$n$是考虑的项数,$r$是开方次数($\alpha=1/r$情形),此由文献<cite>BRPKHT78</cite>给出的Newton迭代等算法可以达到.关于形式幂级数操作的快速算法可以参考该文,另外对于形式幂级数的求逆也可参考<cite>KHT74</cite>等文献,这里就不再赘述了.

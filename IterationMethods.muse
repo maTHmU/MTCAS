@@ -1,0 +1,143 @@
+#title 迭代法
+
+<contents>
+
+以前所讨论的是适用于一般矩阵计算的直接法,它们适合求解一般的稠密矩阵问题.本章将讨论特别适用于大规模稀疏矩阵特定问题求解的迭代法.
+
+* 概述
+
+以后所介绍的迭代法是基于把$m$维问题投影到低维Krylov子空间这一思想.给定矩阵$A$和向量$b$,相联系的Krylov序列是向量$b,Ab,A^2b,\cdots$的集合,相应的Krylov子空间是由这些向量顺次组成的集合张成的.
+
+将要讨论的算法可如下表归类:
+
+<latex>
+\begin{center}
+\begin{tabular}{|c|c|c|}
+  \hline
+   &$Ax=b$& $Ax=\lambda x$\\\hline
+  $A=A^H$& CG& Lanczos\\ \hline
+  $A\neq A^H$& GMRES& Arnoldi \\\hline
+\end{tabular}
+\end{center}
+</latex>
+在每一问题中,投影到Krylov子空间的结果是把原来的矩阵问题约化到维数为$n=1,2,\cdots$的矩阵问题的序列.当$A$是Hermite矩阵时,约化的矩阵是三对角矩阵.而在非Hermite矩阵情形下,有Hessenberg形式.例如,用Arnoldi方法逼近大矩阵的特征值,是用计算相继较大维数的某些Hessenberg矩阵的特征值完成的.
+
+* Arnoldi迭代
+
+Arnoldi迭代是基于以下思想:用正交相似变换把$A$完全约化到Hessenberg型可记作$A=QHQ^H$,或$AQ=QH$.记
+<latex>
+\begin{align*}
+  Q&=\left[q_1,\cdots,q_n,q_{n+1},\cdots,q_m\right],\\
+  Q_n&=\left[q_1,\cdots,q_n\right],\\
+  H&=
+  \begin{bmatrix}
+    \tilde{H}_n& *\\
+    O& *
+  \end{bmatrix}=
+  \begin{bmatrix}
+    H_n& X_1\\
+    X_2& X_3
+  \end{bmatrix}.
+\end{align*}
+</latex>
+$\tilde{H}_n$为$H$的$(n+1)\times n$阶子阵,$H_n$为$n$阶顺序主子阵.考察等式的前$n$列,得到$AQ_n=Q_{n+1}\tilde{H}_n$,它的第$n$列可以写为$$Aq_n=h_{1n}q_1+\cdots+h_{nn}q_n+h_{n+1,n}q_{n+1},$$由此,$$\mathrm{span}\{q_1,\cdots,q_n\}=\mathrm{span}\{q_1,Aq_1,\cdots,A^{n-1}q_1\}\equiv \mathcal{K}_n$$为$n$阶Krylov子空间,$\{q_1,\cdots,q_n\}$为一组正交基.
+
+由以上关系可以导出,$$H_n=Q_n^HQ_{n+1}\tilde{H}_n=Q_n^HAQ_n,$$即$A$在$\mathcal{K}_n$上的投影在基$\{q_1,\cdots,q_n\}$上的表示.由此我们可以期望$H_n$的一些特征值以有效形式与$A$的一些特征值有关.$$\lambda (H_n)\equiv \{\theta_j\}$$称为$A$的Arnoldi特征值估计或$A$关于$\mathcal{K}_n$的Ritz值.
+
+下面给出Arnoldi迭代的算法描述:
+
+<algorithm  name="Arnoldi迭代">
+<latex>
+\begin{align*}
+ &b=\text{任意值},q_1=b/\|b\|.\text{（迭代开始）}\\
+ &\text{for}~n=1,2,3\ldots\\
+ &~~~~v=Aq_n\\
+ &~~~~\text{~~~~for}~j=1~\text{to}~n\\
+ &~~~~~~~~~~~~h_{jn}=q_j^*v\\
+ &~~~~~~~~~~~~v=v-h_{jn}q_j\\
+ &~~~~h_{n+1,n}=\|v\|\\
+ &~~~~q_{n+1}=v/h_{n+1,n}
+\end{align*}
+</latex>
+(迭代的每一步计算Krylov子空间的正交基.)
+</algorithm>
+
+若迭代的第$n$步有$h_{n+1,n}=0$,则迭代中断.但这是一种"良性"的中断,即此时$H_n$的特征值都是$A$的特征值.可随机选取正交向量$q_{n+1}$使迭代进行下去.
+
+实际分析表明,Arnoldi迭代往往给出$A$的靠近谱边缘的特征值精确的逼近 (常以几何速度收敛),而这正是实际中感兴趣的情形.
+
+最后指出,Arnoldi迭代同如下的多项式逼近问题之间的联系:
+
+Arnoldi-Lanzcos逼近问题:求$n$次首一多项式$p^n\in P^n$使得$\|p^n (A)b\|_2$为极小值.
+
+有如下定理,其证明可参见<cite>TreBau06</cite>:
+
+<theorem>
+只要Arnoldi迭代不中断,即$\mathcal{K}_n$是满秩$n$,则以上问题有唯一解$p^n$,即$H_n$的特征多项式.
+</theorem>
+
+* GMRES
+
+Arnoldi迭代也可用于求解方程组$Ax=b$,其标准算法称为GMRES,是广义极小剩余 (Generalized Minimal Residuals)的简称.
+
+GMRES的思想如下:在迭代的第$n$步,求$x_n\in \mathcal{K}_n$使$\|r_n\|_2\equiv \|b-Ax_n\|_2$最小,则$x_n$的序列将逼近方程组的精确解$x_*$.特别地,当迭代中止,即$\mathcal{K}_n$的维数小于$n$时,将有$x_*\in \mathcal{K}_n$,从而$x_n=x_*$.
+
+由$x_n\in \mathcal{K}_n$,存在$y\in \mathbb{C}^n$使$x_n=Q_ny$,从而问题化为求$y\in \mathbb{C}^n$使$\|AQ_ny-b\|_2$最小.由Arnoldi迭代的过程可知,$$\|AQ_ny-b\|_2=\|Q^*_{n+1}AQ_ny-Q^*_{n+1}b\|_2=\|\tilde{H}_ny-\|b\|_2e_1\|_2,$$于是在GMRES的第$n$步用标准方法 (对$\tilde{H}_n$进行$QR$分解),求得如上问题中的极小化向量$y$,然后令$x_n=Q_ny$.进一步分析指出,由于$\tilde{H}_1,\tilde{H}_2,\cdots$的关系,不用对每一个矩阵独立构造$QR$因子分解,而可以用更新步骤从$\tilde{H}_{n-1}$的$QR$因子分解来得到$\tilde{H}_n$的$QR$分解,只需要单个Givens旋转和$O (n)$工作量.
+
+同样指出,GMRES同多项式逼近之间的联系:事实上,我们已经得到GMRES本质上是求常数项为1的不高于$n$次的多项式$p_n$,使$\|p_n (A)b\|$为极小值.
+
+* Lanczos迭代
+
+Lanczos迭代是限定在$A$是Hermite矩阵情形下的Arnoldi迭代.由于矩阵的对称性,Arnoldi迭代中的Hessenberg矩阵$H_n$将进而化为三对角矩阵$T_n$,每步迭代的递推式也从$(n+1)$项减少为$3$项,这使得Lanczos迭代所需的运算更少.
+
+但舍入误差对Lanczos迭代有着重要的影响.正由于每步迭代仅对三个向量进行正交化,每步的舍入误差导致正交性的损失,从而算法的稳定性降低.实际计算中发现,经过多步迭代后会有所谓"重像 (Ghost)"特征值出现.这些迭代中出现的表观 (而非真实存在)的重特征值与$A$的实际特征值的重数毫无关系,这些原因使得Lanczos迭代的实用性降低.
+
+* 共轭梯度法 (CG)
+
+现在假设$A$不仅是实的和对称的,而且是正定的.在此假设下,由$\|x\|_A\equiv \sqrt{x^TAx}$定义的函数$\|\cdot\|_A$是$\mathbb{R}^m$上的范数,称为$A$-范数.共轭梯度迭代在第$n$步产生唯一的$$\|e_n\|_A\equiv \|x_n-x_*\|_A,(x_n\in \mathcal{K}_n)$$达到极小这一性质的迭代序列的递推公式系统.
+
+下面首先给出CG迭代步骤,之后证明它具有以上所述的极小性质.
+
+<algorithm  name="CG迭代">
+<latex>
+\begin{align*}
+ x_0&=0,r_0=b,p_0=r_0\\
+ \text{for}&~n=1,2,3,\ldots\\
+ &\alpha_n= (r_{n-1}^Tr_{n-1})/ (p_{n-1}^TAp_{n-1}),~~(\text{步长}),\\
+ &x_n=x_{n-1}+\alpha_np_{n-1},\text{(近似解)},\\
+ &r_n=r_{n-1}-\alpha_nAp_{n-1},\text{(剩余)},\\
+ &\beta_n= (r_n^Tr_n) /(r_{n-1}^Tr_{n-1})~~,\text{(扩展此步)},\\
+ &p_n=r_n+\beta_np_{n-1}~~,(\text{搜索方向}).
+\end{align*}
+</latex>
+</algorithm>
+
+<theorem Label="CG">
+设在对称正定矩阵问题$Ax=b$上应用CG迭代,只要迭代还不收敛 (即$r_{n-1}\neq 0$),那么算法就没有用零作除数而继续进行,并且有以下的子空间恒等式:
+<latex>
+\begin{equation*}
+\begin{split}
+\mathcal{K}_n&=\mathrm{span}\{x_1,x_2,\cdots,x_n\}=\mathrm{span}\{p_0,p_1,\cdots,p_{n-1}\}\\
+&=\mathrm{span}\{r_0,r_1,\cdots,r_{n-1}\}=\mathrm{span}\{b,Ab,\cdots,A^{n-1}b\}.
+\end{split}
+\end{equation*}
+</latex>而且,剩余是正交的:$$r_n^Tr_j=0,(j<n).$$以及搜索方向是"$A$-共轭":$$p_n^TAp_j,(j<n).$$
+</theorem>
+
+由CG迭代的步骤易于归纳地证明该定理.由此,可以得到以下CG迭代的最优性质:
+<theorem>
+设在对称正定矩阵问题$Ax=b$上应用CG迭代.如果迭代还没有收敛 (即$r_{n-1}\neq 0$),那么$x_n$是在$\mathcal{K}_n$中极小化$\|e_n\|_A$的唯一点.收敛性是单调的:$$\|e_n\|_A\leqslant\|e_{n-1}\|_A.$$并且对某个$n\leqslant m$,可以得到$e_n=0$.
+</theorem>
+<proof>
+由前一定理知道$x_n\in \mathcal{K}_n$.为了证明$x_n$是$\mathcal{K}_n$中极小化$\|e\|_A$的唯一点,考虑任意点$x=x_n-\Delta x\in\mathcal{K}_n$,其误差$e=x_*-x=e_n+\Delta x$.计算$$\|e\|_A^2= (e_n+\Delta x)^T (e_n+\Delta x)=e_n^TAe_n+ (\Delta x)^TA (\Delta x)+2e_n^TA (\Delta x),$$因$\Delta x\in\mathcal{K}_n$,故$$e_n^TA (\Delta x)=r_n^T (\Delta x)=0,$$从而$$\|e\|_A^2=\|e_n\|_A^2+\|\Delta x\|_A^2\geqslant \|e_n\|_A^2.$$这样就得到了$x_n$的极小性与唯一性.迭代的单调性由$\mathcal{K}_n\subseteq \mathcal{K}_{n+1}$容易得到.
+</proof>
+
+事实上,以上也得到了CG与多项式逼近问题的联系:
+
+求$p_n\in P_n$为常数项为$1$的不高于$n$次的多项式,使得$\|p_n (A)e_0\|_A$为极小值.
+
+* 预处理
+
+矩阵迭代的收敛性依赖于矩阵的性质:特征值,奇异值等.人们发现,在许多情况下,可以对感兴趣的问题加以转换使得矩阵的性质获得巨大的改进."预处理 (preconditioning)"这个过程,对于大多数迭代方法的成功应用是必不可少的.
+
+有多种预处理器可以应用,如对角线缩放式,不完全Cholesky分解等,可以参考<cite>TreBau06</cite>.

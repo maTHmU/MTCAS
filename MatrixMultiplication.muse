@@ -1,0 +1,122 @@
+#title 矩阵乘法
+
+<contents>
+
+在有关矩阵的计算中,矩阵乘法具有基础性的意义.对于$N$阶矩阵的乘法,常规算法具有$O(N^3)$的复杂度,加速矩阵计算是很重要的.
+
+* 基于向量内积算法的Winograd加速算法(1968)
+
+以下讨论主要来自文献<cite>Win68</cite>.
+<algorithm label:"alg:WinogradInnerProduct" name="Winograd内积算法">
+设$x=(x_1,\cdots,x_n)^T$,$y=(y_1,\cdots,y_n)^T$,记$\xi=\sum\limits_{j=1}^{\lfloor n/2\rfloor}x_{2j-1}x_{2j}$,$\eta=\sum\limits^{\lfloor n/2\rfloor}_{j=1}y_{2j-1}y_{2j}$,则内积$(x,y)$可由下式给出:
+
+<latex>
+\begin{equation*}
+  (x,y)=
+  \begin{cases}
+    \sum\limits^{\lfloor n/2\rfloor}_{j=1}(x_{2j-1}+y_{2j})(x_{2j}+y_{2j-1})-\xi-\eta& \text{$n$ even,} \\
+    \sum\limits^{\lfloor n/2\rfloor}_{j=1}(x_{2j-1}+y_{2j})(x_{2j}+y_{2j-1})-\xi-\eta+x_ny_n& \text{$n$ odd.}
+  \end{cases}
+\end{equation*}
+</latex>
+</algorithm>
+
+将这种算法用于$C=AB$的矩阵元素运算时,由于减少重复计算$\xi$,$\eta$,可使计算所需的乘法次数减半,但同时使所需的加法运算增加.Winograd算法也是$O(N^3)$的算法,仅适用于小规模的矩阵求积运算,且由于该算法破坏了向量内积的整体间运算,同时增加了内存开销,因而其算法改进价值并不很大.
+
+* Strassen算法(1968)
+
+Strassen算法是一种分治策略的算法.它以分块矩阵运算为基础.
+
+下面介绍改进型Strassen算法,它较原始算法<cite>Str68</cite>需要更少的矩阵加法运算<cite>mca</cite>.
+
+<algorithm label:"alg:Str" name="Strassen算法">
+设$A$,$B$为$n$阶矩阵,必要时通过补充零行零列加以扩充,将其分块:
+
+<latex>
+\begin{gather*}
+  A=
+  \begin{pmatrix}
+    A_{11}& A_{12}\\
+    A_{21}& A_{22}
+  \end{pmatrix}
+  ,B=
+  \begin{pmatrix}
+    B_{11}& B_{12}\\
+    B_{21}& B_{22}
+  \end{pmatrix}
+ ,C=AB=
+  \begin{pmatrix}
+    C_{11}& C_{12}\\
+    C_{21}& C_{22}
+  \end{pmatrix}.
+\end{gather*}
+</latex>
+进行如下递归运算:
+ 1. 若$n\leq l$($l$为递归下界),做直接乘法.
+ 2. 令
+<latex>
+\begin{gather*}
+  S_1=A_{21}+A_{22},S_2=S_1-A_{11},S_3=A_{11}-A_{21},S_4=A_{12}-S_2,\\
+  T_1=B_{12}-B_{11},T_2=B_{22}-T_1,T_3=B_{22}-B_{11},T_4=T_2-B_{21}.
+\end{gather*}
+</latex>
+ 3. 令
+<latex>
+\begin{gather*}
+  P_1=A_{11}B_{11},P_2=A_{12}B_{21},P_3=S_4B_{22},P_4=B_{22}T_4,\\
+  P_5=S_1T_1,P_6=S_2T_2,P_7=S_3T_3.
+\end{gather*}
+</latex>
+ 4. 令
+<latex>
+\begin{gather*}
+  U_1=P_1+P_2,U_2=P_1+P_6,U_3=U_2+P_7,U_4=U_2+P_5,\\
+  U_5=U_4+P_3,U_6=U_3-P_4,U_7=U_3+P_5.
+\end{gather*}
+</latex>
+ 5. return
+<latex>
+\begin{equation*}
+\begin{pmatrix}
+   U_1& U_5\\
+   U_6& U_7
+\end{pmatrix}.
+\end{equation*}
+</latex>
+</algorithm>
+
+可以看出,每次需要7次乘法与15次加法,从而其算法复杂度是$O(N^{log_27})\simeq O(N^{2.808})$.
+
+这种算法中的分治策略思想,也适用于矩阵求逆及求行列式,所依据的公式可参考<cite>ZhaXu04</cite>.事实上,由此可证明,以上两问题的复杂度不超过矩阵乘法的复杂度.
+
+Strassen算法在之后有许多推广,包括双线性(bilinear)算法及S-disjoint双线性算法等,其渐进复杂度可以降到$O(N^{2.376})$.但在实际中,仅当$N$极大时才有价值,可参考<cite>Pan84</cite>.
+
+* 影响矩阵运算的因素
+
+以下讨论主要来自文献<cite>GolVan01</cite>.
+** 向量化与数据重复利用
+
+与流水线作业类似,向量处理器可通过数据处理的并行化提高运算效率.考虑到处理的向量长度$n$长于向量硬件的长度$v_L$,其计算效率
+<latex>
+\begin{equation*}
+  R_{op}{n}=\frac{\rho_n}{T_{op}(n)}=\frac{\rho}{\mu}\frac{1}{1+\frac{\tau_{op}}{n}\lceil\frac{n}{v_L}\rceil}\rightarrow\frac{\rho}{\mu}\frac{1}{1+\frac{\tau_{op}}{n}}(n\rightarrow\infty),
+\end{equation*}
+</latex>其中$\rho$为每步计算flop数,$\mu$为每步计算所需时间,则$R_{op}(n)$表示每秒计算的flop数.
+
+以矩阵乘法的简单算法为例.经分析,当$m$,$n$,$p$均小于$v_L$时,最有效的形式应具有最长的内层循环.$m$,$n$,$p$均远大于$v_L$时,各种运算形式差别细微.
+
+** 数据存储方式及调用顺序的影响
+
+二维数组在计算机中的存储方式及调用顺序对于计算效率也产生一定的影响.储存浮点向量的"间"是指向量元素(在逻辑内存位置之间)的距离.非整体间的运算影响计算机的流水线能力,从而影响运算效率.
+
+对于矩阵乘法,简单算法可以通过合理地设计运算顺序使计算具有整体间的性质,从而提高效率.
+
+** 向量触
+
+在进行大量数据运算时,从内存读写一组向量所需时间是影响算法效率的,故矩阵程序中向量触的数目是重要的统计数.向量触是一次向量读取或一次数据存写.
+
+例如,$m\times n$外积修正$A=A+xy^T$约需要$2mn$次向量触,而gaxpy修正$y=Ax+y$约需要$mn$次向量触.
+
+** 总结
+
+以上分析大多只适用于矩阵加法与矩阵乘法的简单算法,而对于一些加速算法则并不适用.正是由于以上因素的影响,对于规模较小的矩阵运算,"加速算法"往往不及简单算法有效.

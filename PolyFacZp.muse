@@ -1,0 +1,737 @@
+#title 有限域上多项式因子分解
+
+<contents>
+
+<index name="因子分解" sub="有限域上多项式"></index>多项式因子分解问题比最大公因子问题要复杂也更困难一些。然而令人惊喜的是，相对于整数上多项式来说，在有限域上多项式的因子分解问题却较为简单。这给我们提供了一种将整数环或有理数域上的多项式因子分解问题转化到较简单的有限域情况上来解决的可能性。
+
+这一部分我们首先解决$\mathbb{F}_p$域上的多项式因子分解问题。这些内容是$\mathbb{Z}[x]$,$\mathbb{Q}[x]$,$\mathbb{Z}_m[x]$乃至$\mathbb{R}[x]$,$\mathbb{C}[x]$和多元多项式因子分解的基础.
+
+在有限域上进行因子分解的方法很多，一般来说,有限域上多项式因子分解要经过下面三个步骤：
+
+ 1. <index>无平方因子分解</index>(Squarefree Factorization)
+
+ 2. <index>不同次因子分解</index>(Distinct-degree Factorization)
+
+ 3. <index>同次因子分解</index>(Equal-degree Factorization)
+
+其中第2、3步或者单独第3步可以由<index>Berlekamp算法</index>代替.这一章首先将从上面三个方面介绍有限域上的因子分解问题，然后讨论Berlekamp算法.
+
+本章我们假定读者具有有限域及群论等基本知识,这方面可以参考相关的抽象代数或数论等书籍.当然,我们下面也会对一些较重要的知识作一些简单介绍.
+
+* 不同次数因子分解
+
+首先我们假定多项式是无平方因子的(Squarefree)，即无重因子。这一点很容易做到，如果$f$含重因子，那么取$f/\gcd(f,f')$，则可消去重因子，得到无重因子的多项式。不同次因子分解即是在无平方因子分解的基础上，将多项式中各不同次数因子的乘积逐一剥离出来。这一算法,最早出现在Zassenhaus<cite>hz69</cite>的论述中.
+
+首先我们介绍一些有限域的准备知识,它们对于理解本章的算法是必要的.
+
+** 有限域$\mathbb{F}_p$和$\mathbb{F}_{p^d}$
+
+在数论教程中,我们熟知如下的<index>Fermat小定理</index>.
+
+<theorem label="fermatlittletheorem" name="Fermat小定理">
+对于非零元$a\in\mathbb{F}_p$,我们有$a^{p-1}=1$。对于$a\in\mathbb{F}_p$，我们有$a^p=a$，且$$x^p-x=\prod_{a\in\mathbb{F}_p}(x-a).$$
+</theorem>
+
+<remark>
+我们知道,有限域的阶数只可能是素数以及素数的幂，对于$d\ge 1\in\mathbb{N}$,可以构造$p^d$阶的域如下：$$\mathbb{F}_{p^d}=\mathbb{F}_p[x]/\langle f\rangle,$$其中$f\in\mathbb{F}_p[x]$是$d$次不可约多项式。
+</remark>
+
+
+<remark>
+Fermat小定理$p$对于素数以及素数的幂均成立，素数的幂情况证明同素数情况。
+</remark>
+
+下面的定理是<index>Fermat小定理的推广</index>，Fermat小定理是其$d=1$的特殊情形。
+
+<theorem label="th:fermat2" name="Fermat小定理推广">
+对于任何$d\ge 1$,$x^{p^d}-x\in\mathbb{F}_p[x]$是$\mathbb{F}_p[x]$中所有次数整除$d$的不可约首一多项式的乘积。其中$p$是素数或素数幂.
+</theorem>
+
+<proof>
+由Fermat小定理知$h=x^{p^d}-x$是所有的一次因子$x-a$的乘积，其中$a$取遍$\mathbb{F}_{p^d}$中的元素。因此，$h$是无平方因子的，于是我们只须证明对任何$\mathbb{F}_p[x]$中首一不可约$n$次多项式$f$:
+$$f\mid x^{p^d}-x\Leftrightarrow n\mid d.$$
+
+充分性：若$f\mid x^{p^d}-x$,则由Fermat小定理，可以取$\mathbb{F}_{p^d}$的子集$A$使得$f=\prod_{a\in A}(x-a)$.任取$a\in A$,令$\mathbb{F}_p[x]/\langle f\rangle\cong\mathbb{F}_p(a)\subset\mathbb{F}_{p^d}$,其中$\mathbb{F}_p(a)$是$\mathbb{F}_{p^d}$中包含$a$的最小子域，有$p^n$个元素，$\mathbb{F}_{p^d}$是它的扩域，因此存在正整数$e$使得$p^d=(p^n)^e$，即有$n\mid d$.
+
+必要性：若$n\mid d$,令$\mathbb{F}_{p^n}=\mathbb{F}_p[x]/\langle f\rangle$,且$a=(x \bmod f)\in\mathbb{F}_{p^n}$为$f$的一个根。于是$a^{p^n}=a\Rightarrow (x-a)\mid (x^{p^n}-x)$,由于$p^n-1\mid p^d-1$，设$$p^d-1=(p^n-1)e=(p^n-1)(p^{d-n}+p^{d-2n}+\cdots+1),$$则$$x^{p^d-1}-1=(x^{p^n-1}-1)(x^{(p^n-1)(e-1)}+\cdots+1).$$
+将上式乘以$x$则可得$(x-a)\mid (x^{p^n}-x)\mid (x^{p^d}-x)$.因此在$\mathbb{F}_{p^n}[x]$中$(x-a)\mid \gcd(f,x^{p^d}-x)$,由于$\mathbb{F}_p[x]$中多项式的最大公因子应该也在$\mathbb{F}_p[x]$中，于是由其非平凡可推出$\gcd(f,x^{p^d}-x)=f$,即$f\mid x^{p^d}-x$.
+</proof>
+
+** 不同次因子分解
+
+<index>不同次因子分解</index>算法的目标即是要求出多项式的<index>不同次因子序列</index>,其定义如下:
+
+<definition name="不同次因子序列">
+$\mathbb{F}_p[x]$中非平凡多项式$f$的不同次因子分解是指得到如下的不同次因子序列$(g_1,\ldots,g_s)$,其中$g_i$是$f$在$\mathbb{F}_p[x]$中所有首一不可约$i$次多项式的乘积,且$g_s\neq 1$.
+</definition>
+
+由定理##th:fermat2 ,我们很容易构造出如下不同次因子分解算法.
+
+<algorithm label="al:distinct" name="不同次因子分解">
+
+输入：无平方因子$n(n>0)$次首一多项式$f\in\mathbb{F}_p[x]$,
+
+输出：$f$的不同次因子序列$(g_1,\ldots,g_s)$.
+
+ 1. $h_0=x$,$f_0=f$,$i=0$,
+
+ 2. $i=i+1$,在环$R=\mathbb{F}_p[x]/\langle f\rangle$中调用快速求幂算法（例如算法##al:r2l ）计算$h_i=h_{i-1}^p \bmod f$,
+
+ 3. $g_i=\gcd(h_i-x,f_{i-1})$,$f_i=\displaystyle\frac{f_{i-1}}{g_i}$,
+
+ 4. 若$f_i\neq 1$则转到第2步,
+
+ 5. $s=i$,输出$(g_1,\ldots,g_s)$.
+
+</algorithm>
+
+<proof name="算法有效性">
+设$(G_1,\ldots,G_t)$是$f$的不同次因子序列，考虑命题$$P_i:h_i\equiv x^{p^i}\pmod{f},\quad f_i=G_{i+1}\cdots G_t,\quad g_i=G_i(\text{若}i>0).$$
+
+显然$P_0$成立，设$P_0,\ldots,P_{i-1}$均成立，则对$i\ge 1$,有$h_i\equiv h_{i-1}^p\equiv x^{p^i}\pmod{f}$且$$g_i=\gcd(h_i-x,f_{i-1})=\gcd(x^{p^i}-x,f_{i-1}).$$
+
+由定理##th:fermat2 ，$g_i$是$\mathbb{F}_p[x]$中所有首一不可约且次数整除$i$的多项式的乘积且能整除$f_{i-1}=G_i\cdots G_t$,因此$g_i=G_i$(低于$i$次的因子已在前面提出了).于是归纳证明了$P_i(0\le i\le s)$成立。同时也可得到$s=t$.
+</proof>
+
+<remark>
+算法##al:distinct 可在$\deg f_i<2(i+1)$时即终止，因为$f_i$所有不可约因子次数至少为$i+1$,因此$f_i$已经是不可约的了。
+</remark>
+
+<remark>
+算法##al:distinct 第2步求$h_{i-1}^p\bmod f$时也可利用$\mathbb{F}_p$中$p$次幂的特殊性质来计算,即对于$f=a_0+a_1x+\cdots+a_nx^n$,有
+$$f^p=a_0+a_1x^p+\cdots+a_nx^{np}.$$
+</remark>
+
+<problem>
+考虑多项式$f=x^5+x^3+x^2+x-1\in\mathbb{F}_3[x]$.
+</problem>
+
+<solution>
+我们将单步执行算法##al:distinct 的步骤列于下：
+<latex>
+\begin{align*}
+f_0&=f=x^5+x^3+x^2+x-1, \\
+h_0&=x, \\
+h_1&=h_0^3\bmod f=x^3\bmod f=x^3, \\
+g_1&=\gcd(h_1-x,f_0)=x^2-1, \\
+f_1&=\frac{f_0}{g_1}=x^3-x+1, \\
+h_2&=h_1^3\bmod f=x^9\bmod f=-x^3-x, \\
+g_2&=\gcd(h_2-x,f_1)=1, \\
+f_2&=x^3-x+1.
+\end{align*}
+</latex>
+此时算法已可以终止，得到不同次因子序列为$(x^2-1,1,x^3-x+1)$.
+</solution>
+
+不同次因子分解算法利用快速求幂算法以及快速Euclid算法,其复杂度可以达到$O(sM(n)\log(nq))$次$\mathbb{F}_p$中的运算(<cite>mca</cite>定理14.4),其中$s$是$f$不可约因子最大的次数.1998年,Kaltofen和Shoup<cite>ks98</cite>提出了一种改进的不同次因子分解算法(Baby step-Giant step算法),其复杂度达到了$O(n^{1.815}\log p)$,当有限域的阶$p$小于多项式次数$n$时,该算法的效率较高.
+
+* 同次因子分解
+
+本节对上一节不同次因子分解的结果继续进行<index>同次因子分解</index>，或称为<index>Cantor-Zassenhaus算法</index><cite>dgchz81</cite>，最终将$f$完全分解为不可约多项式的积。由于域的特征为奇素数与2的两种情况在处理中有一点微小的技术区别，因此本节分成两部分来讨论.
+
+** 特征为奇素数的有限域
+
+首先,我们给出一些必要的群论方面的准备命题.
+
+<lemma label="le:cz1">
+设$q$为一素数幂,$k$为$q-1$的因子，记$\mathbb{F}_q^*$为$\mathbb{F}_q$中除去零元素所构成的乘法群,$S=\{b^k\mid b\in\mathbb{F}_q^*\}$为$\mathbb{F}_q^*$中的$k$次幂集合，则：
+
+ 1. $S$为$(q-1)/k$阶子群。
+
+ 2. $S=\{a\in\mathbb{F}_q^*\mid a^{(q-1)/k}=1\}$.
+
+</lemma>
+
+<proof>
+$S$为$k$次幂同态映射$\sigma_k:\mathbb{F}_q^*\rightarrow\mathbb{F}_q^*$的象，从而为$\mathbb{F}_q^*$的子群。$\sigma_k$的核为$k$次单位根：$$\ker\sigma_k=\{a\in\mathbb{F}_q^*\mid \sigma_k(a)=1\}.$$
+由于$\mathbb{F}_q$为域，可知多项式$x^k-1\in\mathbb{F}_q[x]$的根至多有$k$个，于是$\#\ker\sigma_k\le k$.
+
+因为$(b^k)^{(q-1)/k}=b^{q-1}=1$对于任何$b\in\mathbb{F}_q^*$均成立，由Fermat小定理得$S\subset\ker\sigma_{(q-1)/k}$,可知$\# S\le (q-1)/k$.于是由群同态定理得
+$$q-1=\# \mathbb{F}_q^*=\#\ker\sigma_k\cdot \#\mathrm{im}\sigma_k=\#\ker\sigma_k\cdot \# S\le k(q-1)/k=q-1,$$
+可知$\#\ker\sigma_k=k$且$\# S=(q-1)/k$,$S=\ker\sigma_{(q-1)/k}$.
+</proof>
+
+作为引理##le:cz1 的推论，我们有
+<lemma label="le:cz11">
+设$q$为一奇素数幂,$S=\{a\in\mathbb{F}_q^*\mid \exists b\in\mathbb{F}_q^*(a=b^2)\}$,则
+
+ 1. $S\subset\mathbb{F}_q^*$是$(q-1)/2$阶子群。
+
+ 2. $S=\{a\in\mathbb{F}_q^*\mid a^{(q-1)/2}=1\}$.
+
+ 3. $\forall a\in\mathbb{F}_q^*,a^{(q-1)/2}\in\{1,-1\}$.
+
+</lemma>
+
+下面的概率性算法给出$f$的可能因子，其中$f$是经上节算法给出的无平方首一同次因子乘积，即存在$n=\deg f$的一个因子$d$使得$f$可分解为$r=n/d$个$d$次首一不可约因子$f_1,\ldots f_r$.
+<algorithm name="同次因子分解概率算法" label="al:preEDF">
+
+输入：$f$,$d$,
+
+输出：$f$的首一因子$g$,或者失败.
+
+ 1. 随机选取$a\in\mathbb{F}_q[x]$使得$\deg a<n$.若$a\in\mathbb{F}_q$则输出失败,
+
+ 2. $g_1=\gcd(a,f)$,若$g_1\neq 1$且$g_1\neq f$则输出$g_1$,
+
+ 3. 调用快速求幂算法在环$R=\mathbb{F}_q[x]/\langle f\rangle$中计算$b=a^{(q^d-1)/2} \bmod f$,
+
+ 4. $g_2=\gcd(b-1,f)$,若$g_2\neq 1$且$g_2\neq f$则输出$g_2$,否则输出失败.
+
+</algorithm>
+
+设$f=f_1f_2\cdots f_r$,则由中国剩余定理有如下的环同构：
+$$\chi:R=\mathbb{F}_q[x]/\langle f\rangle\rightarrow\mathbb{F}_q[x]/\langle f_1\rangle\times\cdots\times\mathbb{F}_q[x]/\langle f_r\rangle=R_1\times\cdots\times R_r,$$
+其中$\mathbb{F}_{q^d}\cong R_i=\mathbb{F}_q[x]/\langle f_i\rangle\supset\mathbb{F}_q$.
+引入下面记号：$$\chi(a\bmod f)=(a\bmod f_1,\ldots,a\bmod f_r)=(\chi_1(a),\ldots,\chi_r(a)),$$其中$\chi_i(a)=a\bmod f_i$.记$e=(q^d-1)/2$,则对任意$\beta\in R_i^*=\mathbb{F}_{q^d}^*$,我们有$\beta^e\in\{-1,1\}$,且等概率地取两个值之一. 如果我们随机任意选取$a\in\mathbb{F}_q[x]$使得$\deg a<n$且$\gcd(a,f)=1$，则$\chi_1(a),\ldots,\chi_r(a)$是$\mathbb{F}_{q^d}^*$中随机元素，且$\varepsilon_i=\chi_i(a^e)\in R_i$等概率取$1$或$-1$,因此$$\chi(a^e-1)=(\varepsilon_1-1,\ldots,\varepsilon_r-1),$$
+此时$a^e-1$是$f$的一个因子(不一定不可约),除非$\varepsilon_1=\cdots=\varepsilon_r$.因为若只有部分$\varepsilon_i=1(i\in T\subset\{1,2,\ldots,r\})$,则$\chi_i(a^e-1)=0\Rightarrow f_i\mid \gcd(a^e-1,f)$,那么$\gcd(a^e-1,f)=\prod_{i\in T}f_i$给出$f$的一个非平凡因子.因此算法发生错误的概率为$\varepsilon_i$全相等的概率,即$2\cdot(1/2)^r=2^{-r+1}\le 1/2$,这里一般有$r\ge 2$.
+
+<algorithm label="al:EDF" name="同次因子分解">
+
+输入：$f$, $d$,
+
+输出：$f$在$\mathbb{F}_q[x]$中的首一不可约因子.
+
+ 1. 若$n=d$则输出$f$,
+
+ 2. 重复调用算法##al:preEDF ，输入$f$和$d$，直至返回$f$的一个因子$g$,
+
+ 3. 递归调用本算法,分别求出$g$和$f/g$分解的结果并输出所有的结果.
+
+</algorithm>
+
+<problem>
+我们讨论$f=x^4+x^3+x-1\in\mathbb{F}_3[x]$,$d=2$(因为我们可以假定这里的$f$是上节因子算法已分解出的$g_2$，从而此处可设$d=2$).
+</problem>
+
+<solution>
+随机取$a=x$,则$g_1=\gcd(a,f)=1$,
+$$b=a^{(3^2-1)/2}\bmod f=a^4\bmod f=-x^3-x+1,$$ 
+$$g_2=\gcd(b-1,f)=x^2+1,$$
+我们找到了一个因子$x^2+1$,另一个因子为$f/(x^2+1)=x^2+x+2$.
+</solution>
+
+<remark>
+算法##al:preEDF 的复杂度为$O((d\log q+\log n)M(n))$次$\mathbb{F}_q$中运算(<cite>mca</cite>定理14.9),而同次因子分解算法##al:EDF 的复杂度为$O((d\log q+\log n)M(n)\log r)$次$\mathbb{F}_q$中运算(<cite>mca</cite>定理14.11).
+</remark>
+
+<remark>
+Gathen和Shoup<cite>jvzgvs92</cite>提出了一种Frobenius迭代算法(iterated Frobenius algorithm),对于环$R=\mathbb{F}_q[x]/\langle f\rangle$中的元素$\alpha$,能够快速地求出序列$\alpha,\alpha^q,\ldots,\alpha^{q^d}$,其中$d$不超过无平方因子多项式$f$的次数$n$.该算法复杂度约为$O(M(n)^2\log n\log d)$个$\mathbb{F}_q$中运算.将其应用到不同次因子分解的求幂计算上时,复杂度为$O(M(n^2)\log n+M(n)\log q)$.在同次因子分解中,由于求幂可用下式计算:
+</remark>
+
+
+$$\alpha^{(q^d-1)/2}=\left(\alpha^{q^{d-1}}\cdots\alpha^q\alpha\right)^{(q-1)/2},$$
+因此,其复杂度变为$O((M(nd)r\log d+M(n)\log q)\log r)$.以上复杂度的分析均可参考<cite>mca</cite>14.7节相关定理.
+
+** 特征为2的有限域
+
+注意到引理##le:cz1 和引理##le:cz11 均是在奇素数阶有限域中成立的,对于阶为2及其幂次的有限域,上一小节提到的算法已不适用,因此这里我们要单独讨论一下.
+
+以下设$\field{q}$是一特征为2的域，且$q=2^k$,$k$是一正整数.$\field{q}$上多项式$f$是无平方因子$n$次多项式,且是$r$个$d$次不可约多项式之积.
+
+<definition label="def:tracepolynomial">
+对于正整数$m$，定义$\field{2}$上$m$阶<index>迹多项式</index>($m$th trace polynomial)$T_m$为$$T_m=x^{2^{m-1}}+x^{2^{m-2}}+\cdots+x^4+x^2+x.$$
+</definition>
+
+<remark>
+$x^{2^m}+x=T_m(T_m+1)$.此式可直接验证.
+</remark>
+
+<remark>
+$\forall\alpha\in\field{2^m}$,$T_m(\alpha)=0$或$1$,且各有一半概率.这是因为$\alpha$一定是$x^{2^m}+x$的根，因而$T_m(\alpha)=0$或$T_m(\alpha)+1=0$,且二者次数均为$2^{m-1}$，因此各有$2^{m-1}$个根.
+</remark>
+
+<lemma>
+设$a$是$R=\field{q}[x]/\idea{f}$上随机选取的一个多项式,$b=T_{kd}(a)$,则$\gcd(b-1,f)$可能给出$f$的一个非平凡因子,且失败概率不超过1/2.
+</lemma>
+
+<proof>
+首先,$\chi_i(b)=\chi_i(T_{kd}(a))=T_{kd}(\chi_i(a))=0$或$1$,而由中国剩余定理所得到的环同构可知,当且仅当$\chi_i(b)(1\le i\le r)$同时为0或1时,$b\in\field{2}$,此概率为$2\times 2^{-r}=2^{1-r}\le\frac{1}{2}$.
+</proof>
+
+<algorithm  name="特征为2的域上同次因子分解">
+算法基本同算法##al:preEDF 和##al:EDF ,只需将算法##al:preEDF 中第3步改为计算$b=T_{kd}(a)$即可.
+</algorithm>
+
+<problem>
+作为例子，我们计算$f=(x^3+x^2+1)(x^3+x+1)=x^6+x^5+x^4+x^3+x^2+x+1\in\field{2}[x]$的同次因子分解,其中$d=3$,$k=1$.
+</problem>
+
+<solution>
+若取$a=x$,则$b=T_2(a)=x^4+x^2+x\bmod f=x^4+x^2+x$,而
+$$g=\gcd(b,f)=x^3+x+1,$$
+故$f_1=x^3+x+1$,$f_2=f/f_1=x^3+x^2+1$.
+</solution>
+
+* 一个完整的因子分解算法及其应用
+
+对于一般有重因子的多项式$f\in\mathbb{F}_q[x]$，利用上两节的方法可以完全将其分解。设$f$是首一的，并且$f$的首一不可约因子分解为$f=\prod_{i=1}^{m}g_i^{e_i}$,记$U=\{(g_1,e_1),\ldots,(g_m,e_m)\}$表示它的分解，则可利用下面的算法##factor1 给出此分解：
+
+<algorithm label="factor1" name="一个完整的分解算法">
+
+输入：首一多项式$f\in\mathbb{F}_q[x]$,$q$为一素数幂.
+
+输出：$f$的分解$U$.
+
+ 1. $h_0=x,f_0=f,i=0,u=\emptyset$,
+
+ 2. $i=i+1$,
+
+ 3. (不同次因子分解)利用快速求幂算法计算$h_i=h_{i-1}^q\bmod f$,$g=\gcd(h_i-x,f_{i-1})$,
+
+ 4. 若$g\neq 1$则利用算法##al:EDF 求出$g$的所有同次首一不可约因子$g_1,g_2,\ldots,g_s$,
+
+ 5. $f_i=f_{i-1}$,并不断除以$g$的同次因子求出$g_1,\ldots,g_s$的次数$e_1,\ldots,e_s$,每求出一个$e_i$,将$(g_i,e_i)$添入$u$,
+
+ 6. 若$f_i\ne 1$则转第2步,
+
+ 7. 输出$U$.
+
+</algorithm>
+
+<remark>
+算法##factor1 中每次循环的过程中，都会先利用不同次因子分解求出$f$中所包含的$i$次不可约因子，这些不可约因子的(一次）乘积即为$g$,然后依次求出$f$中包含$g$的不可约因子的次数。此算法用试除法代替了无平方因子分解,以求得不可约因子在待分解多项式中的重数.
+</remark>
+
+作为前面提过的诸多因子分解算法的应用，下面讨论$\mathbb{F}_q[x]$中的多项式求根问题。设$f$为$\mathbb{F}_q[x]$上一非平凡多项式，下面的算法##al:finiteroot 给出其所有$\mathbb{F}_q$中的根。
+
+<algorithm label="al:finiteroot" name="$\mathbb{F}_q$上多项式求根算法">
+利用快速求幂算法(例算法如##al:r2l )求出$h=x^q\bmod f$,令$g=\gcd(h-x,f)$,若$\deg g=0$则无根，否则利用同次因子分解算法##al:EDF 其出所有不可约因子$x-u_1,\ldots,x-u_r$,则$u_1,\ldots,u_r$即为其所有$\mathbb{F}_q$上的根。
+</algorithm>
+
+算法避免了将$f$完全分解来求根，求根实际上只要求出所有一次不可约因子，因此先将其与$x^q-x$取最大公因子。由此而衍生出下面的$\mathbb{Z}[x]$中求整数根的算法。引入该算法之前，我们先证明
+
+<lemma label="le:prezroot">
+设$\mathbb{Z}[x]$上非平凡$ n $次多项式$f$，$\|f\|_{\infty}=A$,且$u\in\mathbb{Z}$是$f$的非零根，$f=(x-u)g$,则$\|g\|_{\infty}\le nA$.
+</lemma>
+
+<proof>
+设$g=\sum_{i=0}^{n-1}g_ix^i$,则$f=(x-u)g=g_{n-1}x^n+(g_{n-2}-ug_{n-1})x^{n-1}+\cdots+(g_0-ug_1)x-ug_0$.式中每项系数绝对值均不超过$A$，于是
+<latex>
+\begin{align*}
+|g_0|&\le\frac{A}{|u|}, \\
+|g_1|&\le\frac{A+|g_0|}{|u|}\le\frac{2A}{|u|}, \\
+&\ \,\vdots \\
+|g_{n-1}|&\le\frac{nA}{|u|}.
+\end{align*}
+</latex>
+由$|u|\ge1$可知$\|g\|_{\infty}\le nA$.
+</proof>
+
+<algorithm label="al:zroot" name="整数多项式整数根算法">
+
+输入：非平凡$n$次多项式$f\in\mathbb{Z}[x]$,且$\|f\|_{\infty}=A$.
+
+输出：中$f$的不同的整数根.
+
+ 1. $B=2n(A+A^2)$,任取奇素数$p\in(B+1,2B]$.
+
+ 2. 使用算法##al:finiteroot 找出$\mathbb{F}_p[x]$上$f\bmod p$的所有根$\{u_1\bmod p,\ldots,u_r\bmod p\}$,其中$u_i\in\mathbb{Z}$且$|u_i|<p/2(1\le i\le r)$.
+
+ 3. 对于每个$i$，计算$n-1$次多项式$v_i\in\mathbb{Z}[x]$且$\|v_i\|_{\infty}\le p/2$使得$f\equiv (x-u_i)v_i\pmod{p}$.
+
+ 4. 输出$\{u_i\mid 1\le i\le r, |u_i|\le A, \|v_i\|_{\infty}\le nA\}$.
+
+</algorithm>
+
+<proof name="算法有效性">
+不妨设$f$无零根，则对于其任何一个非零根$u\in\mathbb{Z}$,其能整除$f$的常数项，因而$|u|\le A<p/2$,因此所有整数根都可以从其在模$p$下的象还原出来。现在我们只需证明$f(u_i)=0$当且仅当$|u_i|\le A$且$\|v_i\|_{\infty}\le nA$.
+
+若$f(u_i)=0$,则显然有$|u_i|\le A$.可设$f/(x-u_i)=g$,则由引理##le:prezroot 知$\|f/(x-u_i)\|_{\infty}=\|g\|_{\infty}\le nA<p/2$.但由于$f/(x-u_i)\equiv v_i\pmod{p}$,且两边多项式系数均比$p/2$小，知有$f/(x-u_i)=v_i$,故也有$\|v_i\|_{\infty}\le nA$.
+
+另一方面，若$|u_i|\le A$且$\|v_i\|_{\infty}\le nA$，则$\|(x-u_i)v_i\|_{\infty}\le(1+A)nA<p/2$,因此$f\equiv(x-u_i)v_i\pmod{p}$, 可知$f=(x-u_i)v_i$。
+</proof>
+
+* 无平方因子分解
+
+这一小节详细介绍<index>无平方因子分解</index>,我们分特征为零的域和有限域上多项式这两种情况进行介绍.
+
+** 特征为零的域上无平方分解
+
+<index name="无平方因子分解" sub="特征为零的域上多项式"></index>
+<definition>
+多项式$f=\sum_{i=0}^nf_ix^i\in\mathbb{F}[x]$($\mathbb{F}$可以是环、域等)的形式微商定义为：$$f'=\sum_{i=0}^nif_ix^{i-1}.$$
+</definition>
+
+我们先假定$\mathbb{F}$是一特征为零的域，那么我们已经知道若$u\in\mathbb{F}$是$f$的$m$阶零点，则其是$f'$的$m-1$阶零点，于是$f/f'$中将只含$(x-u)$的一次因子。我们可以在任一域$\mathbb{F}$内证明如下的命题：
+
+<theorem>
+$\mathbb{F}$是任一域，若$g\in\mathbb{F}[x]$是$f\in\mathbb{F}[x]$的一不可约因子，且$f=g^eh$,$h\in\mathbb{F}[x]$,$g,h$互素，则有$g^{e-1}\mid f'$,并且$g^e\nmid f'$当且仅当$eg'\neq 0$.
+</theorem>
+
+<proof>
+由$f$的表达式我们得到$$f'=ehg^{e-1}g'+g^eh',$$则显然$g^{e-1}\mid f'$.另一方面$g^e$对$f'$的整除性等价于对$ehg^{e-1}g'$的整除性，即$ g $是否能整除$eg'$,由于$\deg eg'<\deg g$，则$g\mid eg'\Leftrightarrow eg'=0$.
+</proof>
+
+<remark label="re:charpd">
+我们注意到，在特征为零的域中，当$g$是一非平凡多项式时，$g'\neq 0$,但在特征有限的域中，这一点并不一定正确，如$g=x^3+1\in\mathbb{F}_3[x]$的形式微商$g'$ $=$ $0$.这正是我们下面将要提到的算法不适合于有限域上的原因.
+</remark>
+
+有了上面的定理，则首先我们可以在特征为零的域上求出$f$的无平方因子部分.
+
+
+<algorithm name="无平方因子部分">
+
+对于输入的特征为零的域$\mathbb{F}$上的$n$次首一多项式$f$，输出无平方因子部分$\displaystyle\frac{f}{\gcd(f,f')}$.
+
+</algorithm>
+
+因子分解时,我们往往不仅需要求出无平方因子部分,还要求出下面所谓的无平方因子分解.即若首一非平凡多项式$f=g_1g_2^2\cdots g_m^m$,其中$g_1,\ldots,g_m$两两互素且无平方因子，$g_m\neq 1$,则称$(g_1,\ldots,g_m)$为$f$的无平方分解(Squarefree Decompositon).Yun<cite>dyyy76</cite>提出了一种较快的算法以求出无平方分解.
+
+<algorithm label="al:SFD" name="无平方分解">
+
+ 1. $u=\gcd(f,f')$,$v_1=f/u$,$w_1=f'/u$,$i=1$,
+
+ 2. $h_i=\gcd(v_i,w_i-v_i')$,$v_{i+1}=v_i/h_i$,$w_{i+1}=(w_i-v_i')/h_i$,$i=i+1$,
+
+ 3. 若$v_i\neq 1$则转第2步,
+
+ 4. 输出$(h_1,\ldots,h_{i-1})$.
+
+</algorithm>
+
+<remark>
+上述两个算法的复杂度均为$O(M(n)\log n)$(参见<cite>mca</cite>14.6节).
+</remark>
+
+<remark>
+该算法的思想是简单的,但要给出严格证明比较繁琐.其基本思想是利求导运算将不同次幂的不可约因子的次数变成某项前的系数，利用系数的不同将这些因子一层一层“剥离”出来.这个思想对于理解后面有限域上无平方分解算法的原理是很重要的.下面我们用一个例子来具体展示这一过程.
+</remark>
+
+<problem label="prob:SFD">
+求$f=abc^2d^3$的无平方分解.
+</problem>
+
+<solution>
+顺次计算可得:
+<latex>
+\begin{align*}
+f'{}&=a'bc^2d^3+ab'c^2d^3+2abcc'd^3+3abc^2d^2d', & w_2-v_2'{}&= cd',\\
+u&=\gcd(f,f')=cd^2, & h_2&=\gcd(cd,cd')=c,\\
+v_1&=f/u=abcd,& v_3&=v_2/h_2=d, \\
+w_1&=f'/u=a'bcd+ab'cd+2abc'd+3abcd',& w_3&=(w_2-v_2')/h_2=d', \\
+w_1-v_1'{}&=abc'd+2abcd',& w_3-v_3'{}&= 0, \\
+h_1&=\gcd(abcd,abc'd+2abcd')=ab,& h_3&=\gcd(d,0)=d, \\
+v_2&=v_1/h_1=cd, & v_4&=v_3/h_3=1, \\
+w_2&=(w_1-v_1')/h_1=c'd+2cd',& w_4&=(w_3-v_3')/h=0.
+\end{align*}
+</latex>
+最后输出为$(ab,c,d)$.
+</solution>
+
+** 特征有限的域上无平方分解
+
+<index name="无平方因子分解" sub="有限域上多项式"></index>
+我们再来考虑特征有限的域上无平方分解。在注##re:charpd 中我们已经看到特征有限与特征为零的域的区别为对于一个非平凡的多项式$f(\deg f\ge 1)$,它的形式微商仍然可能是零。下面探讨一下什么情况下形式微商为零，以及此时的多项式有什么特点。
+
+考虑多项式$f=\sum_{i=0}^nf_ix^i\in\mathbb{F}_p[x]$,$p$是一素数.若其微商为零，则$f'=\sum_{i=0}^nif_ix^{i-1}=0$,若$f_i\neq 0$,则须有$i\bmod p=0$,于是$f$中所含的单项均是$x$的$p$的倍数的幂次项，亦即$f=\sum_{i=0}^{n/p}f_ix^{ip}$.于是$$f=\sum_{i=0}^{n/p}(f_ix^i)^p=\left(\sum_{i=0}^{n/p}f_ix^i\right)^p.$$即$f$是一个多项式的$p$次幂，注意到上一小节提到的例子$g=x^3+1=(x+1)^3$.对于素数幂阶的域$\mathbb{F}_{q}(q=p^d)$,也有下面的结论：
+
+<theorem>
+设$q=p^d$为素数$p$的幂,非平凡多项式$f\in\mathbb{F}_q[x]$且$f'= 0$,那么$f$为一$p$次幂.
+</theorem>
+
+<remark>
+该定理的证明要点在于注意到同$\mathbb{F}_p$一样,$\mathbb{F}_q$中的元$a$均有$p$次根.
+</remark>
+
+<corollary  label="cor:squarefree1">
+$\mathbb{F}$为任一域，则其上非平凡多项式$f$是无平方因子的当且仅当$\gcd(f,f')=1$.
+</corollary>
+
+由上面的定理我们知道不可约非平凡多项式的形式微商一定非零。现在前面的算法唯一不可行之处即是对于$p\mid e_i$的情形。设$f=\prod_{i=1}^rf_i^{e_i}$,式中$f_i$两两互素且不可约,$\deg f=n\ge 1$,$e_1,\ldots,e_r$均是正整数.显然我们有$$f'= \prod_{p\nmid e_i}e_i\frac{f}{f_i}f_i',$$可知$u=\gcd(f,f')=\prod_{p\nmid e_i}f_i^{e_i-1}\prod_{p\mid e_i}f_i^{e_i}$,于是$$v=\frac{f}{u}=\prod_{p\nmid e_i}f_i,$$其中乘积中缺少了某些项，这些项的次数均是$p$的倍数. 我们注意到多项式$u$中含有我们需要的这些幂次，且$e_i\le n$,则有如下关系：$$w=u/\gcd(u,v^n)=\prod_{p\mid e_i}f_i^{e_i},$$ 从而$w$为$p$次幂。由此我们可以得到如下算法：
+
+<algorithm  name="有限域无平方部分算法">
+
+输入：有限域$\mathbb{F}_q[x]$上首一非平凡多项式$f$,$\deg f=n$.
+
+输出：$f$的无平方部分$g$.
+
+ 1. $u=\gcd(f,f')$,$v=f/u$,$w=u/\gcd(u,v^n)$,
+
+ 2. 若$w=1$，则输出$v$,否则递归调用本算法计算$w^{1/p}$的无平方部分$v_1$.
+
+ 3. 输出$vv_1$.
+</algorithm>
+
+<problem>
+求$f=a^2b^3c^6d^9\in\mathbb{F}_3[x]$的无平方部分,其中$a,b,c,d$是互素且不可约首一多项式.
+</problem>
+
+<solution>
+顺次计算得:
+<latex>
+\begin{align*} 
+f'&= 2aa'b^3c^6d^9, \\
+u&=\gcd(f,f')=ab^3c^6d^9, \\
+v&=f/u=a, \\
+w&=u/\gcd(u,v^n)=u/a=b^3c^6d^9,
+\end{align*}
+</latex>
+递归调用算法，计算得
+<latex>
+\begin{align*}
+f_1&=w^{1/3}=bc^2d^3, \\
+f_1'&= b'c^2d^3+2bcc'd^3, \\
+u_1&=cd^3, \\
+v_1&=bc, \\
+w_1&=d^3,
+\end{align*}
+</latex>
+再次递归调用的结果为$v_2=d$. 故最后输出$vv_1v_2=abcd$.
+</solution>
+
+上节中的例##prob:SFD 给了我们对于算法##al:SFD 的理解：$v_i$序列包含了要处理的无平方部分，$g=v_1=g_1\cdots g_m$,$w_1=\sum_{i=1}^{m}e_ig_i'g/g_i$,$e_i$是$g_i$在$f$中的次数(在下面的说明中$e_i=i$)，每处理一次，$v_i$中去掉次数$i$的项，如果是在有限域中，该算法就只能在$m<p$时正确，因为它会将模$p$相同的次数$i$归于同一个次数$i\bmod p$上,即有下面的结果：
+<latex>
+\begin{align*}
+h_i&=\prod_{j\equiv i\pmod{p}}g_j\quad(1\le i<p), \\
+h_i&=1\quad(i\ge p).
+\end{align*}
+</latex>
+假设$m>p$,$f=\prod_{i=1}^mg_i^i$,则算出$h_1,h_2,\ldots,h_{p-1}$后，令$f_1=fh_1^{-1}h_2^{-2}\cdots h_{p-1}^{-p+1}$,则
+$$f_1=\prod_{i\ge p}g_i^{i-i\bmod p},$$
+于是
+$$f_1^{\frac{1}{p}}=\prod_{i\ge p}g_i^{\left[\frac{i}{p}\right]}.$$
+
+如果我们能够构造递归算法以得到$f_1^{1/p}$的无平方分解$(s_1,\ldots,s_l)$,则显然有
+$$s_j=\prod_{[\frac{i}{p}]=j}g_i,$$
+于是$\gcd(h_i,s_j)=g_{jp+i}$.
+
+通过前面的讨论，我们得到了如下一种利用递归进行分解的算法。
+
+<algorithm name="有限域无平方分解">
+输入：有限域$\field{q}$上首一不可约多项式$f$
+
+输出:$f$的无平方分解$(g_1,g_2,\ldots,g_m)$.
+
+ 1. 调用算法##al:SFD 计算出$h_k(1\le k<p)$, $f_1=\displaystyle\frac{f}{h_1h_2^2\cdots h_k^k}$。若$f_1=1$则输出$(h_1,\ldots,h_k)$,
+
+ 2. 递归调用本算法得到$f_1^{1/p}$的无平方分解$(s_1,s_2,\ldots,s_l)$,
+
+ 3. 令$h_{k+1},\ldots,h_{p-1}=1$,
+
+ 4. $g_{jp+i}=\gcd(h_i,s_j)\quad(1\le i<p,1\le j\le l)$,
+
+ 5. $g_{jp}=\displaystyle\frac{s_j}{g_{jp+1}g_{jp+2}\cdots g_{(j+1)p-1}}\quad(1\le j\le l)$,
+
+ 6. $g_i=\displaystyle\frac{h_i}{g_{p+i}g_{2p+i}\cdots g_{lp+i}}\quad(1\le i<p)$,
+
+ 7. 令$m$为最大的使$g_m\neq 1$的下标，输出$(g_1,\ldots,g_m)$.
+</algorithm>
+
+* Berlekamp 算法
+
+最早的有限域上多项式因子分解算法是Berlekamp于1967，1970年提出的<cite>berlekamp67</cite><cite>berlekamp70</cite>.为了引入这个算法，我们先做一些代数上的准备。
+
+** Frobenius映射和Berlekamp子代数
+
+<definition>
+$\field{q^n}$或$\field{q}[x]$上($q$为一素数幂)的映射$\sigma:a\mapsto a^q$称为<index>Frobenius映射</index>.
+</definition>
+
+<remark>
+注意到Frobenius映射$\sigma$是线性映射,且保持加法和乘法.
+</remark>
+
+以下设$f\in\field{q}[x]$是一首一无平方因子多项式,$\deg f=n$且$f=\prod_{i=1}^{r}f_i$,$f_i$为两两互素且不可约首一多项式.由中国剩余定理有下面的环同构：$$R=\field{q}[x]/\idea{f}\cong\field{q}[x]/\idea{f_1}\times\cdots\times\field{q}[x]/\idea{f_r}=R_1\times\cdots\times R_r,$$通过同构映射：$$\chi:a\bmod f\in R\mapsto(a\bmod f_1,\ldots,a\bmod f_r).$$
+
+<theorem>
+$\sigma$是$R$的自同构.
+</theorem>
+
+<proof>
+由于$\chi$是$R$到$\prod_{i=1}^rR_i$的同构,故可由$\sigma$在$R_i$上诱导出相应的线性映射$\sigma_i:a_i\mapsto a_i^q(a_i\in R_i)$,于是$\ker\sigma\cong\prod_{i=1}^r\ker\sigma_i$.又由于$R_i$为域，那么$\sigma_i(a_i)=a_i^q=0$仅有$q$重根$0$,即$\dim\ker\sigma_i=0$,因此$\dim\ker\sigma=0$,$\sigma$是单射. 由于有限维线性空间上的线性变换若是单射则必为同构，可知$\sigma$是$R$的自同构. 
+</proof>
+
+<definition>
+记$\mathcal{B}=\ker(\sigma-\mathrm{id})$,其是$\field{q}$上$R$的子代数，也被称为<index>Berlekamp子代数</index>.
+</definition>
+
+<theorem>
+$\dim\mathcal{B}=r$.
+</theorem>
+
+<proof>
+由于$\chi$是$R$到$\bigotimes_{i=1}^rR_i$上的同构，因此我们实际上将两者等同看待，则$\sigma$等同于$$(a\bmod f_1,\ldots,a\bmod f_r)\mapsto(a^q\bmod f_1,\ldots,a^q\bmod f_r).$$ $\forall a\in\mathcal{B}$,记$a_i=a\bmod f_i$,则$a^q=a\Rightarrow a_i^q=a_i$.但是$a_i\in R_i=\field{q}[x]/\langle f_i\rangle$,$R_i$实际上是一个域，其上的代数方程$x^q-x=0$至多有$q$个根，全体根恰好组成$\field{q}$这个子域，即有$a_i\in\field{q}$. 于是$a\in\bigotimes_{i=1}^r\field{q}\Rightarrow\mathcal{B}\subset\bigotimes_{i=1}^r\field{q}$.而显然后者也包含于前者，于是有两者相等，从而$\dim\mathcal{B}=r$.
+</proof>
+
+<definition>
+Frobenius映射在$R$上自然基$\{1,x,\ldots,x^{n-1}\}$下的表示矩阵记作$Q\in\field{q}^{n\times n}$,称为<index>Petr-Berlekamp矩阵</index>.
+</definition>
+
+<corollary>
+$\field{q}$上无平方因子$n$次多项式$f$不可约当且仅当$\rank(Q-I)=n-1$.
+</corollary>
+
+<corollary>
+$\field{q}$上无平方因子$n$次多项式$f$的不可约因子的个数为$\ker\mathcal{B}=n-\rank(Q-I)$.
+</corollary>
+
+取$\mathcal{B}$的一组基$\{b_1,b_2,\ldots,b_r\}$,因为$\mathcal{B}=\bigotimes_{i=1}^r\field{q}$,可设这组基在$R_1\times R_2\times\cdots\times R_r$中的表示矩阵为$$B=(b_1,\ldots,b_r)=\begin{pmatrix} b_{11} &b_{21} &\cdots &b_{r1}\\ \vdots &\vdots & &\vdots\\ b_{1r} &b_{2r} &\cdots &b_{rr}\end{pmatrix}\in\field{q}^{n\times n}.$$ 此为一可逆矩阵，于是$\forall 1\le i<j\le r$,$\exists k(1\le k\le r)$使得$b_{ik}\neq b_{jk}$,即$b_k\bmod f_i\neq b_k\bmod f_j$,则对于$b_k-b_{ik}$有$$f_i\mid (b_k-b_{ik}),\quad f_j\nmid (b_k-b_{ik}).$$ 则$b_i-b_{ik}$是可以分离$f$的一个多项式.
+
+<corollary label="cor:idontknow">
+任取$\mathcal{B}$的一个基矢$b_k$,任取$a\in\field{q}$,则$\gcd(b_k-a,f)$可能给出$f$的一个非平凡因子.
+</corollary>
+
+** Berlekamp算法的实现
+
+有了上面的准备工作,下面我们可以来引入<index>Berlekamp算法</index>了.由推论##cor:idontknow 可以得到如下算法.
+
+<algorithm label="al:berlekamp1" name="Berlekamp算法1">
+
+输入：$\field{q}$上无平方因子首一$n$次非平凡多项式$f$,
+
+输出：$f$可能的非平凡因子，或者失败.
+
+ 1. 构作环$R=\field{q}[x]/\idea{f}$上的Frobenius映射的表示矩阵$Q$,即Petr-Berlekamp矩阵,
+
+ 2. 对$Q-I$进行高斯消元法，求出$\mathcal{B}=\ker(Q-I)$的$r$个基矢$\{b_1,\ldots,b_r\}$,
+; U是什么？？
+ 3. 随机任取一个基矢$b_k(1\le k\le r)$,任取$a\in\field{q}$,对$U$中任何一个元素$u$,计算$v=\gcd(b_k-a,u)$,若$v\neq 1$且$v\neq u$,则输出$v$,否则输出失败.
+</algorithm>
+
+<remark>
+求Petr-Berlekamp矩阵时可先用快速求幂算法算出$x^q\bmod f$,进而求出$x^{qi}(1\le i\le n)$.
+</remark>
+
+下面是另外一种概率性的Berlekamp算法<cite>mca</cite>，能给出$f$的可能因子.
+
+<algorithm label="al:berlekamp2" name="Berlekamp算法2">
+输入:$\field{q}$上无平方因子首一$n$次非平凡多项式$f$，
+
+输出:$f$的可能非平凡因子,或者失败.
+
+ 1. 构作环$R=\field{q}[x]/\idea{f}$上的Petr-Berlekamp矩阵Q,
+
+ 2. 对$Q-I$进行高斯消元法，求出$\mathcal{B}=\ker(Q-I)$的$r$个基矢$b_1,\ldots,b_r$,
+
+ 3. 独立地随机选取$c_1,c_2,\ldots,c_r\in\field{q}$,计算$a=\sum_{i=1}^rc_ib_i$,
+
+ 4. $g_1=\gcd(a,f)$,若$g_1\neq 1$且$g_1\neq f$则输出$g_1$,
+
+ 5. $b=a^{(q-1)/2}\bmod f$,$g_2=\gcd(b-1,f)$,
+
+ 6. 若$g_2\neq 1$且$g_2\neq f$则输出$g_2$,否则输出失败.
+</algorithm>
+
+该算法的正确性证明与奇素数幂同次因子分解(算法##al:preEDF )类似,只须注意到$\chi_i(a)\in\field{q}$,这样我们有$a^{(q-1)/2}=0$或$1$,两种取值等概率为$1/2$.
+
+为了引入特征为2的域上与算法##al:berlekamp2 对应的Berlekamp算法,我们证明如下引理.
+
+<lemma>
+设$a$是$\mathcal{B}=\ker(Q-I)$中任意一随机元素,$b=T_k(a)$为迹多项式,则$\gcd(b-1,f)$可能给出$f$的一个非平凡因子,且失败概率不超过$1/2$.
+</lemma>
+
+<proof>
+首先,由于$\chi_i(a)\in\field{2^k}=\field{q}$,有$\chi_i(T_k(a))=T_k(\chi_i(a))=0$或$1$,且两值等概率.当且仅当$\chi_i(b)$全为$0$或$1$时,$b=0$或$1$,此概率为$2^{1-r}\le 1/2$. 易知,当且仅当$b\not\in\field{2}$时,$\gcd(b-1,f)$含有$f$的非平凡因子.
+</proof>
+
+于是对于特征为2的域$\field{q}=\field{2^k}$,有如下的：
+
+<algorithm label="al:berlekamp3" name="Berlekamp算法3">
+将算法##al:berlekamp2 中第5步改为计算$b=T_k(a)$,其余不变.
+</algorithm>
+
+* 各算法复杂度比较
+
+在前面几节,我们着重介绍了不同次因子分解算法,同次因子分解算法(Cantor-Zassenhaus算法)以及Berlekamp算法,并且也提到了von zur Gathen和Shoup的Frobenius迭代算法,Kaltofen和Shoup的Baby Step-Giant Step算法.这些算法渐近复杂度可用图<literal>\ref{fig:faczpcmp}</literal>表示(参见<cite>mca</cite>14.8节).
+
+<latex>
+\begin{figure}[h]
+\centering\includegraphics[scale=0.5]{images/faczp_cmp}
+\caption{各种算法渐近复杂度比较}
+\label{fig:faczpcmp}
+\end{figure}
+</latex>
+
+由图<literal>\ref{fig:faczpcmp}</literal>我们可以看出,在有限域的阶较小时,即$q$比起$n$较小时,较优的算法是Kaltofen和Shoup的算法,然后是Frobenius迭代算法,在$q$很大时,各算法的渐近复杂度是一样的.
+
+; 有限域上的因子分解算法在近些年有很多进展,如1998年Kaltofen和Shoup的Subquadratic算法(见<cite>ks98</cite>),Huang和Pan的Fast rectangular matrix multiplication算法(见<cite>hp98</cite>)等等.
+
+* 不可约性检测和不可约多项式的构造
+
+若要检测一个多项式的不可约性,前面的因子分解的方法当然也是适用的,只需修改相应的算法终止条件即可,下面再介绍一个比较简单的检测方法<cite>mca</cite>.
+
+<corollary>
+$ n $次非平凡多项式$f\in\field{q}[x]$是不可约的当且仅当:
+
+ 1. $f\mid x^{q^n}-x$,
+
+ 2. 对满足$t\mid n$的素数$t$,都有$\gcd(x^{q^{n/t}}-x,f)=1$.
+</corollary>
+
+<proof>
+由定理##th:fermat2 知道上面两个条件是必要的.再设两个条件满足,则首先由条件1及定理##th:fermat2 知$f$的不可约因子次数均整除$n$,不妨设有这样一个非平凡因子$g$且$\deg g=d<n$,则存在$n$的素因子$t$使$d\mid (n/t)$,于是$g\mid \gcd(x^{q^{n/t}}-x,f)$,矛盾,于是$f$不可约.
+</proof>
+
+<algorithm  name="有限域上不可约性检测">
+
+输入：$ n $次多项式$f\in\field{q}[x]$,
+
+输出：不可约或可约.
+
+ 1. 调用快速求幂算法计算$x^q\bmod f$,
+
+ 2. 调用模复合算法##al:fastmodularcomposition 计算$a=x^{q^n}\bmod f$,若$a\neq x$则输出可约,
+
+ 3. 对于所有$n$的素因子$t$,调用模复合算法计算$a=x^{q^{n/t}}\bmod f$,若$\gcd(b-x,f)\neq 1$则输出可约,
+
+ 4. 输出不可约.
+</algorithm>
+
+<remark>
+模复合(Modular composition)算法<cite>mca</cite>是快速矩阵乘法的应用,这里不加证明地给出如下.
+</remark>
+
+<algorithm  label="al:fastmodularcomposition" name="模复合算法">
+
+输入：设$R$为环, $f$,$g$,$h\in R[x]$,且$\deg g$,$\deg h<\deg f=n$,$f$首一且不为零,
+
+输出：$g(h)\bmod f\in R[x]$.
+
+ 1. $m=[n^{1/2}]$,并设$g=\sum_{0\le i<m}g_ix^{mi}$,其中$g_0,\ldots,g_{m-1}\in R[x]$的次数少于$m$,
+
+ 2. 对于$2\le i\le m$,计算$h^i\bmod f$,
+
+ 3. 令$A\in R^{m\times n}$,其行由$1$,$h\bmod f$,$\cdots$,$h^{m-1}\bmod f$的系数组成,$B\in R^{m\times m}$,其行由$g_0,\ldots,g_{m-1}$的系数组成,计算$BA\in R^{m\times n}$,
+
+ 4. 对于$0\le i<m$循环,令$r_i$为$BA$第$i$行作为系数构成的多项式,并利用Horner规则计算$b=\sum_{0\le i<m}r_i(h^m)^i\bmod f$,
+
+ 5. 输出$b$.
+</algorithm>
+
+构造一个不可约多项式的最基本的想法就是随机取一个多项式,再对其作不可约性检测。于是我们必须要对随机选取取到不可约多项式的概率进行估计。
+
+<lemma label="le:primeprob">
+设$q$是一素数幂,$ n $是正整数,则$\field{q}[x]$中$ n $次首一不可约多项式的个数$I(n,q)$满足$$\frac{q^n-2q^{n/2}}{n}\le I(n,q)\le\frac{q^n}{n},$$因此随机选取$\field{q}[x]$中$ n $次首一多项式为不可约的概率$p_n$满足$$\frac{1}{n}(1-\frac{2}{q^{n/2}})\le p_n\le\frac{1}{n}.$$
+</lemma>
+
+<proof>
+令$f_n$为$\field{q}[x]$中所有首一不可约$ n $次多项式的乘积，则$\deg f_n=n\cdot I(n,q)$,由定理##th:fermat2 知$$x^{q^n}-x=\prod_{d\mid n}f_d=f_n\cdot\prod_{d\mid n, d<n}f_d.$$
+
+对上式取次数，有$$q^n=\deg f_n+\sum_{d\mid n, d<n}\deg f_d,$$因此$$q^n\ge\deg f_n=n\cdot I(n,q)\Rightarrow I(n,q)\le\frac{q^n}{n}.$$
+
+另外,$$\sum_{d\mid n, d<n}\deg f_d\le\sum_{1\le d\le n/2}\deg f_d\le\sum_{1\le d\le n/2}q^d<\frac{q^{n/2+1}-1}{q-1}\le 2q^{n/2},$$因此$$n\cdot I(n,q)=\deg f_n=q^n-\sum_{d\mid n, d<n}\deg f_d\ge q^n-2q^{n/2},$$由此可得到关于$I(n,q)$下界的估计.
+
+由于$ n $次首一多项式共有$q^n$个,因此不可约的概率为$p_n=I(n,q)/q^n$,由此得到关于概率的估计.
+</proof>
+
+<remark>
+由于$q^n=\sum_{d\mid n}\deg f_d$,则由Mobius反演公式可给出$I(n,q)$的精确表达(参见<cite>fkq03</cite>26-29页)$$n I(n,q)=\deg f_n=\sum_{d\mid n}\mu\left(\frac{n}{d}\right)q^d.$$
+</remark>
+
+由引理##le:primeprob 我们看到当$n$很大时,$n$次多项式不可约的概率趋向于$1/n$.因此在$n$不是很大时,可以用下面的算法来产生不可约多项式.
+
+<algorithm  name="产生不可约多项式算法">
+
+输入：素数幂$q$和正整数$ n $,
+
+输出：一个随机生成的$ n $次首一多项式$f\in\field{q}[x]$.
+
+ 1. 随机生成一个首一$ n $次多项式$f\in\field{q}[x]$,
+
+ 2. 对于$i=1,\ldots,[n/2]$循环,令$g_i=\gcd(x^{q^i}-x,f)$,若$g_i\neq 1$则转1,
+
+ 3. 输出$f$.
+</algorithm>
+
+

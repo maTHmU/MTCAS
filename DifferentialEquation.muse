@@ -1,0 +1,745 @@
+#title 微分方程符号解
+
+<contents>
+
+微分方程在数学、自然科学乃至社会科学中的都起着重要作用，求解微分方程的方法被广泛地发展起来。在计算机代数中，求出微分方程的符号解也是一个令人众多研究者着迷的课题。微分Galois理论、Lie对称理论等众多理论被发展并应用在此领域。关于这方面更详细的综述和文献目录，我们推荐读者参考<cite>seiler</cite>和<cite>Gra03</cite>的2.11节。
+
+本章主要介绍微分方程符号解中最基本的问题，包括Risch微分方程、一阶线性微分方程、微分Galois理论简介、二阶微分方程的Kovacic算法、高阶线性微分方程的多项式解、有理解与指数解以及二阶微分方程的特殊解，主要参考书为<cite>dav84</cite>，<cite>kol73</cite>和<cite>put07</cite>。阅读本章需要读者具备基本的微分方程、抽象代数知识（例如<cite>ding04</cite>，<cite>nlzdss00</cite>），对于Laurent展式、极点、Puiseux展式等概念有所了解。
+
+* Risch 微分方程
+
+在考虑超越指数函数积分时我们遇到了形如$$A_i(x)=B_i(x)'+iB_i(x)\eta'(x)$$的微分方程##eq:rischexp ，其中数$A_i,\eta'\in K$（基域）为已知函数，$B_i\in K$为未知函数。这是一个Risch微分方程的求解问题。一般地，设$f,g\in K$，<index>Risch微分方程</index>问题就是要判断
+<latex>
+\begin{equation}
+  y'{}+fy=g@@eq:risch
+\end{equation}
+</latex>
+在$K$中是否有解，如果有解则构造出解。此问题是最简单的一类微分方程，同时对于符号积分的求解过程也是本质上重要的。
+
+** 有理函数域
+
+首先我们考虑最简单的有理函数域情形，即设$K=\mathbb{Q}(x)$、$\mathbb{R}(x)$或$\mathbb{C}(x)$。记$\den(y)$表示有理函数$y$的既约分母，对于任意不可约多项式$p\in K$且$p\mid \den(y)$，我们希望求出$p$的次数。设$p^\alpha\|\den(y)$，$p^\beta\|\den(f)$，$p^\gamma\|\den(g)$。可令$y=\dfrac{v}{p^\alpha u}$，其中$(p,u)=1$，则$y'{}=\dfrac{v'pu-v(pu'+\alpha p'u)}{p^{\alpha+1}u^2}$，由$(p,p')=1$可知$p^{\alpha+1}\|\den(y')$。故方程##eq:risch 中三项$y'$，$fy$，$g$的分母中$p$的次数分别为$\alpha+1$，$\alpha+\beta$，$\gamma$。比较两端分母中$p$的次数，分为三种情形：
+ 1. $\beta>1$时，必有$\gamma=\alpha+\beta$；
+ 2. $\beta<1$时，必有$\gamma=\alpha+1$；
+ 3. $\beta=1$时，
+   - 若左端求和后无约分，则$\gamma=\alpha+1$；
+   - 若左端求和后有约分。由$(p,u)=1$可找到$a$，$b$，使得$ap^\alpha+bu=1$，从而$$y=\frac{v}{p^\alpha u}=\frac{v(ap^\alpha+bu)}{p^\alpha u}=\frac{vb}{p^\alpha}+\frac{va}{u}=:\frac{Y}{p^\alpha}+\tilde y,$$满足$\deg Y<\deg p$，$p^\alpha\nmid\den(\tilde y)$。同理可设$f=\dfrac{F}{p}+\tilde f$满足$\deg F<\deg p$，$p\nmid\den(\tilde f)$。从而
+
+$$y'+fy=-\frac{\alpha Yp'}{p^{\alpha+1}}+\frac{Y'}{p^\alpha}+\tilde{y}'+\frac{FY}{p^{\alpha+1}}+\frac{F\tilde y}{p}+\frac{Y\tilde f}{p^\alpha}+\tilde f\tilde y,$$由于有约分，左端求和分母为$p^{\alpha+1}$的项之和必定可以约分，于是$$p\mid-\alpha Yp'+FY,$$而$p$不可约,$\deg Y<\deg p$，故$(p,Y)=1$，可得$$p\mid -\alpha p'+F.$$又由$\deg F<\deg p$可知必有$F=\alpha p'$，即$\alpha=\dfrac{F}{p'}$。
+
+由此得到了未知函数$y$分母中$p$的次数$\alpha$的上界，使我们便于使用待定系数法。通过上面的讨论，我们实际上证明了<cite>ris69</cite>中的如下引理。
+
+<lemma>
+若$\dfrac{F}{p'}$为整数且$\beta=1$，则
+$$\alpha\le \max\left\{\gamma-1,\frac{F}{p'}\right\},$$否则$$\alpha\le \min\{\gamma-1,\gamma-\beta\}.$$
+</lemma>
+
+仔细验证可以发现，只有在论证$(p,Y)=1$时用到了$p$为不可约多项式，其他地方均可以将条件减弱为$p$为无平方因子的多项式。因此可以首先用$\den(f),\den(g)$的无平方因子分解代替完全分解。需要处理的是对幂次$\beta=1$的无平方因子$p$，求出$p$的不可约因子$q_i$，使得$z=\dfrac{F}{q_i'}$为整数。与Rothstein-Trager方法类似得论证可以得到
+$$F=zq_i'\Leftrightarrow(F-zp',p)\text{非平凡}\Leftrightarrow \res_x(F-zp',p)=0.$$从而我们只需求结式$\res_x(F-zp',p)=0$关于$z$的整数根即可。我们得到了如下计算$\den(y)$的一个倍数的方法。
+
+<algorithm  name="计算$\den(y)$的一个倍数">
+ 1. 计算无平方分解$\den(f)=\prod\limits_{i=1}^np_i^{\beta_i}$，$\den(g)=\prod\limits_{i=1}^np_i^{\gamma_i}$，其中$\beta_i,\gamma_i\ge 0$，$p_i$无平方因子。
+ 2. 对每个$1\le i\le n$，令$p=p_i$，$\beta=\beta_i$，$\gamma=\gamma_i$。
+   - 若$\beta\ne1$，令$\alpha=\min\{\gamma-1,\gamma-\beta\}$，$r=p^\alpha$；
+   - 否则计算分解$f=\dfrac{F}{p}+\tilde f$，求出$\res_x(F-zp',p)=0$的整数根$z_1,\ldots,z_m$（例如利用算法##al:zroot ）。令$\alpha_j=\max\{\gamma-1,z_j\}$，$q_j=(F-z_jp',p)$，$r=p^{\gamma-1}\cdot\prod\limits_{j=1}^mq_j^{\alpha_j-(\gamma-1)}$。
+ 3. 累乘所有$r$并输出，算法终止。
+</algorithm>
+
+在得到$\den(y)$的一个倍数之后，只要确定$y$分子次数的一个上界，即可使用待定系数法求出$y$的分子来了。设$y=\dfrac{a}{b}$，我们希望求出$\alpha=\deg a$。将其带入方程##eq:risch 并两端乘以最小公分母可以得到形如$$Ra'+Sa=T$$的等式，其中$R,S,T$为多项式，记$\beta=\deg R$，$\gamma=\deg S$，$\delta=\deg T$，则$Ra'$，$Sa$，$T$的次数分别为$\beta+\alpha-1$，$\gamma+\alpha$，$\delta$。比较等式两端的次数，分为三种情形：
+
+ 1. $\gamma<\beta-1$时，必有$\delta=\beta+\alpha-1$；
+ 2. $\gamma>\beta-1$时，必有$\delta=\gamma+\alpha$；
+ 3. $\gamma=\beta-1$时，
+   - 若左端求和后最高项未被消去，则$\delta=\gamma+\alpha$；
+   - 若左端求和后最高项被消去。设$a=\sum\limits_{i=1}^\alpha a_ix^i$，$R=\sum\limits_{i=1}^\beta r_ix^i$，$S=\sum\limits_{i=1}^\gamma s_ix^i$，则有$\alpha r_\beta a_\alpha+s_\gamma a_\alpha=0$，从而$\alpha=-\dfrac{s_\gamma}{r_\beta}$。
+
+由此我们得到了$y$分母次数$\alpha$的一个上界：
+
+<lemma label="le:numbound">
+若$\gamma=\beta-1$且$-\dfrac{s_\gamma}{r_\beta}$为正整数，则
+$$\alpha\le\max\left\{\delta-\beta+1,-\frac{s_\gamma}{r_\beta}\right\},$$否则$$\alpha\le\min\{\delta-\beta+1,\delta-\gamma\}.$$
+</lemma>
+
+有了引理##le:numbound ，接下来便可以对$y$的分子进行待定系数法求解了，最终可得到方程##eq:risch 在$K=\mathbb{Q}(x)$、$\mathbb{R}(x)$或$\mathbb{C}(x)$的解$y$。
+
+** 一般情形
+
+上面我们讨论了$K$为最简单的有理函数域的情形。对于一般情形，Bronstein<cite>bro90</cite>证明了如下定理。
+
+<theorem label="th:bro90" name="Bronstein">
+若在$K$的任意有限次代数扩张中初等积分和Risch方程问题都可解，设$\theta$为$K$上的超越初等生成元，则在$K(\theta)$的任意有限次代数扩张中初等积分和Risch方程问题也都可解。
+</theorem>
+<index name="符号积分"></index>
+由于Risch<cite>ris69</cite>, Rothstein<cite>rot77</cite>, Davenport<cite>dav86</cite>解决了超越初等扩张的积分问题和Risch方程问题，Trager<cite>tra84</cite>，Davenport<cite>dav84</cite>解决了代数扩张的积分问题和Risch方程问题。从而根据定理##th:bro90 ，便可以从理论上得到所有初等函数的初等积分和Risch方程问题的解决方案了。
+
+* 一阶线性微分方程
+<index name="一阶线性微分方程"></index>
+管求积分实际上就是最简单的一阶方程$y'(x)=f(x)$，但仅仅此问题解决起来难度已经相当大了。Risch微分方程是最简单的一类一阶微分方程（线性方程），当然我们求的仅仅是$K$中的解，而非一般的$K$上的初等函数解。虽然我们知道一阶线性方程##eq:risch 有通解表达式（参考<cite>ding04</cite>）$$y=e^{-\int f}\cdot\left(c+\int ge^{\int f}\right),$$但这并没有解决一般问题，因为为了算出表达式中的指数积分，我们还得回到解Risch方程问题上。
+
+不过以下的定理<cite>dav88</cite>使我们能够避免循环论证而得到$K$上可能的初等函数解。
+
+<theorem  name="Davenport">
+设$K$上的Risch方程在$K$上有初等函数解，则有一个解$y\in K$或者$e^{\int f}$在$K$上代数（从而可以求出$y$）。
+</theorem>
+
+<proof>
+记$F=K(\int f)$。
+ 1. 若$e^{\int f}$在$F$上代数，则由Liouville定理（定理##th:liouville ），$\int f$必为$\hat K$上对数函数的和，从而$e^{\int f}$必也在$K$上代数。
+ 2. 若$e^{\int f}$在$F$上超越，由于$y$在$K$上初等，自然在$F$上初等，故$\displaystyle \int ge^{\int f}=ye^{\int f}$也在$F$上初等。记$\theta=e^{\int f}$为$F$上的超越指数函数，由分解引理可知$\int g\theta=h\theta$，其中$h\in F$（注意指数函数求导后次数不变），从而有解$y=h\in F$。若$F=K$，则有$y\in K$，否则$\int f$中必有$\hat K$上的对数函数。可设$y=p\big(\int f\big)$，其中$p(x)\in K(x)$，而由方程##eq:risch 可得$$p'\left(\int f\right)+p\left(\int f\right)=\frac{g}{f}\in K,$$可知必有$p'+p\in K$，也有$y\in K$。
+
+这就完成了证明。
+</proof>
+
+因此求一阶线性方程可以通过求$K$中的解，或是$K$上的代数函数积分来完成。
+
+<remark>
+由于$\int g\theta=h\theta$中积分常数的存在，注意并没有要求所有解$y$都属于$K$，例如方程$$y'(x)+y(x)=x+1$$的通解为$x+ce^{-x}$，的确有属于$K=\mathbb{Q}(x)$的解$y(x)=x$，但并非解所有都是。
+</remark>
+
+* 微分Galois理论
+<index name="微分Galois理论"></index>
+接下来要讨论的自然是一般高阶线性方程如何求解的问题。对一般的高阶线性方程$$y^{(n)}+a_1(x)y^{(n-1)}+\cdots+a_n(x)y=f(x),$$可化为线性方程组矩阵形式$$\mathbf{y}'{}=\mathbf{A}(x)\mathbf{y}+\mathbf{f}(x),$$其中
+<latex>
+\begin{equation*}
+  \mathbf{y}=
+  \begin{bmatrix}
+    y \\
+    y' \\
+    \vdots \\
+    y^{(n-2)} \\
+    y^{(n-1)}
+  \end{bmatrix},\mathbf{f}(x)=
+  \begin{bmatrix}
+    0 \\
+    0 \\
+    \vdots \\
+    0 \\
+    f(x)
+  \end{bmatrix},
+\end{equation*}
+</latex>
+<latex>
+\begin{equation*}
+\mathbf{A}(x)=
+  \begin{bmatrix}
+    0 & 1&0&\cdots&0 \\
+    0 &0&1&\cdots&0 \\
+    \ldots&\ldots&\ldots& & \ldots \\
+    0 & 0&0&\cdots&1 \\
+    -a_n(x)&-a_{n-1}(x)&-a_{n-2}(x)&\cdots&-a_1(x)
+  \end{bmatrix}.
+\end{equation*}
+</latex>
+
+设对应的齐次方程的基本解矩阵为$\mathbf{\Phi}(x)$，则非齐次线性方程的通解为（参考<cite>ding04</cite>）$$\mathbf{y}(x)=\Phi(x)\left(\mathbf{c}+\int\Phi^{-1}(s)\mathbf{f}(s)\right)ds.$$因此我们可以首先考虑齐次方程的求解。
+<index name="Kovacic算法"></index>
+在求解多项式方程的过程中诞生了伟大的Galios理论，解线性微分方程也有一个对应物——微分Galois理论。在这里我们做一个简要介绍，这些理论也是Kovacic著名的二阶线性方程求解算法的基础（尽管最终的算法可以完全摆脱微分Galois理论的语言）。首先引入几个重要的概念（可参看<cite>put07</cite>）。
+<index name="Picard-Vessiot域"></index>
+<definition  name="Picard-Vessiot域">
+设$\mathbf{y}'{}=\mathbf{Ay}$为$K$上的齐次线性方程组，微分代数$L\supseteq K$称为关于此方程的Picard-Vessiot域，如果$C(K)$为代数闭域，且存在方程的基本解矩阵$F\in GL_n(L)$，使得$F$的矩阵元在$K$上生成$L$。
+</definition>
+
+<problem label="ex:2order">
+考虑$K=\mathbb{C}(x)$上的二阶线性微分方程$y''{}=ry$，设$\eta,\zeta$为方程的一个基础解系，则一个基本解矩阵为
+<latex>
+\begin{equation*}\Phi=
+\begin{bmatrix}
+  \eta& \zeta \\
+  \eta' &\zeta'
+\end{bmatrix}
+\end{equation*}
+</latex>
+故Picard-Vessiot域为$\mathbb{C}(x)(\eta,\zeta,\eta',\zeta')$。
+</problem>
+<index name="微分Galois群"></index>
+<definition  name="微分Galois群">
+设$\mathbf{y}'{}=\mathbf{Ay}$为$K$上的齐次线性方程组，其微分Galois群$G=\gal(L/K)$定义为其Picard-Vessiot域$L$上的微分$K$-代数自同构群，即$G$的元素为$L$上的所有$K$-代数自同构$\sigma$，满足$\sigma(f')=(\sigma(f))'$。
+</definition>
+
+
+<problem>
+(续例##ex:2order )设$\sigma\in G$为微分Galois群中的元素，则$\sigma(\eta),\sigma(\zeta)$仍为方程的基础解系，可在基$\eta,\zeta$下表示为$$\sigma(\eta)=a_\sigma\eta+b_\sigma\zeta,\quad\sigma(\zeta)=c_\sigma\eta+d_\sigma\zeta,$$将其写为
+<latex>
+\begin{equation*}
+  \sigma(\eta\ \zeta)=(\eta\ \zeta)
+  \begin{bmatrix}
+    a_\sigma&c_\sigma \\
+    b_\sigma&d_\sigma
+  \end{bmatrix}=(\eta\ \zeta)M_\sigma,
+\end{equation*}
+</latex>
+其中$M_\sigma$为$\mathbb{C}$上的$2\times2$矩阵，于是$\sigma$可视为$GL_2(\mathbb{C})$元素。
+</problem>
+
+下面的结果将微分Galois群与代数群建立了联系,具有根本的重要性。
+
+<definition  name="代数群">
+若$G$既是群又是仿射簇，且群的乘法与求逆运算为<index>仿射簇</index>的态射，则称$G$为<index>代数群</index>。
+</definition>
+
+<remark>
+关于仿射簇（定义##de:variety ）及其态射，感兴趣的读者可参看<cite>har01</cite>的第一章。直观而言，代数群同时具备群和仿射簇结构，并且这两种结构在某种意义下是“相容”的。
+</remark>
+
+<problem>
+例如特殊线性群$SL_n(\mathbb{C})$为多项式方程$\det(x_{ij})=1$决定的仿射簇，且群运算为态射，故$SL_2(\mathbb{C})$即为一个代数群。同样的，也可以知道特殊正交群$SO_n(\mathbb{C})$也是一个代数群。
+</problem>
+
+<theorem label="th:galois">
+微分Galois群$G$（视为$GL_n(C(K))$的子群）为代数群，且$L$的$G$-不变域为$K$。
+</theorem>
+
+定理的证明需要较多的准备（感兴趣的读者可参看<cite>put07</cite>），因此我们在这里只给出几个例子。
+
+<problem>
+考虑$\mathbb{C}(x)$上的方程$y''{}=y$，则Picard-Vessiot域$L=\mathbb{C}(x)(e^x,e^{-x})=\mathbb{C}(x,e^x)$，且由$(\sigma(e^x))'{}=\sigma((e^x)')=\sigma(e^x)$知$$\sigma(e^x)=a_\sigma e^x,\quad\sigma(e^{-x})=a_\sigma^{-1} e^{-x},$$即有
+<latex>
+\begin{equation*}
+  M_\sigma=
+  \begin{bmatrix}
+    a_\sigma & \\
+    & a_\sigma^{-1}
+  \end{bmatrix}.
+\end{equation*}
+</latex>
+可知$M_\sigma$全体的确构成$GL_2(\mathbb{C})$的代数子群。
+</problem>
+
+<problem>
+考虑$\mathbb{C}(x)$上的方程$y''{}=-\dfrac{1}{4x^2}y$，则Picard-Vessiot域$L=\mathbb{C}(x)(\sqrt{x},\sqrt{x}\ln x)$，且由$(\sigma(\sqrt{x}))'{}=\sigma\left(\dfrac{1}{2\sqrt{x}}\right)=\dfrac{1}{2\sigma(\sqrt{x})}$解得$$\sigma(\sqrt{x})=\pm\sqrt{x}.$$又由$(\sigma(\sqrt{x}\ln x))'{}=\sigma\left(\dfrac{\ln x}{2\sqrt{x}}+\dfrac{1}{\sqrt{x}}\right)=\dfrac{\sigma(\sqrt{x}\ln x)}{2x}+\dfrac{1}{\sigma(\sqrt{x})}$解得$$\sigma(\sqrt{x}\ln x)=c_\sigma\sqrt{x}\pm\sqrt{x}\ln x.$$所以方程对应的微分Galois群
+<latex>
+\begin{equation*}
+G=\left\{
+    \begin{bmatrix}
+      1& c \\
+      & 1
+    \end{bmatrix}\Bigg\vert c\in\mathbb{C}
+  \right\}\bigcup
+  \left\{
+    \begin{bmatrix}
+      -1 & c \\
+      & -1
+    \end{bmatrix}\Bigg\vert c\in\mathbb{C}
+  \right\},
+  \end{equation*}
+</latex>
+的确也是$GL_2(\mathbb{C})$的代数子群。
+</problem>
+
+<problem>
+(续例##ex:2order )设
+<latex>
+\begin{equation*}
+  W=
+  \begin{vmatrix}
+    \eta& \zeta \\
+  \eta' &\zeta'
+  \end{vmatrix}
+\end{equation*}
+</latex>
+为Wronsky行列式（参考<cite>ding04</cite>），由于$\eta,\zeta$为方程的一个基础解系，可知$W$为非零常数，而
+<latex>
+\begin{equation*}
+  \sigma
+  \begin{bmatrix}
+     \eta& \zeta \\
+  \eta' &\zeta'
+\end{bmatrix}=
+\begin{bmatrix}
+     \eta& \zeta \\
+  \eta' &\zeta'
+  \end{bmatrix}
+  \begin{bmatrix}
+    a_\sigma&c_\sigma \\
+    b_\sigma&d_\sigma
+  \end{bmatrix},
+\end{equation*}
+</latex>
+可知$\sigma(W)=W\det M_\sigma$。又$\sigma(W)=W\ne0$，可知$\det M_\sigma=1$，$M_\sigma$全体实际上构成$SL_2(\mathbb{C})$的一个代数子群。
+</problem>
+
+* Lie-Kolchin定理
+
+我们可以考虑比初等函数更广的一类函数，应用起来也更加方便。
+
+<definition  name="Liouville函数">
+设$K$为一个微分代数，$K(\eta)$为$K$的微分扩张，满足$C(K(\eta))=C(K)$。$\eta$称为在$K$上的<index>Liouville生成元</index>，若$\eta$满足以下条件之一
+ 1. $\eta$在$K$上是代数的，即有$f(x)\in K[x]$使得$f(\eta)=0$；
+ 2. $\eta$在$K$上是原函数，即有$\eta'\in K$；
+ 3. $\eta$在$K$上是原函数的指数，即有$\dfrac{\eta'}{\eta}\in K$。
+
+称$K(\eta_1,\ldots,\eta_n)$为$K$上的一个Liouville函数域，若$\forall 1\le i\le n$，$\eta_i$为$K(\eta_1,\ldots,\eta_{i-1})$上的Liouville生成元（约定$K(\eta_0)=K$）。$K$上的任一个Liouville函数域中的元素称为$K$上的<index>Liouville函数</index>。
+</definition>
+
+<remark>
+因为对数函数满足第二条，指数函数满足第三条，因此初等函数一定也是Liouville函数。但反之则不然，例如$\int e^{x^2}$是Liouville函数而非初等函数。
+</remark>
+
+线性微分方程的优美理论将引导我们，把方程Liouville解与一般线性群$GL_n(\mathbb{C})$的代数子群联系到一起。下面的<index>Lie-Kolchin定理</index>（参见<cite>kov01</cite>）给出了线性微分方程的解是Liouville解的充要条件,在理论上十分重要.
+
+<theorem  name="Lie-Kolchin" label="th:liekol">
+设$G$为线性微分方程对应的微分Galois群，$G_0$为$G$的包含单位的连通分支，则以下条件是等价的：
+ 1. 线性微分方程对应的解都是Liouville的；
+ 2. $G_0$可解；
+ 3. $G_0$可上三角化。
+</theorem>
+
+因此为了研究线性微分方程的Liouville解，我们可以转向代数子群的研究。比如说对于二阶线性方程，我们便需要对特殊线性群$SL_2(\mathbb{C})$的代数子群有所了解。
+
+* 二阶线性微分方程
+<index name="二阶线性微分方程"></index>
+考虑二阶齐次线性方程$$z''+az'+bz=0,$$其中$a,b\in K=\mathbb{C}(x)$，通过标准的变换$y=e^{\frac{1}{2}\int a}z$（$\mathbb{C}(x)$中的积分总可以求出），可化为缺项形式$$y''{}=(b-\dfrac{1}{4}a^2-\dfrac{1}{2}a')y.$$因此我们下面可以只考虑形如
+<latex>
+\begin{equation}
+y''{}=ry,@@eq:order2
+\end{equation}
+</latex>
+其中$r\in K$的二阶线性方程。在这样的特殊形式下我们知道，若$\eta$是一个Liouville解的话，那么$\zeta=\eta\int\dfrac{1}{\eta^2}$是与$\eta$线性无关的另一个解（参考<cite>ding04</cite>），从而方程所有的解都是$K$上的Liouville解。
+
+正如上面所说的，特殊线性群$SL_2(\mathbb{C})$的代数子群对于我们很重要，事实上有下面的定理(参见<cite>kov86</cite>)。
+; 做一个冗余的注记,不是建议,也不是修改意见.
+; 关于$SL_2(\mathbb{C})$有大量的研究.这一方面是由于它在代数数论中的重要应用,如S. Lang著有$SL_2(\mathbb{C})$一书,另一方面由于$SL_2(\mathbb{C})\Bumpeq SO(3,1)$(局部同构),从而与广义相对论的规范理论建立了自然的紧密联系,如M. Carmeli的$\emph{Group theory and general relativity: representation and application of Lorentz group}$.:-)
+<theorem  name="$SL_2(\mathbb{C})$代数子群的分类" label="th:sl2">
+设$G$为$SL_2(\mathbb{C})$的代数子群，则$G$满足以下之一：
+ 1. $G$共轭于$\left\{\begin{bmatrix}c & d\\ & c^{-1} \end{bmatrix}\Bigg\vert c,d\in\mathbb{C},c\ne0\right\}$的子群，即$G$可上三角化；
+ 2. $G$共轭于$\left\{\begin{bmatrix}c & \\ & c^{-1} \end{bmatrix}\Bigg\vert c\in\mathbb{C},c\ne0\right\}\bigcup\left\{\begin{bmatrix} & c\\-c^{-1} & \end{bmatrix}\Bigg\vert c\in\mathbb{C},c\ne0\right\}$的子群，且不属于第一类；
+ 3. $G$是前两类以外的有限群（四面体群，八面体群，十二面体群）；
+ 4. $G=SL_2(\mathbb{C})$。
+</theorem>
+
+; to:待补证明
+
+
+对应于代数子群的四个类型，如下定理就不令人意外了。
+
+<theorem label="th:order2sol">
+方程##eq:order2 的解只有四种可能性：
+ 1. 有一个解$y=e^{\int\omega}$为Liouville解，其中$\omega\in\mathbb{C}(x)$；
+ 2. 有一个解$y=e^{\int\omega}$为Liouville解，其中$\omega$为$\mathbb{C}(x)$上的二次代数元，且第一类情形不成立；
+ 3. 所有解$y$在$\mathbb{C}(x)$上是代数的，为Liouville解，且前两类情形不成立；
+ 4. 无Liouville解。
+</theorem>
+
+<proof>
+我们分别讨论对应于定理##th:sl2 的四种情形。设$\eta,\zeta$为方程的基础解系。
+ 1. 可假设$G$是上三角的，由$\forall \sigma\in G$，$\sigma\eta=c_\sigma\eta$，可知$\sigma\left(\dfrac{\eta'}{\eta}\right)=\dfrac{\eta'}{\eta}\in \mathbb{C}(x)$，令$\omega=\dfrac{\eta'}{\eta}$，即得$\eta=e^{\int\omega}$。
+ 2. 可假设$G$为$\left\{\begin{bmatrix}c & \\ & c^{-1} \end{bmatrix}\Bigg\vert c\in\mathbb{C},c\ne0\right\}\bigcup\left\{\begin{bmatrix} & c\\-c^{-1} & \end{bmatrix}\Bigg\vert c\in\mathbb{C},c\ne0\right\}$的子群，则$\forall \sigma\in G$有$$\sigma(\eta)=c_\sigma(\eta),\quad\sigma(\zeta)=c_\sigma^{-1}\zeta$$或者$$\sigma(\eta)=-c_\sigma^{-1}(\zeta),\quad\sigma(\zeta)=c_\sigma\eta.$$于是总有$\sigma(\eta\zeta)=\pm\eta\zeta$，$\sigma((\eta\zeta)^2)=(\eta\zeta)^2$。由定理##th:galois 可知必有$(\eta\zeta)^2\in\mathbb{C}(x)$。设$\phi=\dfrac{\eta'}{\eta}+\dfrac{\zeta'}{\zeta}$，则$$\phi=\dfrac{(\eta\zeta)'}{\eta\zeta}=\frac{1}{2}\cdot\frac{((\eta\zeta)^2)'}{(\eta\zeta)^2}\in\mathbb{C}(x).$$且由$$\left(\frac{\eta'}{\eta}\right)'{}=r+\left(\frac{\eta'}{\eta}\right)^2$$可计算得
+<latex>
+\begin{equation}
+-\phi''-3\phi\phi'-\phi^3+4r\phi+2r'{}=0.@@eq:riccati2
+\end{equation}
+</latex>
+设$\omega$为方程$$\omega^2-\phi\omega+\frac{1}{2}\phi'+\frac{1}{2}\phi^2+r=0$$的一个解，对方程两端求导可得$$(2\omega-\phi)\omega'{}=\phi'\omega-\frac{1}{2}\phi''-\phi\phi'+r',$$从而$$2(2\omega-\phi)(\omega'+\omega^2-r)=-\phi''-3\phi\phi'-\phi^3+4r\phi+2r'{}=0.$$可假定$2\omega\ne\phi$（这是第一类情形），于是有$$\omega'+\omega^2=r,$$令$y=e^{\int\omega}$即为原方程的解，且$\omega$为$\mathbb{C}(x)$上的二次代数元。
+ 3. 只须证扩张次数$[L:K]$有限即可。由于$G$为有限群，可设$G=\{\sigma_1,\ldots,\sigma_n\}$。取$L$中的$n+1$个元素$u_1,\ldots,u_{n+1}$，令
+<latex>
+\begin{equation*}
+  v_k=
+  \begin{bmatrix}
+      \sigma_1(u_k) \\
+      \vdots \\
+      \sigma_n(u_k)
+  \end{bmatrix},
+\end{equation*}
+</latex>
+则必存在$1\le m\le n$使得$v_1,\ldots,v_m$线性无关，$v_1,\ldots,v_{m+1}$在$L$上线性相关。设$v_{m+1}=c_1v_1+\cdots+c_mv_m$，则$\sigma(v_{m+1})=\sigma(c_1)\sigma(v_1)+\cdots\sigma(c_m)\sigma(v_m)$，而由于$\{\sigma_1,\ldots,\sigma_n\}$在任一个$\sigma\in G$作用下仍为$\{\sigma_1,\ldots,\sigma_n\}$的一个排列，故由$v_k$的构造知道$\forall 1\le i\le m, \sigma(c_i)=c_i$，由定理##th:galois 知$c_i\in K$，从而任$n+1$个$L$中的元素在$K$上线性相关，$[L:K]$自然是有限的。
+ 4. 由于对二阶线性方程来说，如果有一个Liouville解的话，那么所有解都是Liouville的。由Lie-Kolchin定理##th:liekol 可知在这种情况下$G_0$是可解的。但$G=GL_2(\mathbb{C})$对应的$G_0=SL_2(\mathbb{C})$是不可解的。这个矛盾便证明了方程无Liouville解。
+
+定理得证。
+</proof>
+
+在知道了Liouville解的形式之后，对Liouville解的存在性的判定便有了一些依据。下面的必要条件主要是通过对解的奇点分析得到的。我们知道，设$r=\dfrac{p}{q}\in\mathbb{C}(x)$，其中$p$，$q$为互素的多项式，则$r$的极点即为$q$的零点，且在极点$a$处的阶数等于$a$作为$q$零点的重数。$r$在$\infty$处阶数定义为$\deg q-\deg p$。这实际上是更一般的离散赋值的特殊情形。
+
+<definition name="阶数">
+设$q\in\mathbb{C}[x]\backslash\{0\}$，定义$q$在$\infty$处的<index>阶数</index>$$\nu_\infty(q)=-\deg(q).$$设$p\in\mathbb{C}[x]$为不可约多项式，定义$q$在$p$处的阶数$$\nu_p(q)=\max\{n\in\mathbb{Z}:p^n\mid q\}.$$并约定$\nu_\infty(0)=\infty$，$\nu_p(0)=\infty$。
+
+设$r=\dfrac{s}{t}\in\mathbb{C}(x)$，定义$r$的阶数$\nu(r)=\nu(s)-\nu(t)$（其中$\nu$可以是$\nu_\infty$或$\nu_p$）。
+</definition>
+
+在这样的定义下，$r$在$a$处的极点阶数实际上等于$|\nu_{x-a}(r)|$。
+
+<theorem>
+定理##th:order2sol 的前三种情形成立的必要条件分别是：
+ 1. $r$的所有极点阶数为偶数或1，在$\infty$处的阶数为偶数或大于2；
+ 2. $r$至少有一个极点的阶数为2或大于2的奇数；
+ 3. $r$在极点处的阶数小于等于2，在$\infty$处的阶数大于等于2。可设部分分式分解$$r=\sum_{i}\frac{\alpha_i}{(x-c_i)^2}+\sum_j\frac{\beta_j}{x-d_j},$$则$\sqrt{1+4\alpha_i}\in\mathbb{Q}$，$\sum\limits_j\beta_j=0$。令$$\gamma=\sum_i\alpha_i+\sum_j\beta_jd_j,$$有$\sqrt{1+4\gamma}\in\mathbb{Q}$。
+</theorem>
+
+<proof>
+所有记号与定理##th:order2sol 的证明中一致。
+
+ 1. 不妨设0为极点，考虑$r$和$\omega$在0处的Laurent展式（其它点处类似考虑）
+<latex>
+\begin{equation}
+\begin{aligned}
+  r&=\alpha x^n+\cdots,\\
+  \omega&=bx^m+\cdots.
+\end{aligned}@@eq:laurent 
+\end{equation}
+</latex>
+由$\omega'+\omega^2=r$可得$$mbx^{m-1}+\cdots+b^2x^{2m}+\cdots=\alpha x^n+\cdots.$$从而$n\ge\min\{m-1,2m\}$。故当$n\le-3$时，必有$m<-1$，$2m<m-1$，知$n=2m$。所以极点阶数为偶数或者1。再考虑作为$\infty$处的Laurent展式##eq:laurent ，则有$n\le\max\{m-1,2m\}$。故当$n\ge-1$时，必有$m>-1$，$2m>m-1$，知$n=2m$。所以$\infty$处的阶数为偶数或大于2。
+
+ 2. 由$(\eta\zeta)^2\in\mathbb{C}(x)$但$\eta\zeta\in\mathbb{C}(x)$（否则为第一类情形），不失一般性，可设$$(\eta\zeta)^2=x^e\prod_i(x-c_i)^{e_i},$$其中$e$为奇数。则$$\phi=\frac{1}{2}ex^{-1}\cdots.$$由式##eq:riccati2 及展式##eq:laurent 可得$$\left(e-\frac{3}{4}e^2+\frac{1}{8}\right)x^{-3}+\cdots=2\alpha(e+n)x^{n-1}+\cdots.$$而$e$为奇数，$e-\frac{3}{4}e^2+\frac{1}{8}x^{-3}=\frac{1}{8}e(e-2)(e-4)\ne0$，可知$n=-2$或$n=-e,n<-2$。所以$r$至少有一个极点阶数为2或为大于2的奇数。
+ 3. 不妨设0为一个极点（其它极点类似考虑），由于解为$\mathbb{C}(x)$上的代数函数，可设在0处的Puiseux展式$$\eta=cx^\mu+\cdots,$$其中$\mu\in\mathbb{Q}$，由$\eta''{}=r\eta$及展式##eq:laurent 可得$$\mu(\mu-1)cx^{\mu-2}+\cdots=\alpha cx^{\mu+n}.$$可知$n\ge-2$，即$r$在极点处的阶数小于等于2。并且若$n=-2$则有$\mu(\mu-1)=\alpha$，可知$\sqrt{1+4\alpha}\in\mathbb{Q}$。于是可设$$r=\sum_{i}\frac{\alpha_i}{(x-c_i)^2}+\sum_j\frac{\beta_j}{x-d_j}+P,$$其中$P\in\mathbb{C}[x]$。再考虑$\infty$处$r$的Laurent展式（为了不混淆，我们将$r$的系数换一个记号）$$r=\gamma x^m+\cdots.$$同样可得$$\mu(\mu-1)cx^{m-2}+\cdots=\gamma cx^{\mu+m}.$$可知$m\le-2$，$P=0$，即有$r$在$\infty$处的阶数大于等于2。由
+<latex>
+\begin{align*}
+  r&=\sum_i\frac{\alpha_i}{(x-c_i)^2}+\sum_j\frac{\beta_j}{x-d_j} \\
+  &=\sum_j\beta_jx^{-1}+\left(\sum_i\alpha_i+\sum_j\beta_jd_j\right)x^{-2}+\cdots
+\end{align*}
+</latex>
+可知$\sum\limits_j\beta_j=0$，$\gamma=\sum\limits_i\alpha_i+\sum\limits_j\beta_jd_j$。再由$\mu(\mu-1)=\gamma$知$\sqrt{1+4\gamma}\in\mathbb{Q}$。
+
+证毕。
+</proof>
+
+<problem>
+考虑Airy方程$$y''=xy,$$则$r=x$无极点（阶数均为零）且在$\infty$处的阶数为-1，不满足任一条必要条件，故方程无Liouville解，其一组基解称为Airy函数。同样可以知道，当$n\ge1$时，方程$y''{}=x^ny$都没有Liouville解。
+</problem>
+
+下面我们来说明如何通过类似的奇点分析具体构造出所需要的Liouville解。首先设$r$满足第一类必要条件，即$r$的所有极点阶数为偶数或1，在$r$处的阶数为偶数或大于2。
+
+设解$\eta=e^{\int\omega}$，$\omega\in\mathbb{C}(x)$。则$\omega$在$c$处的部分分式项可写为$$\sum_{i=2}^\nu\frac{a_i}{(x-c)^i}+\frac{\alpha}{x-c}=:[\omega]_c+\frac{\alpha}{x-c}.$$不妨仅考虑0处，简记$[\omega]=[\omega]_0$，则$\omega$在0处的Laurent展式可写为$$\omega=[\omega]+\frac{\alpha}{x}+\overline\omega,$$其中$\overline\omega$为$x$的非负幂次项级数。以下分几种情况讨论。
+
+($c_1$) 设0处极点阶数为1，$r=*x^{-1}+\cdots$，由$\omega'+\omega^2=r$得到$$-\frac{\nu a_\nu}{x^{\nu+1}}+\cdots+\frac{a_\nu^2}{x^{2\nu}}=\frac{*}{x}+\cdots.$$可知$\nu\le1$，$[\omega]=0$。从而有$$-\frac{\alpha}{x^2}+\overline{\omega}'+\frac{\alpha^2}{x^2}+\frac{2\alpha}{x}\overline\omega+\overline{\omega}^2=\frac{*}{x},$$可知$\alpha^2-\alpha=0$，而0是极点，故只能有$\alpha=1$。从而$\omega$在0处的部分分式为$\dfrac{1}{x}$。为了统一起见，记$\alpha^\pm=1$。
+
+($c_2$) 设0处极点阶数为2，$r=bx^{-2}+*x^{-1}+\cdots$，同样的推理可以得到$[\omega]=0$，$\alpha^2-\alpha=b$，从而$\omega$在0处的部分分式为$\dfrac{\alpha^\pm}{x}$，其中$\alpha^\pm=\frac{1}{2}(1\pm\sqrt{1+4b})$。
+
+($c_3$) 设0处极点阶数为$2\nu\ge4$，可设$$[\sqrt{r}]=\frac{a}{x^\nu}+\cdots+\frac{*}{x^2}.$$由$(\sqrt{r}-\omega)(\sqrt{r}+\omega)=\omega'$可得$[\omega]=\pm[\sqrt{r}]$。设$\omega$在0处的部分分式为$\pm[\sqrt{r}]+\dfrac{\alpha^\pm}{x}$，经过计算可得$\alpha^{\pm}=\frac{1}{2}(\pm\frac{b}{a}+\nu)$，其中$b$为$r-[\sqrt{r}]^2$中$\frac{1}{x^{\nu+1}}$的系数。
+
+($c_4$) 设0非极点，与($c_1$)同样的推理可得$[\omega]=0$，$\alpha=0$或$\alpha=1$。$\omega$在0处的部分分式是0或者$\dfrac{1}{x}$。
+
+综合以上四种情况得到$$\omega=\sum_{c\in\Gamma}\left(s(c)[\sqrt{r}]_c+\frac{\alpha_c^{s(c)}}{x-c}\right)+\sum_{i=1}^d\frac{1}{x-d_i}+R,$$其中$\Gamma$表示$r$的极点集合，$R\in\mathbb{C}[x]$，记号$s(c)$可取
+$+$或$-$。因此下面的任务就是确定$d$，$d_i$和$R $了，为此我们还需考虑$r$在$\infty$处Laurent展式$$\omega=R+\frac{\alpha_\infty}{x}\cdots+.$$
+
+($\infty_1$) 设$\infty$处阶数为$\nu$大于2，$$r=\frac{*}{x^\nu}+\frac{*}{x^{\nu+1}}+\cdots,$$代入$\omega'+\omega^2=r$可得$R=0$，$\alpha_\infty=0$或$\alpha_\infty=1$。
+
+($\infty_2$) 设$\infty$处阶数为2，$r=bx^{-2}+*x^{-3}+\cdots$，同样的可得$R=0$，$\alpha_\infty^2-\alpha_\infty=b$，$\alpha_\infty^\pm=\frac{1}{2}(1\pm\sqrt{1+4b})$。
+
+($\infty_3$) 设$\infty$处阶数为$-2\nu\le0$，$[\sqrt{r}]_\infty=ax^\nu+\cdots$表示$\sqrt{r}$在$\infty$处展式的多项式部分。类似($c_3$)可得$R=[\sqrt{r}]_\infty$，$a_\infty^\pm=\frac{1}{2}(\pm\frac{b}{a}-\nu)$，其中$b$为$r-[\sqrt{r}]_\infty^2$中$x^{\nu-1}$的系数。
+
+综合以上三条可得到$$\omega=\underbrace{\sum_{c\in\Gamma}\left(s(c)[\sqrt{r}]_c+\frac{\alpha_c^{s(c)}}{x-c}\right)+s(\infty)[\sqrt{r}]_\infty}_\theta+\underbrace{\sum_{i=1}^d\frac{1}{x-d_i}}_{P'/P}.$$再比较两边$\infty$展式的$\dfrac{1}{x}$的系数可得$$d=\alpha_\infty^{s(\infty)}-\sum_{c\in\Gamma}\alpha_c^{s(c)}\in\mathbb{N}.$$最后还需要确定$d_i$，设$P=\prod\limits_{i=1}^d(x-d_i)$，则$\omega$可写为$\theta+\dfrac{P'}{P}$，代入$\omega'+\omega^2=r$得到$$P''+2\theta P'+(\theta'+\theta^2-r)P=0.$$用待定系数法求出多项式$P $即可。得解$\eta=e^{\int\omega}=Pe^{\int\theta}$。
+
+以上对构造第一类解的讨论，我们可以稍作一些总结。为了求解$\eta=e^{\int\omega}$，首先通过奇点分析得到$\theta$（即每个奇点贡献的总和），再通过待定系数法求解关于多项式$P $的一个微分方程，最后根据$\theta$和$P $计算$\omega$。在构造另外两类解时过程也大抵如此，只不过奇点分析更复杂一些，关于$P $的微分方程次数会较高，而通过$\theta$和$P $计算$\omega$的过程也更复杂，需要解一个代数方程。我们不再一一详述，具体可参见<cite>kov86</cite>，不过为了完整起见，这里给出Saunders<cite>sau81</cite>对Kovacic算法的一个简化版本，不仅利于实现，也避免了具体求出所有奇点。
+; rel:无平方分解
+<index name="Kovacic算法" sub="Saunders简化版本"></index>
+<algorithm  name="Kovacic算法简化版本">
+求微分方程$y''{}=ry$的Liouville解。
+
+ 1. 预处理与必要条件检测。
+   1. 设$r=\dfrac{s}{t}$为既约分式，作无平方分解（例如算法##al:SFD ） $t=\prod\limits_{i=1}^mt_i^i$。
+   2. 构造$L\subseteq \{1,2,4,6,12\}$为$\omega$在$\mathbb{C}(x)$上代数次数可能的取值。
+     - 若$\forall i\ge3$为奇数有$t_1=1$，且$\nu_\infty(r)$大于2或为偶数，则$1\in L$；
+     - 若$t_2\ne1$，或$\exists i\ge3$为奇数有$t_i\ne1$，则$2\in L$；
+     - 若$m\le2$且$\nu_\infty(r)\ge2$，则$4,6,12\in L$。
+ 2. 构造$\theta$和$d$的组成部分。
+   1. 构造固定部分
+<latex>
+\begin{align*}
+  d_\mathrm{fix}&=\frac{1}{4}(\min(\nu_\infty(r),2)-\deg t-3\deg t_1), \\
+  \theta_\mathrm{fix}&=\frac{1}{4}\left(\frac{t'}{t}+\frac{3t_1'}{t_1}\right).
+\end{align*}
+</latex>
+   2. 构造2阶极点对应项。设$t_2$的根为$c_1,\ldots,c_{k_2}$，设$b_i(i=1,\ldots,k_2)$为$r$中$\dfrac{1}{(x-c_i)^2}$的系数，令$$d_i=\sqrt{1+4b_i},\quad\theta_i=\dfrac{d_i}{x-c_i}.$$
+   3. 构造大于等于3阶极点对应项。当$1\in L$时求得$t_4,t_6,\ldots$的根为$c_{k_2+1},\ldots,c_k$。设在$c_i(i=k_2+1,\cdots,k)$处的阶数为$l_i$，设$\nu_i=l/2$，$a_i$为$[\sqrt{r}]_{c_i}$中$\dfrac{1}{(x-c_i)^{\nu_i}}$的系数，$b_i$为$r-[\sqrt{r}]_{c_i}^2$中$\dfrac{1}{x^{\nu_i+1}}$的系数。令$$d_i=\frac{b_i}{a_i},\quad\theta_i=2[\sqrt{r}]_{c_i}+\frac{d_i}{x-c_i}.$$
+   4. 构造$\infty$处阶数为2的对应项。若$\nu_\infty(r)=2$，令$b_0$为$r$中$\dfrac{1}{x^2}$的系数，令$$d_0=\sqrt{1+4b_0},\quad\theta_0=0.$$
+   5. 构造$\infty$处阶数小于2的对应项。若$\nu_\infty(R)<2$，设$\nu_0=\nu_\infty(r)/2$，$a_0$为$[\sqrt{r}]_\infty$中$x^{\nu_0}$的系数，$b_0$为$r-[\sqrt{r}]_\infty^2$中$x^{\nu_0-1}$的系数，令$$d_0=\frac{b_0}{a_0},\quad\theta_0=2[\sqrt{r}]_\infty.$$
+ 3. 构造$\theta$和$d$。
+   1. 取$n\in L$，若$n=1$则$m=k$，否则$m=k_2$。
+   2. 其中任取$s_i\in\{-\frac{1}{2}n,-\frac{1}{2}n+1,\ldots,\frac{1}{2}n\}$，令$S=(s_0,\ldots,s_m)$。构造$$d_s=n\cdot d_\mathrm{fix}-\sum_{i=0}^ms_id_i,$$
+   3. 若$d_s\in\mathbb{N}$，则令$$\theta_s=n\cdot\theta_\mathrm{fix}-\sum_{i=0}^ms_i\theta_i,$$进行第四步的求解，否则换一组不同的$S$。若已尝试所有$S$则换一个不同的$n\in L$，若已尝试所有的$n $，则算法终止。
+ 4. 求解。记$\theta=\theta_s$。
+   1. 若$n=1$，求解$d_s$次首一多项式$P $，使$$P''+2\theta P'+(\theta'+\theta^2-r)P=0.$$输出解$\eta=Pe^{\int\theta}$。
+   2. 若$n=2$，求解$d_s$次首一多项式$P $，使$$P''+3\theta P''+(3\theta^2+3\theta'-4r)P'+(\theta''+3\theta\theta'+\theta^3-4r\theta-2r')P=0.$$令$\phi=\theta+\dfrac{P'}{P}$，求解方程$$\omega^2-\phi\omega+\left(\frac{1}{2}\phi'+\frac{1}{2}\phi^2-r\right)=0.$$输出解$\eta=e^{\int\omega}$。
+   3. 若$n=4,6,12$，求解$d_s$次首一多项式$P $，使
+<latex>
+\begin{equation*}
+  \left\{
+    \begin{aligned}
+      P_n&=-P, \\
+      P_{i-1}&=-QP_i'+((n-i)Q'-Q\theta)P_i-(n-i)(i+1)Q^2rP_{i+1}, \\
+      P_{-1}&=0.
+    \end{aligned}\right.
+\end{equation*}
+</latex>
+其中$i=1,\ldots,n$，$Q=\prod\limits_{i=1}^mt_i$。求解方程$$\sum_{i=0}^n\frac{Q^iP_i}{(n-i)!}\omega^i=0.$$输出解$\eta=e^{\int\omega}$。
+</algorithm>
+
+; <latex>
+; \begin{align*}
+;   &\quad([\omega]-[\sqrt{r}])([\omega]+[\sqrt{r}])\\
+;   &=[\omega]^2-[\sqrt{r}]^2 \\
+;   &=(\omega-\frac{\alpha}{x}-\overline{\omega})^2-(
+; \end{align*}
+; </latex>
+
+* 高阶线性微分方程的多项式解和有理解
+
+Kovacic算法成功地解决了二阶线性方程的Liouville解，我们看到了微分Galois理论的巨大威力。尽管更加困难，使用微分Galois理论也的确可以用来求解<index>高阶线性微分方程</index>。例如早在1981年Singer<cite>sin81</cite>就在理论上提出了一个确定性的过程来求出所有的Liouville解，在此基础上还有许多发展，但复杂度仍太高以至于无法实际应用。因此需要考虑更快速、便于实现的方法。这里我们简要地介绍Abramov，Kvansenko<cite>abr91</cite>，Bronstein<cite>bro92bar</cite>提出的高阶线性方程多项式解、有理解、原函数指数解的方法。
+
+
+** 多项式解
+
+在本节中设$K$为一个数域，我们$K[x]$上考虑$n $阶线性方程
+<latex>
+\begin{equation}
+a_ny^{(n)}+\cdots+a_1y'+a_0y=b,@@eq:nthorder  
+\end{equation}
+</latex>
+其中系数$a_i,b\in K[x]$，我们第一步的目标是求出方程##eq:nthorder 在$K[x]$中的多项式解。设$$y=y_kx^k+\cdots+y_1x+y_0,\quad y_k\ne0$$为一个多项式解，代入方程##eq:nthorder 得到
+<latex>
+\begin{equation}
+\sum_{i=0}^k\left(a_i(x)\cdot k(k-1)\cdots(k-i+1)\cdot y_kx^{k-i}+\cdots\right)=b.@@eq:indexeq1
+\end{equation}
+</latex>
+记$m=\max\limits_{0\le i\le n}\{\deg a_i(x)-i\}$，设$\deg a_i-i$在$i=i_1,\ldots,i_s$处取到$m$。记$$p(r)=\sum_{j=1}^s\lc (a_{i_j}(x))\cdot r(r-1)\cdots(r-i_j+1),$$其中$\lc (a_{i_j}(x))$表示$a_{i_j}(x)$的首项系数。则$\deg p=\max\limits_{1\le j\le s}\{i_j\}$，可知当$k\ge \deg p$时，式##eq:indexeq1 中左端最高次项为$$\sum_{j=1}^s\lc (a_{i_j}(x))\cdot k(k-1)\cdots(k-i_j+1)\cdot y_kx^{k+m}.$$比较式##eq:indexeq1 两段最高项可知或者$k+m=\deg b$，或者$p(k)=0$。从而我们得到了$y$次数的上界$$k\le\max\{\deg p,\deg b-m,r_{\max}\},$$其中$r_{\max}$表示$p(r)$的最大正整数根。
+
+如同我们经常做的，在得到$y$次数上界之后便可用待定系数法求解$y$了，最终的未定系数便为解表达式中的任意常数。但由于无法精确求出$r_{\max}$，只能采取近似的估计，而估计的$r_{\max}$往往会很大，计算复杂度就较高。可以考虑如下的递推方法来求解关于待定系数的线性方程组更有效。
+
+对“截断”的线性方程$a_jy^{(j)}+\cdots+a_0y=b$（$0\le j\le n$），同样定义如上的$m$和$p(r)$，记为$m_j$和$p_j(r)$（从而$m=m_n$，$p(r)=p_n(r)$）。假设我们搜索次数不超过$k$的多项式解，同样比较首项系数可得
+<latex>
+\begin{equation}
+P_{\min\{n,k\}}(k)y_k=b_{n+m_{\min\{n,k\}}}.@@eq:pminnk
+\end{equation}
+</latex>
+从而求出$y_k$，再作变量替换$y(x)\leftarrow y(x)-y_kx^k$，得到新的关于$y$的方程$$a_ny^{(n)}+\cdots a_0y=b-y_k(a_n(x^k)^{(n)}+\cdots+a_0(x^k)),$$再继续求解此方程不超过$k-1$次的多项式解，如此续行即可。
+
+当然在通过##eq:pminnk 计算$y_k$的过程中要考虑$P_{\min\{n,k\}}(k)=0$的情形，若此时等式右端为零，则判定此方程无多项式解；若等式右端为零，则$y_k$可视为一个未定参数，代入变换后的新方程进行计算。接下来当比较系数时，若等式左端为零，而右端含未定参数时，便可消去右端的某个参数。到求得$y_0$之后，最终可以得到一个其系数中含若干个参数的多项式，将所有系数联立为零，可确定参数的值或者最终出现在解中的可变常数。这最后一个联立方程的参数个数是小于等于$2n$的（参见<cite>abr91</cite>），复杂度比非递推的待定系数法要小很多。
+
+** 有理解
+
+设$y\in\overline{K}(x)$为有理函数解，则从方程##eq:nthorder 可知$y$的每一个极点都是$a_n$的零点，从而$\den(y)$的每个不可约因子都是$a_n$的因子。为了确定$\den(y)$，只需确定$a_n$的各个不可约因子在$\den(y)$中出现的次数即可。
+
+设$\xi$为$y$的一个极点，$y(x)=\tilde y(x)(x-\xi)^{-k}$。设$a_i$在$x-\xi$处的阶数为$\beta_i$，即$a_i(x)=(x-\xi)^{\beta_i}h_i(x)$，$h_i(\xi)\ne0$。则有$$a_i(x)=\sum_{j=\beta_i}^\infty\frac{a_i^{(j)}(\xi)}{j!}(x-\xi)^j,$$代入方程##eq:nthorder 得到
+<latex>
+\begin{equation}
+\sum_{i=0}^n\left(\frac{a_i^{(\beta_i)}(\xi)}{\beta_i!}(x-\xi)^{\beta_i}\cdot(-k)\cdots(-k-i+1) \tilde y(x)(x-\xi)^{-k-i}+\cdots\right)=b.@@eq:indexeq2  
+\end{equation}
+</latex>
+和多项式解情形类似的，我们定义$m=\min\limits_{0\le i\le n}\{\beta_i-i\}$，并设$\beta_i-i$在$i_1,\ldots,i_s$处取到$m$。记$$p(r)=\sum_{j=1}^sr(r-1)\cdots(r-i_j+1)\frac{a_{i_j}^{(\beta_j)}(\xi)}{\beta_j!},$$则当$k\ge m$时，式##eq:indexeq2 左端$(x-\xi)^{-k+m}$项的系数为$p(-k)$，而$b\in K[x]$，可知必有$p(-k)=0$。于是得到$$k\le \max\{|r_{\min}|,m\},$$即为$x-\xi$在$\den(y)$中的次数上界，其中$r_{\min}$表示$p(r)$的最小负整数根。
+
+因此本质上和多项式解情形一样（对$\nu_\infty$的分析变为了对$\nu_{x-\xi}$的分析），我们从理论上得到了一个求有理函数的方法（求得分母，待定分子系数）。但在$\overline{K}$上分解系数$a_i$总是不很方便的。为了合并$x-\xi$的乘积，从而将所有运算都限制在系数域$K(x) $中，我们引入如下平衡分解的概念(参见<cite>bro92coe</cite>)就显得很自然了。
+
+<definition name="平衡分解">
+设$A,B\in K[x]$，称$A $关于$B$是平衡的，若$B=0$，或者对于$A$的任意不可约因子$P, Q\in K[x]\backslash K$，都有$\nu_P(B)=\nu_Q(B)$。称$A=A_1^{e_1}\cdots A_n^{e_n}$为关于$B $的<index>平衡分解</index>，若$\forall 1\le i\le n$，$A_i$无平方因子，两两互素，且$A_i$关于$B $是平衡的。
+
+再设$S=\{B_1,\ldots,B_m\}\subseteq K[x]$，称$A$关于$S$是平衡的，若$A$对于每个$B_j\in S$都是平衡的。称$A=A_1^{e_1}\cdots A_n^{e_n}$为关于$S$的平衡分解，若此分解对于每个$B_j\in S$都是平衡分解。
+</definition>
+
+$A$的无平方分解总是关于$A$的平衡分解，选取不同的$B $，可以得到不同于$A$的无平方分解的平衡分解。不严格地说，平衡分解要比无平方分解来得“细”，但比完全分解来得“粗”。我们可以只动用$K$上的GCD运算，构造出$A$关于$B $的平衡分解，为了不偏离主题太远，算法将在稍后给出。
+
+设$a_n=c_1^{e_1}\cdots c_l^{e_l}$为关于$S=\{a_0,a_1,\ldots,a_n\}$的平衡分解。考虑$c(x)=c_i(x)$（$1\le i\le l$），设$c(x)=(x-\xi_1)\cdots(x-\xi_k)$为在$\overline{K}$上的完全分解。由于$c(x)$关于$S$平衡，故对于每个$a_j$，$a_j$在因子$x-\xi_1,\ldots,x-\xi_k$处的阶数都是相等的，公共的阶数可记为$\beta_j$。同样定义$m=\min\limits_{0\le i\le n}\{\beta_i-i\}$，并设$\beta_i-i$在$i_1,\ldots,i_s$处取到$m$。令$$p(r,x)=\sum_{j=1}^sr(r-1)\cdots(r-i_j+1)\frac{a_{i_j}^{(\beta_j)}(x)}{\beta_j!}\in K[r][x],$$为了得到$\den(y)$中$c(x)$的次数上界，可对$p(r,x)$与$c(x)$施行Euclid算法，求出$r_{\min}$为使$(p(r,x),c(x))=c(x)$的最小负整数值，则不难知道$\den(y)$中$c(x)$的次数$k$有上界$$k\le \max\{|r_{\min}|,m\}.$$
+
+这样我们避开了$\overline{K}$上的分解而求出了$y$的分母。可设$y=\dfrac{y_1}{q}$，$q=\prod\limits_{i=1}^lc_i^{k_i}$（$k_i$为次数上界）。代入原方程##eq:nthorder 整理可得
+<latex>
+\begin{equation}
+  \sum_{i=0}^n\sum_{j=0}^{n-i}{i+j \choose i}\frac{a_{i+j}S_j}{q^{j+1}}y_1^{(i)}=b,@@eq:newnthorder
+\end{equation}
+</latex>
+其中$$ S_0=1,\quad S_j=S_{j-1}'q-jS_{j-1}q'\ (j\ge1).$$接下来的问题就是求新方程##eq:newnthorder 的多项式解$y_1$，而这是我们已经解决了的。
+
+<remark>
+将方程##eq:newnthorder 化为多项式系数的方程可以两边乘以$q^{n+1}$，但这可能导致系数很大。为了减小方程的系数，可以设$h=(q,q')$，$q_1=\dfrac{q}{h}$，$q_2=\dfrac{q'}{h}$，$h_1=\dfrac{q_1h'}{h}$，令$T_j=\dfrac{S_j}{h^j}$（可证$(S_j,q^{j+1})=h^j$），则方程##eq:newnthorder 化为$$\sum_{i=0}^n\sum_{j=0}^{n-i}{i+j \choose i}\frac{a_{i+j}T_j}{q_1^j}y_1^{(i)}=bq,$$其中$$T_0=1,\quad T_j=T_{j-1}'((j-1)h_1-jq_2)+T_{j-1}q_1\ (j\ge1).$$这时再两边乘以$q_1^{n+1}$可有效减小系数。
+</remark>
+
+**  平衡分解
+; rel:gcd
+
+我们在求高阶线性方程的有理解过程中引入了平衡分解的概念，其实也不难构造计算平衡分解的算法。我们将分几步走，每步的正确性都是不难验证的。
+<index name="平衡分解算法"></index>
+<algorithm  name="子算法$\mathtt{BanFacAB}$">
+设$A\in K[x]$无平方因子，给出$A$关于$B\in K[x]$的平衡分解$\mathtt{BanFacAB}(A, B)=\{A_1, \ldots, A_n\}$。
+
+ 1. 若$B $为常数，则输出$\mathtt{BanFacAB}(A,B)=\{A\}$，算法终止。
+ 2. 若$B $不为常数，计算最大公因子$D=(A,B)$，
+    - 若$D=1$，则输出$\{A\}$，算法终止；
+    - 若$D>1$，设$A=D\tilde A$，$B=D^e\tilde B$（$e\ge1$），递归调用并输出$\mathtt{BanFacAB}(A,B)=\{\tilde A\}\cup \mathtt{BanFacAB}(D,\tilde B)$，算法终止。
+</algorithm>
+
+<algorithm  name="子算法$\mathtt{BanFacAS}$">
+设$A\in K[x]$无平方因子，给出$A$关于$S\subseteq K[x]$的平衡分解$\mathtt{BanFacAS}(A, S)=\{A_1, \ldots, A_n\}$。
+
+ 1. 若$|S|=1$，设$S=\{B\}$，输出$\mathtt{BanFacAB}(A,B)$，算法终止。
+ 2. 若$|S|>1$，任取$B\in S$，递归调用计算出$\{A_1,\ldots,A_m\}=\mathtt{BanFacAS}(A,S\backslash\{B\})$，输出$\bigcup\limits_{i=1}^m\mathtt{BanFacAB}(A_i,B)$，算法终止。
+</algorithm>
+
+上面的两个算法都假定了$A$无平方因子，因此平衡分解中因子的次数都是1。下面明显的定理给出一个最终版的平衡分解算法。
+
+<theorem  name="平衡分解">
+设$A\in K[x]$，$S\subseteq K[x]$，$A=\prod\limits_iA_i^i$为无平方分解，$A_i=\prod\limits_jA_{i_j}$为$A_i$关于$S$的平衡分解（可通过$\mathtt{BanFacAS}$计算），则$A=\prod\limits_i\prod\limits_jA_{i_j}^i$为$A$关于$S$的平衡分解。
+</theorem>
+
+* 高阶线性微分方程的指数解
+<index name="高阶线性微分方程"></index>
+高阶Liouville解的求解要比二阶困难得多。1992年，Bronstein<cite>bro92bar</cite>提出了求解所有指数解（严格来说是原函数的指数解，即解$y$满足$\dfrac{y'}{y}\in \overline{K}(x)$，$K$为一个数域）的一组基的方法，并且此方法也已在Axiom系统上实现。此算法在<cite>sin91</cite>的基础上作了一些改进，甚至不需要在$K$上分解$a_n(x)$，因此也可作为高阶线性微分方程的Singer一般算法<cite>sin81</cite>一个高效的子算法实现。
+
+在本节中仅考虑高阶$n $阶齐次方程的情形，即
+<latex>
+\begin{equation*}
+a_ny^{(n)}+\cdots+a_1y'+a_0y=0,@@eq:nthorder0 
+\end{equation*}
+</latex>
+** Riccati指数与Riccati界
+
+设$y=e^{\int u}$为方程##eq:nthorder0 的一个指数解。在$n=2$的情形，对方程$y''{}=ry$我们知道$u$满足$$u'+u^2=r,$$这被称为原方程关联的<index>Riccati方程</index>。对一般的方程##eq:nthorder0 ，不难求出对应的关联Riccati方程为
+<latex>
+\begin{equation}
+a_nP_n+\cdots+a_1P_1+a_0P_0=0,@@eq:riccati  
+\end{equation}
+</latex>
+其中$$P_0=1,\quad P_i=P_{i-1}'+uP_{i-1}\ (i\ge1).$$因此求指数解的问题就相当于求解非线性的关联Riccati方程在$\overline{K}(x)$中的解$u$。
+
+<definition>
+设$S=\{Q_1,\ldots,Q_m\}\subseteq K[x]$，定义$S$在$P\in K[x]\backslash K$处的<index>Riccati指数</index>及<index>Riccati界</index>分别为
+<latex>
+\begin{align*}
+\Gamma_P(S)&:=\Bigg\{\frac{\nu_P(Q_i)-\nu_P(Q_j)}{i-j}\Bigg\vert 1\le i\ne j\le n,Q_i,Q_j\ne0\Bigg\}\bigcap \mathbb{N}^+, \\
+  \delta_P(S)&:=
+  \begin{cases}
+    1& \Gamma_P(S)=\varnothing, \\
+    \max \Gamma_P(S)& \Gamma_P(S)\ne\varnothing.
+  \end{cases}
+\end{align*}
+</latex>
+
+定义$S$在$\infty$处的Riccati指数和Riccati界分别为
+<latex>
+\begin{align*}
+\Gamma_\infty(S)&:=\Bigg\{\frac{\deg Q_i-\deg Q_j}{i-j}\Bigg\vert 1\le i\ne j\le n,Q_i,Q_j\ne0\Bigg\}\bigcap \mathbb{N}^+, \\
+  \delta_P(S)&:=
+  \begin{cases}
+    0& \Gamma_\infty(S)=\varnothing, \\
+    \max \Gamma_\infty(S)& \Gamma_\infty(S)\ne\varnothing.
+  \end{cases}
+\end{align*}
+</latex>
+</definition>
+
+在这些精巧的定义下，Bronstein证明了以下关于解$u$结构的定理（参见<cite>bro92coe</cite>）。
+
+<theorem  name="Bronstein" label="th:bro92coe">
+设$a_n=c_1^{e_1}\cdots c_l^{e_l}$为关于$S=\{a_0,\ldots,a_n\}$的平衡分解。则有$$u=\sum_{i=1}^l\frac{B_i}{c_i^{\delta_{c_i}(S)}}+\frac{Q'}{Q}+P,$$其中$Q,P,B_i\in \overline{K}[x]$，$(Q,a_n)=1$且$\deg B_i<\deg c_i^{\delta_{c_i}(S)}$。
+</theorem>
+
+限于篇幅，我们这里只能暂时省略论证的过程，来看看有了定理##th:bro92coe 之后能做些什么。首先，我们可以通过计算平衡分解计算得到$\delta_{c_i}(S)$。接下来可以通过试探依次求出$u$中求和的每一项组成部分。例如我们试探$\alpha$为求和中的一项，令$\overline{u}=u-\alpha$，$\overline{y}=e^{\int \overline{u}}$，则由$y=\overline{y}e^{\int \alpha}$及$D(\overline{y}e^{\int \alpha})=e^{\int \alpha}(D+\alpha)\overline{y}$（$D$为微分算子）可得
+<latex>
+\begin{equation}
+a_n(D+\alpha)^n\overline{y}+\cdots+a_1(D+\alpha)\overline{y}+a_0\overline{y}=0,@@eq:nthordertran
+\end{equation}
+</latex>
+且计算可得$$(D+\alpha)^i=\sum_{j=0}^i{i \choose j}P_{i-j}(\alpha)D^j,$$可得为新的关于$\overline{y}$的$n $阶线性方程，如此续行直到求出解或者全部试探完毕。
+
+** 多项式部分
+
+首先我们考虑求出多项式部分$P $。记$d=\deg P$，利用$P_i$中$x$的最高次项为$(\lc(P)x)^{in}$，记$m_d=\max\limits_{0\le i\le n}\{id+\deg a_i\mid a_i\ne0\}$且在$i_1,\ldots,i_s$处取到等号，设$$p_d(r)=\sum_{j=1}^s\lc(a_{i_j})r^{i_j},$$比较方程##eq:riccati 两边$x$的最高项可知$p_d(\lc(P))=0$。从<cite>sin91</cite>命题2.3的证明可以知道$\deg P\le \delta_\infty(S)$，可知$d$的取值只有有限多种，而$p_d$的根只有有限多个，从而$\lc(P)$的取值至多只有有限多种可能，依次试探并作变量替换$\overline{u}\leftarrow u-\lc(P)x^d$，如此续行，直到求出所有可能的多项式解的集合。
+
+** 有理部分
+
+考虑$c_i$对应项$\dfrac{B_i}{c_i^{\delta_{c_i}(S)}}$。简记$c=c_i$，$\delta=\delta_{c_i}(S)$，$R=B_i$，作部分分式分解$$\frac{R}{c^{\delta}}=\frac{R_\delta}{c^\delta}+\cdots+\frac{R_1}{c}.$$记$m=\max\limits_{0\le i\le n}\{i\delta-\nu_c(a_i)\mid a_i\ne0\}$且$i_1,\ldots,i_s$处取到等号。令$$p(r)=\sum_{j=1}^s\left(\frac{a_{i_j}}{c^{\nu_c(a_{i_j})}}\bmod c\right)\cdot S_{\delta,i_j}(r),$$其中
+<latex>
+\begin{equation*}
+  S_{\delta,i}(r)=
+  \begin{cases}
+    r^i &\delta\ne1 ,\\
+    \prod\limits_{j=0}^{i-1}(r-jc')& \delta=1.
+  \end{cases}
+\end{equation*}
+</latex>
+则比较方程##eq:riccati 分母中的$c$的最高次项可知$p(R_\delta)\bmod c=0$。由$\deg R_\delta<\deg c$可得到一个关于$R_\delta$系数的代数方程组，得到的$R_\delta$至多有有限种可能。接下来依次求$R_{\delta-1},\ldots,R_1$并试探所有的$c_i$对应的项，直到求出所有可能的$\displaystyle\sum\limits_{i=1}^l\frac{B_i}{c_i^{\delta_{c_i}(S)}}$。
+
+最后求解对数导数$\dfrac{Q'}{Q}$了，而这相当于对变换后的$n $阶线性方程##eq:nthordertran 求多项式解$Q $，是我们已经解决的问题。
+
+<remark>
+算法中需要求解代数方程，因此还显得有些复杂。不过这些代数数是表示指数解所必要的，无法完全避免。
+</remark>
+
+
+
+* 二阶微分方程的特殊函数解
+<index name="二阶微分方程的特殊函数解"></index>
+许多特殊函数往往来源于某一类微分方程的解（二阶的尤为常见）。当一个方程没有Liouville解时，我们期望能够用特殊函数来表示方程的解，便于进一步的研究。精确地说，希望找到形如$m(x)F(\xi(x))$的解，其中$m(x) $为$K(x)$上的Liouville函数，$\xi(x)\in K(x)$为有理函数，$F $则为某一个标准方程的解（例如<index>Bessel方程</index>$y''+\dfrac{1}{x}y+(1-\dfrac{\nu^2}{x^2})=0$）。
+
+<problem>
+例如二阶微分方程$y''{}=(8x+1)y$无Liouville解，但若$\eta(x)$为Airy方程$y''{}=xy$的一个解（例如<index>Airy函数</index>），则$\eta\left(\frac{1}{4}+2x\right)$为原方程的一个解。
+</problem>
+
+我们将在下面几小节中介绍Bronstein在<cite>bro02</cite>中建立的二阶微分方程的特殊函数求解方法。
+
+** 变量替换
+
+下面我们考虑二阶方程$y''{}=ry$，$r\in K(x)$的特殊函数解。设给出特殊函数的标准方程为$$y''+a_1y'+a_0y=0,$$作变量替换$y=m(x)F(\xi(x))$，记$M=m(x)$，$G_0=F(\xi(x))$，$G_1=F'(\xi(x))$，$A_0=a_0(\xi(x))$，$A_1=a_1(\xi(x))$，$Z=\xi(x)$，利用$G_0'{}=G_1Z'$，$G_1'{}=-Z'(A_0G_0+A_1G_1)$，可得
+<latex>
+\begin{align*}
+  y&=MG_0 \\
+  y'&=M'G_0+MZ'G_1 \\
+  y''&=(M''-A_0MZ'^2)G_0+(2M'Z'+MZ''-A_1MZ'^2)G_1
+\end{align*}
+</latex>
+消去$G_0$，$G_1$可得
+<latex>
+\begin{equation*}
+  \begin{split}
+    y''-\left(2\frac{M'}{M}+\frac{Z''}{Z'}-A_1Z'\right)y'-\Bigg(\left(\frac{M'}{M}\right)'-\frac{M'^2}{M^2}-\frac{M'Z''}{MZ}+\\+A_1Z'\frac{M'}{M}-A_0Z'^2\Bigg)y=0
+  \end{split}
+\end{equation*}
+</latex>
+若$y$满足待求解方程$y''{}=ry$，则有
+<latex>
+\begin{equation}
+2\frac{M'}{M}+\frac{Z''}{Z'}-A_1Z'{}=0,@@eq:yterm
+\end{equation}
+</latex>
+及$$\left(\frac{M'}{M}\right)'-\frac{M'^2}{M^2}-\frac{M'Z''}{MZ}+A_1Z'\frac{M'}{M}-A_0Z'^2=r$$可解得
+<latex>
+\begin{equation}
+\frac{M'}{M}=\frac{1}{2}\left(A_1Z'-\frac{Z''}{Z'}\right).@@eq:Z-M 
+\end{equation}
+</latex>
+代入式##eq:yterm 可得
+<latex>
+\begin{equation}
+3Z''-2Z'Z'''+(A_1^2+2A_1'-4A_0)Z'^4-4rZ'^2=0.@@eq:ZAr  
+\end{equation}
+</latex>
+
+
+** 有理函数$Z$的求解
+
+首先注意到，由式##eq:Z-M 可得$$M=Z'^{-\frac{1}{2}}e^{\frac{1}{2}\int A_1Z'}$$为Liouville函数。因此要求得符合标准方程的解，关键问题是如何找出合适的有理函数$Z$。寻找的主要方法还是分析函数的奇异性，首先求出$Z$的分母$\den(Z)$，再找到其分子次数的上界，最后通过求解代数方程求出分子的各系数。
+
+<theorem  name="Bronstein" label="th:bro02">
+; 引文格式?
+设$\den(r)$的无平方分解为$\prod\limits_iQ_i^i$。记$\Delta=a_1^2+2a_1'-4a_0$，$\delta=\nu_\infty(\Delta)$。若$\delta<2$，则$Z$可写为$\dfrac{P}{Q}$，其中
+<latex>
+\begin{equation}
+  Q=\prod\limits_iQ_{(2-\delta)i+2}^i\in K[x],@@eq:denZ
+\end{equation}
+</latex>
+$P\in K[x]$，满足$\deg P\le\deg Q+1$（当$\delta<0$时不等号严格）或者$\deg P=\deg Q+\dfrac{2-\nu_\infty(r)}{2-\delta}$。
+</theorem>
+
+<proof>
+设$p$为不可约多项式，使得$\nu_p(Z)<0$，则有$\nu_p(Z''^2)=\nu_p(Z'Z''')=2(\nu_p(Z)-2)$，$\nu_p(\Delta(Z)Z'^4)=-\delta \nu_p(Z)+4(\nu_p(Z)-1)=(4-\delta)\nu_p(Z)-4$，$\nu_p(rZ'^2)=\nu_p(r)+2(\nu_p(Z)-1)$。从而由$\delta<2$及式##eq:ZAr 可知$$(4-\delta)\nu_p(Z)-4=\nu_p(r)+2(\nu_p(Z)-1),$$即$$\nu_p(Z)=\frac{\nu_p(r)+2}{2-\delta}.$$注意到$-\nu_p(Z)$，$-\nu_p(r)$为分别为$\den(Z)$，$\den(r)$中$p$的重数，可知式##eq:denZ 成立。
+
+设$\deg P>\deg Q+1$，下证必有$\deg P=\deg Q+\dfrac{2-\nu_\infty(r)}{2-\delta}$。由于$\nu_\infty(Z)\le-2$，可得$\nu_\infty(Z''^2)=2\nu_\infty(Z)+4$，$\nu_\infty(Z'Z''')=2\nu_\infty(Z)+4$（当$\nu(Z)<-2$）或$\ge-1$（当$\nu(Z)=-2$时），$\nu_\infty(\Delta(Z)Z'^4)=(4-\delta)\nu_\infty(Z)+4$，$\nu_\infty(rZ'^2)=\nu_\infty(r)+2(\nu_\infty(Z)+1)$，同样由$\delta<2$及式##eq:ZAr 可得$$(4-\delta)\nu_\infty(Z)+4=\nu_\infty(r)+2(\nu_\infty(Z)+1),$$即$$\nu_\infty(Z)=\frac{\nu_\infty(r)-2}{2-\delta}.$$再注意到$\nu_\infty(Z)=\deg Q-\deg P$可得所要证的。
+
+最后注意当$\delta<0$时有$\nu_\infty(r)=\delta$，从而$\nu_\infty(Z)=1$，故不等号成立与后一种情形是重合的，这就完成了证明。
+</proof>
+
+由此我们得到了想要的$Q $的表达式和$P $次数的上界，将$P $的系数待定代入##eq:ZAr 可以得到一个代数方程组，最后解此方程组即可。另外，为保证得到的$Z=\dfrac{P}{Q}$不是常数（注意常数总是解），我们可以添加额外的一些限制方程。设$P=\sum\limits_{j=0}^nc_jx^j$，$Q=\sum\limits_{i=0}^nq_ix^i$，，$\forall 0\le N\le n, q_N\ne0$，加入方程$\sum\limits_{j=0}^N(q_jc_N-q_Nc_j)w_j=1$，其中$w_j$为新的待定元。可以看出，解新的方程组可以保证至少有一个$j$使得$q_jc_N\ne q_Nc_j$，从而$Z$非常数。
+
+函数$a_0$，$a_1$也允许带上参数（例如Bessel方程中的参数$\nu$），将它们也视作方程组中的未定元，求解代数方程组时可以将参数确定下来。
+
+<remark>
+用此方法也可求解一些特殊形式的代数解，例如形如$Z=P(x^{\frac{1}{2-\delta}})\prod\limits_iQ_i^{\frac{i-2}{2-\delta}}$的解。
+</remark>
+
+** 经典特殊函数
+
+在本节的最后我们给出定理##th:bro02 在一些经典特殊函数的情形，便于实际应用。
+; 这些特殊函数多为超几何函数或合流超几何函数的特殊情形(可参考王竹溪,郭敦仁的特殊函数概论一书).这里需不需要将一般情形与它们之间的关系指出?特别是我们的书如果没有特殊函数这一章.
+ - <index>Airy函数</index>，由方程$$y''{}=xy$$给出。$\Delta=4x$，$\delta=-1<0$，可知$Q=\prod\limits_iQ_{3i+2}^i$，$\deg P\le\deg Q$或$\deg P=\deg Q+\dfrac{2-\nu_\infty(r)}{3}$，$M=\sqrt{\dfrac{1}{Z'}}$。
+ - Bessel函数，由方程$$y''+\frac{1}{x}y'+\left(\varepsilon-\frac{\nu^2}{x^2}\right)y=0$$给出，其中$\varepsilon=\pm1$。$\Delta=\dfrac{4\nu^2-1}{x^2}-4\varepsilon$，$\delta=0<2$，可知$Q=\prod\limits_iQ_{2i+2}^i$，$\deg P\le \deg Q+1$或$\deg P=\deg Q+1-\dfrac{\nu_\infty(r)}{2}$，$M=\sqrt{\dfrac{Z}{Z'}}$。
+ - <index>Kummer函数</index>，由方程$$y''+ \left(\frac{\nu}{x}-1 \right)y'-\frac{\mu}{x}y=0$$给出。$\Delta=\mu+\dfrac{4\mu-\nu}{x}+\dfrac{\nu^2-2n}{x^2}$，$\delta=0<2$，可知$Q=\prod\limits_iQ_{2i+2}^i$，$\deg P\le \deg Q+1$或$\deg P=\deg Q+1-\dfrac{\nu_\infty(r)}{2}$，$M=e^{-\frac{1}{2}\int Z}\sqrt{\dfrac{Z^\nu}{Z'}}$。
+ - <index>Whittaker函数</index>，由方程$$y''{}=\left(\frac{1}{4}-\frac{\mu}{x}-\frac{1/4-\nu^2}{x^2}\right)y$$给出，$\Delta=1-\dfrac{4\mu}{x^2}-\dfrac{1-4\nu^2}{x^2}$，$\delta=0<2$，可知$Q=\prod\limits_iQ_{2i+2}^i$，$\deg P\le \deg Q+1$或$\deg P=\deg Q+1-\dfrac{\nu_\infty(r)}{2}$，$M=\sqrt{\dfrac{1}{Z'}}$。
+
+
+

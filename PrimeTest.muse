@@ -1,0 +1,534 @@
+#title 素数判定
+
+<contents>
+
+<index>素数判定</index>(Primality Test)是一个数论中十分基本,却又趣味盎然的问题.判定一个整数是否是素数,最为朴素的想法是直接利用素数的定义,用小的素数去一一试除,如果能整除的话,那就能确定无疑为合数了.根据Mertens定理（参见<cite>yao07</cite>），可以估算出大约有76%的奇数有小于100的素因子,可见这种最平凡的方法有时十分有效. 在本章中，我们将用$N$来表示待判定的目标数.
+
+相比整数的因子分解，素数判定一直以来被认为是较为容易的问题。2002年三位印度计算机科学家Agrawal，Kayal，Saxena<cite>aks04</cite>找到了素数判定的多项式算法（被称为<index>AKS算法</index>），其时间复杂度为$O(\ln^{12} N)$。AKS算法在理论上有重要的意义，不过实践中还要更多地考虑效率问题。实践中的素数检测方法大致分为两类，一类是确定性的，例如Lehmer $N-1$检测，Lucas $N+1$检测，<index>椭圆曲线素性证明</index>(<index>ECPP</index>)等等，当输出结果为“素数”时，能够保证被检测数一定为素数；另一类是概率性的，如Rabin-Miller检测，Baillie-PSW检测等等，当输出结果为“素数”时，仅以一定的高概率保证被检测数的素性。不过概率性检测一般要比确定性检测快得多。
+
+<index>APRCL方法</index>将Fermat类型的想法运用到分圆域中,最先由Adleman,Pomerance,Rumely<cite>apr</cite>提出,后经Cohen,Lenstra<cite>cl</cite>的改进，时间复杂度为“近似”多项式的$O((\ln N)^{c\ln\ln\ln N})$，其中$c$为一个常数。椭圆曲线素数证明最早由Goldwasser,Kilian<cite>gk86</cite>提出，后经Atikin，Morain<cite>atk93</cite>改进和实现，平均时间复杂度达到了$O(\ln^6 N)$。这两种方法已经成为目前实践上最快的确定性检测方法，并在密码学等领域有重要的应用。鉴于我们的目的，不能用太多篇幅来介绍这两种方法，详细可参阅文献<cite>cohen</cite>.
+
+有些素数判定方法严格来说应当是<index>合性检测</index>(Compositeness Test),这类方法总可以有效地把素数判定出来,而有可能把一个合数判定为素数.也就是说,此类方法判定一个数为合数总是准确无误的,而“漏网的”,即无法判定的合数往往称为<index>伪素数</index>(Pseudoprimes).
+
+阅读本章需要读者初等数论和抽象代数的基础知识（例如<cite>fkq03</cite>,<cite>nlzdss00</cite>）。本章的主要参考书是<cite>riesel</cite>，<cite>cohen</cite>和<cite>pei02</cite>. 读者也可以参考写的十分通俗易懂的<cite>yan08</cite>及其他算法/计算数论方面的相关文献。
+
+
+
+
+* Fermat检测
+
+几乎所有素数检测的想法之基石均为著名的<index>Fermat小定理</index>,即若$p$为素数,$(a,p)=1$,则$$a^{p-1}\equiv1\pmod{p}.$$
+
+由此我们得到最简单的检测算法——<index name="Fermat检测">Fermat合性检测</index>。
+
+<algorithm label="al:fermat" name="Fermat小定理作为合性检测">
+任取整数$a$，如果$(a,N)=1$且$a^{N-1}\not\equiv1\pmod{N}$，则输出$N$为合数，否则输出$N$可能为素数。
+</algorithm>
+
+<definition label="de:pseudo:fermat" name="Fermat伪素数">
+满足$a^{N-1}\equiv1\pmod{N}$的合数$N$称为一个(对于基$a$)的<index name="伪素数" sub="Fermat伪素数">Fermat伪素数</index>.
+</definition>
+
+在$25\times10^9$以下,有21853个对于基$a=2$的Fermat伪素数（参考<cite>psw</cite>）,如果对其再进行基为$a=3$的检测的话,伪素数将还剩下4709个,对于$a=2,3,5$有2552个,$a=2,3,5,7$有1770个.
+
+运用Fermat检测的关键是如何快速计算$a^{d} \mod N$.求幂运算采取二进算法##al:r2l ,##al:l2r ,可以使Fermat检测的算法复杂度降到平均$1.5\log N\cdot M(N)$(其中$M(N)$表示乘法运算的复杂度),已经为多项式阶的算法了. 使用Montgomery约化算法##al:monredc 可以更进一步地提高速度。
+
+<index name="伪素数" sub="Camichael数">Camichael数</index>是看起来比Fermat伪素数条件更“苛刻”的一类数.
+
+<definition label="de:CamichaelNumber" name="Camichael数">
+如果合数$N$,对任意满足$(a,N)=1$的整数$a$都有$a^{N-1}\equiv1\pmod{N}$,则称$N$为Camichael数.
+</definition>
+
+也就是说,Camichael数都将会是Fermat检测的“漏网之鱼”.最小的Camichael数的例子是$561=3\cdot 11\cdot 17$.在$25\times10^9$以下一共有2163个Camichael数, 它比对基$a=2,3,5,7$的Fermat伪素数还要来得多的原因是,如果恰巧$N$有2,3,5,7的因子,$N$便可以是Camichael数而非Fermat伪素数.
+
+* Euler检测
+
+<index>Euler检测</index>基于Euler的二次剩余定理,即若$p$为奇素数,$(a,p)=1$,则$$a^{(p-1)/2}\equiv\legendre{a}{p}\pmod{p}.$$其中$\legendre{a}{p}$是<index>Legendre符号</index>.
+<algorithm label="al:EulerTest" name="Euler判则作为合性检测">
+
+设$N$为奇数,任取整数$a$，满足$(a,N)=1$：
+
+ 1. 如果$a^{(N-1)/2}\not\equiv\pm1\pmod{N}$,则输出$N$为合数.
+
+ 2. 如果$a^{(N-1)/2}\equiv\pm1\pmod{N}$且$a^{(N-1)/2}\not\equiv\legendre{a}{N}\pmod{N}$,则输出$N$为合数.
+
+ 3. 如果$a^{(N-1)/2}\equiv\legendre{a}{N}\pmod{N}$,则输出$N$可能为素数。
+
+</algorithm>
+
+<definition label="de:pseudo:euler" name="Euler伪素数">
+如果合数$N$,$(a,N)=1$,满足$a^{(N-1)/2}\equiv\legendre{a}{N}\pmod{N}$,则称$N$为(对于基$a$的)<index name="伪素数" sub="Euler伪素数">Euler伪素数</index>.
+</definition>
+
+<definition label="de:pseudo:strong" name="强伪素数">
+设$N$奇合数,$N-1=d\cdot 2^s$,$d$为奇数.$N$被称为(对于基$a$的)<index name="伪素数" sub="强伪素数">强伪素数</index>,如果$$a^d\equiv 1 \pmod{N}$$或者对于某一个$r(0\le r\le s-1)$有 $$a^{d\cdot 2^r}\equiv -1 \pmod{N}.$$
+</definition>
+
+<remark label="re:strong">
+强伪素数的定义可以这样看出：若$N$为素数,则
+<latex>
+\begin{align*}
+  a^{N-1}-1&=(a^d-1)(a^d+1)(a^{2d}+1)(a^{4d}+1)\cdots(a^{2^{s-1}d}+1)\\
+     &\equiv 0\pmod{N}.
+\end{align*}
+</latex>
+</remark>
+
+对于Euler伪素数和强伪素数均不会出现类似Fermat伪素数的情况,也就是说,只要测试的基$a$足够多,最终总可以将合数和素数分辩开来.$25\times10^9$以下只有13个同时为对基2,3,5的强伪素数.
+
+<remark>
+<cite>psw</cite>证明了,Euler伪素数必定是强伪素数.
+</remark>
+
+* Lehmer $N-1$型检测
+
+<index name="Lehmer $N-1$型检测"></index>有时候$N$的素性很难判定,而$N\pm1$的分解却很容易得到.这一节的方法便是依赖于$N-1$的素因子分解.
+<index name="Fermat小定理" sub="Lehmer的逆定理"></index>
+<theorem label="th:FermatConverse" name="Fermat小定理逆定理, Lehmer">
+设有素因子分解$N-1=q_1^{\beta_1}\cdots q_n^{\beta_n}$.如果对$a$有$$a^{(N-1)/q_j}\not\equiv1 \pmod{N},\qquad \forall j=1,2,\ldots,n,$$且<latex>
+\begin{equation}
+@@eq:fermat
+a^{N-1}\equiv1 \pmod{N} .
+\end{equation}
+</latex>则$N$为素数.
+</theorem>
+
+<proof>
+从简化剩余系的乘法群$M_N=(\mathbb{Z}/N\mathbb{Z})^*$角度来看,条件保证了$a$为$M_N$的一个$N-1$阶元素,而$|M_N|=\varphi(N)$($\varphi$为Euler函数),从而有$\varphi(N)\ge N-1$,这就保证了$N$为素数.
+</proof>
+
+<remark>
+这里不要$(a,N)=1$的条件,是因为其已经被包括在式##eq:fermat 之中了.
+</remark>
+
+寻找$M_N$的生成元(甚至只寻找模$N$的一个二次剩余)都是非常困难的事情,目前还没有有效的确定性的方法.一个现实的问题是如果$N$为伪素数,如何才能快速的找到Lehmer $N-1$检测中符合条件的$a$,即$M_N$的一个生成元呢？有一些步骤可以采用：
+
+ 1. 排除所有$\legendre{a}{N}=1$的$a$,这就排除了一半可能的$a$!
+ 2. 从较小的$q_j$开始检测,因为$q_j$越小,失败的可能性越大.
+
+<index name="Fermat小定理" sub="Lehmer的逆定理!Selfridge的多基推广"></index>
+<theorem label="th:multibase-n-1" name="Selfridge的多基推广">
+如果$\forall q_j$,$\exists a_j$使得$$a_j^{(N-1)/{q_j}}\not\equiv1 \pmod{N} $$且$$a_j^{N-1}\equiv1 \pmod{N} .$$则$N$为素数.
+</theorem>
+
+<proof>
+设$a_j$模$N$的阶为$r_j$,则以上两式表明$r_j\nmid\frac{N-1}{q_j}$且$r_j\mid N-1$,从而$q_j^{\beta_j}\mid r_j\Rightarrow N-1\mid \varphi(N) \Rightarrow \varphi(N)=N-1$.
+</proof>
+
+<remark>
+这个方法对$M_N$的生成元很大的时候非常有用,因为我们不必找出一个“共同”的$a$来.
+</remark>
+<index name="Pepin定理"></index>
+<theorem label="th:pepin" name="Pepin定理">
+设$F_n=2^{2^{n}}+1$为Fermat素数($n\ge1$).则$F_n$为素数当且仅当$$3^{2^{2^{n-1}}}\equiv-1 \pmod{F_n} $$
+</theorem>
+
+<proof>
+用定理##th:FermatConverse 即可,只需注意到3必为$12n\pm 5$型素数的二次非剩余.
+</proof>
+
+<remark>
+使用这个方法,在1963年<cite>sel64</cite>证明了$F_{14}$(有4933个十进制位)是合数，尽管但现在为止还不知道其任何一个因子。
+</remark>
+
+下面的定理让我们可以拥有不必完全分解$N-1$的便利.
+<index name="Fermat小定理" sub="Lehmer的逆定理!放宽版本"></index>
+<theorem label="th:RelaxedFermatConverse" name="Lehmer定理的放宽版本">
+设$N-1=RF$,$(R,F)=1$且$R<F$,有素因子分解$F=\prod\limits_{j=1}^n q_j^{\beta_j}$.若有$a$使得$$a^{(N-1)/q_j}\not\equiv1 \pmod{N},\qquad \forall j=1,2,\ldots,n$$且$$a^{N-1}\equiv1 \pmod{N},$$则$N$为素数.
+</theorem>
+
+<proof>
+设$p$为素数,$p\mid N$,设$a$模$p$的阶是$d$,则由条件有$d\mid N-1$,但$d\nmid \frac{N-1}{q_j}$.从而$\forall j$,$d\mid \prod\limits_{i=1}^n q_i$,但$d\nmid R\cdot q_j^{\beta_j-1}\prod\limits_{i\ne j}q_i^{\beta_i}$.故有$$q_j^{\beta_j}\mid d\Rightarrow F\mid d\Rightarrow F\mid p-1 \Rightarrow F\le \sqrt{N}.$$矛盾！
+</proof>
+<index name="Proth定理"></index>
+<theorem label="th:proth" name="Proth定理">
+设$N=h\cdot2^n+1$,其中$h$为奇数,$2^n>h$.如果存在$a$使得$$a^{(N-1)/2}\equiv-1 \pmod{N} .$$则$N$为素数.
+</theorem>
+
+<proof>
+在定理##th:RelaxedFermatConverse 中令$F=2^n$即得.
+</proof>
+
+* Lucas 伪素数检测与$N+1$型检测
+
+如果$N-1$也是很难分解的,这里的方法就将分解的困难转移到$N+1$上去.想法是与$N-1$型检测是类似的, 不过要将Fermat小定理从$\mathbb{Z}$上推广到二次域的代数整数环上去，替代那里的$a^{N-1}-1$的则是所谓Lucas序列$U_{N+1}$.
+
+设$D$为无平方整数，记$O$为二次域$\mathbb{Q}(\sqrt{D})$的代数整数环，我们熟知(参见<cite>nlzdss00</cite>，P139)当$D\equiv2,3\pmod{4}$时，$$O=\{m+n\sqrt{D}\mid m,n\in\mathbb{Z}\},$$而当$D\equiv1\pmod{4}$时，$$O=\Big\{\frac{m+n\sqrt{D}}{2}\,\Big\vert\, m,n\in\mathbb{Z},m\equiv n\pmod{2}\Big\}.$$
+
+在$O$中可以很容易地讨论同余的概念，称$a\equiv b\pmod{M}$，若$a-b$属于$M$在$O$中生成的理想。记$\bar a$为$a$在$O$中的共轭，即$\overline{r+s\sqrt{D}}=r-s\sqrt{D}$，则在$O$中我们有如下Fermat小定理的类比。
+
+<index name="Fermat小定理" sub="二次域中的"></index>
+<theorem label="th:quafermat" name="二次域中的Fermat小定理">
+设$a\in O$，$p$为奇素数，$p\nmid D$，则有
+<latex>
+\begin{equation*}
+  a^p\equiv
+  \begin{cases}
+    a&\text{若}\displaystyle\legendre{D}{p}=1\\\noalign{\smallskip}
+    \bar{a}&\text{若}\displaystyle\legendre{D}{p}=-1
+  \end{cases}
+  \pmod{p}.
+\end{equation*}
+</latex>
+</theorem>
+
+<proof>
+设$2a=r+s\sqrt{D}$, $r,s\in\mathbb{Z}$，则由$\mathbb{Z}$上的Fermat小定理，二项展开及Euler二次剩余定理得
+<latex>
+\begin{align*}
+  2a^p&\equiv(2a)^p\equiv(r+s\sqrt{D})^p\equiv r^p+(s\sqrt{D})^p \\
+  &\equiv r+sD^{\frac{p-1}{2}}\sqrt{D} \\
+  &\equiv r+s\legendre{D}{p}\sqrt{D}\pmod{p}.
+\end{align*}
+</latex>
+从而得到所要结论。
+</proof>
+
+定理##th:quafermat 中的乘幂不容易计算，为了有效地利用定理##th:quafermat 的结论，我们引入<index>Lucas序列</index>的概念，Lucas序列实际上是一类简单的二阶递推序列。
+
+<definition label="de:LucasSeq" name="Lucas序列">
+设$P ,Q\in\mathbb{Z}$，特征方程$\lambda^2-P\lambda+Q=0$的两根为$a$，$b$.则$P $，$Q$对应的Lucas序列定义为$$U_n=\frac{a^n-b^n}{a-b},\qquad V_n=a^n+b^n.$$
+</definition>
+
+<remark>
+由特征方程对应的递推关系,知道$\{U_n\},\{V_n\}$均为$\mathbb{Z}$中的序列.
+</remark>
+
+<lemma label="le:lucas">
+记号同定义##de:LucasSeq ，设整数$M$满足$(QD,M)=1$，则$a,b,a-b$均模$M$可逆。并且$U_k\equiv0\pmod{M}$当且仅当$(ab^{-1})^k\equiv1\pmod{M}$。
+</lemma>
+
+<proof>
+由$(Q,M)=1$知$Q$模$M$可逆，而$ab=Q$，知$ab\cdot Q^{-1}\equiv1\pmod{M}$，从而$a,b$均模$M$可逆。又$a-b=\sqrt{D}$，而$D^{\varphi(M)}\equiv1\pmod{M}$，可知$(a-b)^{2\varphi(N)}\equiv1\pmod{M}$，从而$a-b$也模$M$可逆。
+
+由于$a-b$模$M$可逆，$U_k\equiv(a-b)^{-1}(a^k-b^k)\pmod{M}$，从而$$U_k\equiv0\pmod{M}\Longleftrightarrow a^k\equiv b^k\pmod{M}\Longleftrightarrow (ab^{-1})^k\equiv1\pmod{M}.$$
+引理得证。
+</proof>
+
+<theorem label="th:lucasfermat">
+设$p$为素数，满足$(2QD,p)=1$，记$\varepsilon=\legendre{D}{p}$，则有$U_{p-\varepsilon}\equiv0\pmod{p}$。
+</theorem>
+
+<proof>
+若$\legendre{D}{p}=1$，则由定理##th:quafermat 可知$a^{p-1}\equiv b^{p-1}\equiv1\pmod{p}$，从而$(ab^{-1})^{p-1}\equiv1\pmod{p}$，由引理##le:lucas 知$U_{p-1}\equiv0\pmod{p}$。
+
+若$\legendre{D}{p}=-1$，则由定理##th:quafermat 可知$a^{p+1}\equiv a\bar a\equiv ab\pmod{p}$，同理$b^{p+1}\equiv ba\pmod{p}$，从而$(ab^{-1})^{p+1}\equiv1\pmod{p}$，由引理##le:lucas 知$U_{p+1}\equiv0\pmod{p}$，这就完成了证明。
+</proof>
+
+由上面的定理我们自然地得到<index name="伪素数" sub="Lucas伪素数">Lucas伪素数</index>的概念。
+
+<definition  name="Lucas伪素数">
+设$N$为奇合数，若存在Lucas序列$\{U_n\}$使得$\varepsilon=\legendre{D}{N}\ne0$且$U_{N-\varepsilon}\equiv0\pmod{N}$，则称$N$为Lucas伪素数。
+</definition>
+
+正如我们在Fermat检测和Euler检测中看到的，一个伪素数概念对应着一个合性检测算法，由此我们立即可以得到<index>Lucas伪素数检测</index>算法。
+
+<algorithm label="al:lpsp" name="Lucas伪素数检测">
+选取Lucas序列参数$P,Q$，使得$\varepsilon=\legendre{D}{N}\ne0$。若$U_{N-\varepsilon}\not\equiv0\pmod{N}$则输出$N$为合数，否则输出$N$可能为素数。
+</algorithm>
+
+<remark>
+由于来源的不同，我们可以期望一个数同时为Lucas伪素数和Fermat伪素数（或强伪素数）的可能情形不大，这样的观察也被用于Baillie-PSW检测算法##al:psw 中。
+</remark>
+
+
+我们已经得到了Lucas伪素数合性检测，和$N-1$型检测类似，我们还能够进行素性的确证。在这里，替代$N-1$的分解的是$N+1$的分解，我们可以看到下面的定理与定理##th:FermatConverse 是多么的“形似”。
+<index name="Lucas $N+1$型检测"></index>
+<theorem label="th:lucas" name="Lucas检测">
+设有素因子分解$N+1=\prod\limits_{j=1}^nq_j^{\beta_j}$，若有Lucas序列$\{U_n\}$，使$(2QD,N)=1$，满足$$(U_{(N+1)/q_j},N)=1,\qquad \forall j=1,2,\ldots,n$$且$$U_{N+1}\equiv0\pmod{N},$$则$N$为素数.
+</theorem>
+
+<proof>
+设$p$为$N$的一个素因子，设$k$为最小的正整数使得$(ab^{-1})^k\equiv1\pmod{p}$。由条件知$U_{N+1}\equiv0\pmod{p}$，$U_{(N+1)/q_j}\not\equiv0\pmod{p}$，从而根据引理##le:lucas 知$k\mid N+1$，$k\nmid (N+1)/q_j,\ \forall j$，从而$k=N+1$。但根据$k$的最小性，由定理##th:lucasfermat 必有$k\mid q+1$或$k\mid q-1$。从而$q=N$，$N$为素数。
+</proof>
+
+与$N-1$型检测完全类似还可以得到以下结果.
+
+<theorem label="th:RelaxedLucas" name="Lucas检测的放宽版本">
+设$N+1=RF$,$(R,F)=1$且$R<F$,有素因子分解$F=\prod\limits_{j=1}^n q_j^{\beta_j}$.若有$\{U_k\}$为Lucas序列,$(2QD,N)=1$,满足$$(U_{(N+1)/q_j},N)=1,\qquad \forall j=1,\ldots,n$$且$$U_{N+1}\equiv0\pmod{N}.$$则$N$为素数.
+</theorem>
+
+<remark>
+Lucas检测的一个优势在于Lucas序列可以通过递推快速地计算.设
+<latex>
+\begin{equation*}A_k=
+\begin{bmatrix}
+  U_{k+1}&V_{k+1}\\
+  U_k & V_k
+\end{bmatrix},
+\end{equation*}
+</latex>
+则有
+<latex>
+\begin{equation*}A_k=
+  \begin{bmatrix}
+    P & -Q\\
+    1 & 0\\
+  \end{bmatrix}A_{k-1}=\cdots=
+  \begin{bmatrix}
+    P & -Q\\
+    1 & 0\\
+  \end{bmatrix}^kA_0.
+\end{equation*}</latex>
+可以使用快速求幂的方法在$O(\log k)$步中完成序列的计算.
+</remark>
+
+<remark>
+上述基于$N+1$分解的算法对<index>Mersenne素数</index>$2^n-1$尤其简单,因此也被著名的[[http://www.mersenne.org/][GIMPS]](Great Internet Mersenne Prime Search)所采用.目前为止已知的最大的Mersenne素数是GIMPS计划在2008年8月23日找到的第45个Mersenne素数,共有12978189个十进制位. 有趣的是，2009年4月12日找到的第47个Mersenne素数要比第45个来的小.
+</remark>
+<index name="Mersenne素数" sub="Lucas-Lehmer检测"></index>
+<theorem label="th:LucasMersenne" name="对Mersenne素数的Lucas-Lehmer检测">
+设$n$为奇数,$v_0=4$,$v_k=v_{k-1}^2-2$.则$M_n=2^n-1$为素数当且仅当$$v_{n-2}\equiv0\pmod{M_n}.$$
+</theorem>
+
+<proof>
+证明主要部分来源于定理##th:lucas ,然而仍有一些技术上的区别,这里就不赘述了.完整的可见Lehmer在1930的证明<cite>lehmer1930</cite>.另外J.W.Bruce在1993年给出了一个短至2页的"trival"版证明<cite>bruce</cite>.
+</proof>
+
+
+* 概率性的检测方法
+
+更加富有趣味的是素性的<index>概率性检测方法</index>.Knuth<cite>taocp2</cite>这样评价概率性的算法：“与其说算法重复地猜测错,倒不如说由于硬件的失灵或宇宙射线的原因,我们的计算机在它的计算中丢了一位.”概率性的算法使我们对传统的可靠性产生疑问：我们是否真的需要“素性”的严格确证？概率性算法最早由Solovay,Strassen<cite>solovay</cite>于1974年提出,Rabin-Miller的改进方法为Mathematica软件所采用. Baillie-PSW检测则综合了各种概率性检测方法，目前为止仍没有找到失败的反例，并且已经验证检测对于$10^{15}$以下的整数均是正确的。
+
+** Solovay-Strassen检测
+<index name="Solovay-Strassen检测"></index>
+<algorithm label="al:solovay" name="Solovay-Strassen检测">
+ 1. 随机生成满足$1\le a\le N$的整数$a$;
+ 2. 若$(a,N)=1$且$\jacobi{a}{N}\equiv a^{(N-1)/2}\pmod{N}$,则输出$N$为素数,否则输出$N$可能为合数.
+
+</algorithm>
+
+<theorem label="th:solovay">
+算法##al:solovay 重复执行$k$次,给出错误的概率为0(当$N$为素数时)或$2^{-k}$(当$N$为合数时)
+</theorem>
+
+<proof>
+只需证明当$N$为合数,$(a,N)=1$时,$\jacobi{a}{N}\equiv a^{(N-1)/2}\pmod{N}$的概率不超过$\frac{1}{2}$即可.设$$G=\left\{a+N\mathbb{Z}\bigm|a\in\mathbb{Z},(a,N)=1,a^{(N-1)/2}\equiv\jacobi{a}{N}\pmod{N}\right\}.$$则$G<M_N$,因此只需证明$G\ne M_N$即可.
+
+如果$N$能分解为两个互素的非平凡因子$r$,$s$,我们证明必有$\forall a$满足$(a,N)=1$都有$a^{(N-1)/2}\equiv1\equiv\jacobi{a}{N}\pmod{N}$(由Jacobi符号的性质便知这是不可能的).若不然,由中国剩余定理找到$b$满足$b\equiv1\pmod{r}$且$b\equiv a\pmod{s}$.则有$b^{(N-1)/2}\equiv 1\pmod{r}$且$b^{(N-1)/2}\equiv -1\pmod{s}$,而这与$b^{(N-1)/2}\equiv\pm1\pmod{N}$是矛盾的！
+
+如果$N=p^e$为素数幂,则$\forall a$满足$(a,N)=1$都有$a^{p^e-1}\equiv1\pmod{p^e}$,再由Euler定理知道$p^{e-1}(p-1)\mid p^e-1$.而这也是不可能的.
+</proof>
+
+
+** Rabin-Miller检测
+
+Solovay-Strassen检测利用了Euler伪素数“并不多”的性质，使用随机给出的基$a$多次重复进而给出高成功率的素性检测结果。同样的想法也可以施用于强伪素数与Lucas伪素数，前者便是著名的Rabin-Miller检测，后者则被运用到Baillie-PSW检测中。
+
+<index>Rabin-Miller检测</index>可以看成我们在注##re:strong 中的想法的一个具体化.
+
+<algorithm label="al:rabin" name="Rabin-Miller强伪素数检测">
+设$N-1=d\cdot 2^s$,
+ 1. 随机生成满足$1\le a\le N$的整数$a$;
+ 2. 顺次计算$$a^d,a^{2d},a^{4d},\ldots,a^{2^s\cdot d}.$$若计算到第$k$步时有
+   1. $k=1$且$a^d\equiv1\pmod{N}$,输出$N$可能为素数;
+   2. $k>1$且$a^{2^{k-1}\cdot d}\equiv-1\pmod{N}$,输出$N$可能为素数；
+   3. $k>s$,输出$N$为合数.
+
+</algorithm>
+
+<remark>
+Rabin<cite>rabin</cite>证明了算法##al:rabin 重复$k$遍,给出正确判断的概率大于$1-4^{-k}$.
+</remark>
+
+<remark>
+使用单个基$a$的Rabin-Miller检测可能会遗漏许多基$a$下的强伪素数，因此实践中的确需要使用多基的Rabin-Miller测试。例如使用前7个素数组成的多基Rabin-Miller测试，可以保证算法在$341550071728321\approx3.4\times10^{14}$以下均是有效的，而且这个数在用前8个素数为基的Rabin-Miller测试下没有改进。
+</remark>
+
+** Baillie-PSW检测
+
+只是使用多基的Rabin-Miller测试可能得不到好的效率。Baillie<cite>bai80</cite>将基为2的Rabin-Miller检测与Lucas伪素数检测结合起来，得到更为有效的素数检测方法。Pomerance, Selfridge, Wagstaff在<cite>psw</cite>中对小于$25\times10^9$的数验证了算法的正确性。尽管Pomerance<cite>pom84</cite>指出对于充分大的$N$，必定有Baillie-PSW检测的反例，并且以30美元悬赏找出一个算法失败的反例（后来增加到620美元），不过反例至今没有找到，并且有经验估计认为第一个反例如果被找到的话，至少得有10000个十进位长度（参见<cite>mar04</cite>）。
+
+下面我们正式给出<index>Baillie-PSW检测</index>。
+
+<algorithm  label="al:psw" name="Baillie-PSW检测">
+ 1. 使用小素数试除$N$，若能整除，输出$N$为合数。
+ 2. 使用基为2的Rabin-Miller强伪素数检测##al:rabin ，若$N$非强伪素数，输出$N$为合数。
+ 3. 选择以下两种方法之一确定Lucas序列的参数$P $，$Q$：
+   - (Selfridge建议)取$D$为$5,-7,9,-11,13,\ldots$中使得$\legendre{D}{N}=-1$的第一个数，选择$P=1$，$Q=\frac{1-D}{4}$；
+   - (Baillie建议)取$D$为$5,9,13,17,21,\ldots$中使得$\legendre{D}{N}=-1$的第一个数，选择$P $为$>\sqrt{D}$的最小奇数，$Q=\frac{P^2-D}{4}$。
+ 4. 使用$P $，$Q$为参数的Lucas伪素数检测算法##al:lpsp ，若$N$非Lucas伪素数，输出$N$为合数，否则输出$N$可能为合数。用算法##al:sqrtest 检测$N$是否为完全平方数。
+</algorithm>
+
+<remark>
+由于$D=P^2-4Q^2$，只需尝试模4余1的数。Selfridge建议方法中不使用$-3$是因为当$D=-3$时有$P=Q=1$，将会产生以$\{1,1,0,-1,-1,0\}$为循环节的周期Lucas序列，这将使得每个奇合数变成关于$P,Q$的Lucas伪素数，并非我们所想要的。
+</remark>
+
+
+<remark>
+若第三步中尝试过程中计算出前若干个$\legendre{D}{N}$均为1，则$N$很可能为完全平方数，此时可用算法##al:sqrtest 对$N$进行平方检测以防止额外的计算，若$N$不是平方数则继续寻找$D$的过程。另外尝试过程中若计算得$\legendre{D}{N}=0$，则意味着$N$必为合数，可直接终止计算。
+</remark>
+
+<remark>
+<cite>bai80</cite>证明了，在第三步中，两种方法取到合适的$D$的平均尝试次数小于$2$。
+</remark>
+
+
+
+; 如果$N-1$也是很难分解的,这里的方法就将分解的困难转移到$N+1$上去.想法是与$N-1$型检测是类似的,替代那里的$a^{N-1}-1$的是所谓Lucas序列的$U_{N+1}$.我们需要一些Lucas序列的准备工作.
+
+
+
+; <definition  name="二次域中的整数">
+; 设$z\in \mathbb{Q}(\sqrt{D}) $,$p,q\in\mathbb{Z}$,若$z$满足方程$z^2+pz+q=0$,则称$z$为$\mathbb{Q}(\sqrt{D})$中的整数.通常意义下的整数($\in \mathbb{Z}$)则称为有理整数,下同.
+; </definition>
+
+; 通过直接的计算可以得到：
+; <proposition label="pr:kd-integer">
+; $\mathbb{Q}(\sqrt{D})$ 中的整数均有以下形式
+; <latex>
+; \begin{equation*}x=
+; \begin{cases}
+;   r+s\sqrt{D} & \text{若}D\equiv2,3 \pmod{4},\\ \noalign{\smallskip}
+;   r+s{\displaystyle\frac{-1+\sqrt{D}}{2}}& \text{若}D\equiv1\pmod{4}.
+; \end{cases}
+; \end{equation*}</latex>
+; 其中$r$,$s$为有理整数,简记为$r+s\rho$.
+; </proposition>
+
+; <remark>
+; 对于$D$为负数的情形,$\mathbb{Q}(\sqrt{D})$中的整数对应于复平面上的某类格点.
+; </remark>
+
+; <definition label="kd-conjugate">
+; $\bar{x}=r-s\sqrt{D}$称为$x=r+s\sqrt{D}$共轭.有理整数$x\bar{x}$称为$x$的模,记为$N(x)$.
+; </definition>
+
+; <definition>
+; 若$N(x)=\pm1$,则称$x$为$\mathbb{Q}(\sqrt{D})$中的单位.
+; </definition>
+
+; <definition>
+; 两个整数称为相伴的(associated),如果其商为单位.
+; </definition>
+
+; <definition  name="二次域中的整除性">
+; 设$\alpha$,$\beta$,$\gamma$为整数,如果有$\alpha=\beta\gamma$,则称$\beta\mid\alpha$,$\gamma\mid\alpha$(此时必有$N(\beta)\mid N(\alpha)$,$N(\gamma)\mid N(\alpha)$).
+; </definition>
+
+; 类似可以引入$\mathbb{Q}(\sqrt{D})$中的关于有理整数的同余关系、最大公因子等等.设$n$为有理整数,则有$$r+s\rho\equiv0\pmod{n}\Leftrightarrow r\equiv s \equiv0 \pmod{n}.$$
+
+; 下面我们给出十分重要的Fermat小定理与Euler定理在二次域中的类似形式.
+
+; <theorem label="th:kd-fermat" name="二次域中的Fermat小定理">
+; 设$a\in \mathbb{Q}(\sqrt{D})$为整数,$p$为奇有理素数,则有
+; <latex>
+; \begin{equation}
+;   @@eq:kd-fermat
+;   a^p\equiv
+;   \begin{cases}
+;     a&\text{若}\displaystyle\legendre{D}{p}=1\\\noalign{\smallskip}
+;     \bar{a}&\text{若}\displaystyle\legendre{D}{p}=-1
+;   \end{cases}
+;   \pmod{p}
+; \end{equation}
+; </latex>
+; </theorem>
+
+; <proof>
+; 用$a$的表示进行二项展开,利用Fermat小定理以及二次剩余的Euler准则.
+; </proof>
+
+; <remark>
+; 由上述定理立即得到,当$\legendre{D}{p}=-1$时,有$a^{p+1}\equiv N(a)\pmod{p}$.
+; </remark>
+
+; <theorem label="th:kd-euler" name="二次域中的Euler定理">
+; 设$(a,p)=1$,若$\legendre{D}{p}=1$,则$$a^{p^{n-1}(p-1)}\equiv1\pmod{p^n}.$$若$\legendre{D}{p}=-1$,则$$a^{p^{n-1}(p+1)}\equiv(N(a))^{p^{n-1}}\pmod{p}.$$
+; </theorem>
+
+; <proof>
+; 利用式##eq:kd-fermat 及二项式展开.
+; </proof>
+
+; <definition label="de:LucasSeq" name="Lucas序列">
+; 设$P $,$Q$为有理整数,特征方程$\lambda^2-P\lambda+Q=0$的两根为$a$,$b(= \bar{a})$.对应的Lucas序列为$$U_n=\frac{a^n-b^n}{a-b},\qquad V_n=a^n+b^n.$$
+; </definition>
+
+; <remark>
+; 由特征方程对应的递推关系,知道$\{U_n\},\{V_n\}$均为有理整数序列.
+; </remark>
+
+; <lemma>
+; 设$D$为$P^2 - 4Q$的非平方部分,$(2QD,p)=1$,$p$为有理素数,则$$U_{p^{n-1}\left(p-\legendre{D}{p}\right)}\equiv0\pmod{p}$$
+; </lemma>
+
+; <proof>
+; 对$a$和$\bar{a}$分别应用定理##th:kd-euler ,再由$U_{p^{n-1}\left(p-\legendre{D}{p}\right)}$的定义即知.
+; </proof>
+
+; 我们给出形式上与Lehmer检测十分相近的
+; <theorem label="th:lucas" name="Lucas检测">
+; 设有素因子分解$N+1=\prod\limits_{j=1}^nq_j^{\beta_j}$,若有Lucas序列$\{U_n\}$,使$(2QD,N)=1$,且满足$$(U_{(N+1)/q_j},N)=1,\qquad \forall j=1,2,\ldots,n$$且$$U_{N+1}\equiv0\pmod{N}.$$则$N$为素数.
+; </theorem>
+
+; <proof>
+; 设$N=\prod\limits_{i=1}^np_i^{\alpha_i}$,记$S_i=p_i^{\alpha_i-1}\left(p_i-\legendre{D}{p_i}\right)$.由上述引理得到$$U_{S_i}\equiv0\pmod{p_i^{\alpha_i}}.$$
+; 设$M=
+; \left\{k\mid U_k\equiv0\pmod{p_i^{\alpha_i}}\right\}$.则根据Lucas序列的定义知$M$有以下性质：$$k_1,k_2\in M\Rightarrow k_1\pm k_2\in M.$$令$d=\mathrm{LCM}\{S_1,\ldots,S_n\}$,即$S_1,\ldots,S_n$的最小公倍数.由$M$的上述性质,完全类似于定理##th:FermatConverse 的论证,可知$d\mid N+1$但$d\nmid\frac{N+1}{q_j}$,得到$q_j^{\beta_j}\mid d\Rightarrow N+1\mid d\Rightarrow d=N+1$.
+
+; 然而另一方面,若$n=1$,$N=p_1^{\alpha_1}$且$\alpha_1\ge2$则
+; <latex>
+; \begin{align*}
+;   d&=2N\cdot\frac{1}{2}\left(1+\frac{1}{p_j}\right)\\
+;     &=N\left(1+\frac{1}{p_j}\right)\\
+;       &\ne N+1;
+; \end{align*}
+; </latex>
+; 若$n\ge2$,由
+; <latex>
+; \begin{align*}
+;   d&=2\cdot \mathrm{LCM}\left\{\frac{1}{2}\left(p_i-\legendre{D}{p_i}\right)p_i^{\alpha_i-1}\Bigm| i=1,\ldots,n\right\}\\
+;   &\le2\prod\limits_{i=1}^n\frac{1}{2}\left(1-\frac{1}{p_i}\legendre{D}{p_i}\right)p_i^{\alpha_i}\\
+;   &\le2N\prod\limits_{i=1}^n\frac{1}{2}\left(1+\frac{1}{p_i}\right)\\
+;   &\le2N\frac{1}{2}\left(1+\frac{1}{3}\right)\cdot\frac{1}{2}\left(1+\frac{1}{5}\right)\\
+;   &=\frac{1}{2}N\left(1+\frac{1}{3}\right)\left(1+\frac{1}{5}\right)\\
+;   &<N+1.
+; \end{align*}
+; </latex>
+; 从而必有$n=1$,$\alpha_1=1$,即$N$为素数.
+; </proof>
+
+; Lucas检测的一个优势在于,Lucas序列可以通过递推快速地计算.设
+; <latex>
+; \begin{equation*}A_k=
+; \begin{bmatrix}
+;   U_{k+1}&V_{k+1}\\
+;   U_k & V_k
+; \end{bmatrix},
+; \end{equation*}
+; </latex>
+; 则有
+; <latex>
+; \begin{equation*}A_k=
+;   \begin{bmatrix}
+;     P & -Q\\
+;     1 & 0\\
+;   \end{bmatrix}A_{k-1}=\cdots=
+;   \begin{bmatrix}
+;     P & -Q\\
+;     1 & 0\\
+;   \end{bmatrix}^kA_0.
+; \end{equation*}</latex>
+; 可以使用快速求幂的方法在$\log k$步中完成序列的计算.
+; <remark>
+; 上述基于$N+1$分解的算法对Mersenne素数$2^n-1$尤其简单,因此也被著名的[[http://www.mersenne.org/][GIMPS]](Great Internet Mersenne Prime Search)所采用.目前为止已知的最大的Mersenne素数是GIMPS计划在2008年8月23日找到的第45个Mersenne素数,共有12978189个十进制位. 有趣的是，2008年9月6日找到的第46个Mersenne素数要比第45个来的小.
+; </remark>
+
+; <theorem label="th:LucasMersenne" name="对Mersenne素数的Lucas-Lehmer检测">
+; 设$n$为奇数,$v_0=4$,$v_k=v_{k-1}^2-2$.则$M_n=2^n-1$为素数当且仅当$$v_{n-2}\equiv0\pmod{M_n}.$$
+; </theorem>
+
+; <proof>
+; 证明思想可以完全跟随定理##th:lucas ,然而仍有一些技术上的区别,这里就不赘述了.完整的可见Lehmer在1930的证明<cite>lehmer1930</cite>.另外J.W.Bruce在1993年给出了一个短至2页"trival"版证明<cite>bruce</cite>.
+; </proof>
+
+; 与$N-1$型检测完全类似的得到以下结果.
+
+; <theorem label="th:RelaxedLucas" name="Lucas检测的放宽版本">
+; 设$N+1=RF$,$(R,F)=1$且$R<F$,有素因子分解$F=\prod\limits_{j=1}^n q_j^{\beta_j}$.若有$\{U_k\}$为Lucas序列,$(2QD,N)=1$,满足$$(U_{(N+1)/q_j},N)=1,\qquad \forall j=1,\ldots,n$$且$$U_{N+1}\equiv0\pmod{N}.$$则$N$为素数.
+; </theorem>
+
+; <definition label="de:pseudo:lucas" name="Lucas伪素数">
+; 如果$N$为奇合数,$\{U_k\}$为一个Lucas序列,$N\nmid Q$,满足$\legendre{D}{N}=-1$且$U_{N+1}\equiv0\pmod{N}$,则称$N$为(关于$P $，$Q$)的Lucas伪素数.
+; </definition>

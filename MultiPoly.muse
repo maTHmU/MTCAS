@@ -1,0 +1,806 @@
+#title 多元多项式
+
+<contents>
+
+在前面的章节中,我们已经具体地讨论了各种一元多项式环上的GCD问题以及因子分解问题,本章我们讨论多元多项式的相关问题,即在$\mathbb{Z}[x_1,\ldots,x_n]$中讨论.
+
+对于多元多项式的最大公因子和因子分解问题,和一元问题类似,我们也主要采用各种同态象的方法,以求将多元问题转化为一元问题求解.
+
+* 多元多项式插值方法
+
+回忆我们在$\mathbb{Z}[x]$中处理问题时所用的方法.为了有效避免系数膨胀问题,我们无论求最大公因子还是做因子分解,都采用了模算法,将其化为有限域上多项式问题,并且最后用中国剩余定理,Hensel提升以及若干特殊的技术（如因子组合,格中短矢量等）将其恢复.对于多元多项式环,不仅要在$\mathbb{F}_p$中讨论问题,还要将多元问题化为一元问题,这里我们主要采用赋值同态的方法.即同态映射
+$$\Phi_{x_i-a}(f)=f\bmod (x_i-a)=f(x_1,\ldots,x_{i-1},a,x_{i+1},\ldots,x_n).$$
+这样相当于给某些未定元取赋值点,最后我们需要用中国剩余定理,或者说是插值的方法还原多项式.为了便于后文叙述,我们引入记号$\Phi_I(f)$表示$f\bmod I$,其中$I$为多项式环中的理想.对于整数$m$引入记号$\Phi_m(f)$表示$f\bmod m$.
+
+前面我们曾经介绍过多点的Lagrange插值快速算法. 由于我们后面的算法会利用逐点插值,甚至所谓的“稀疏插值”,因此本节将介绍稠密插值和稀疏插值算法（参考<cite>rz79</cite>）, 它们对于多元多项式最大公因子的模算法是很有用的.
+
+** 稠密插值
+
+插值问题要解决的问题是已知若干个点$u_1,u_2,\ldots,u_k$和$v_1,v_2,\ldots,v_k$,求多项式$f$使得$\forall i=1,2,\ldots,k$有$f(u_i)=v_i$.下面直接给出<index>Newton插值</index>算法,很容易验证算法的正确性.
+
+<algorithm label="al:newtoninterpolation" name="Newton插值">
+输入和输出同前描述.
+
+ 1. 赋初值$f(x)=v_1$,$q(x)=(x-u_1)$,
+
+ 2. 对于$i=2,3,\ldots,k$,顺次计算
+$$f(x)=f(x)+\frac{q(x)(v_i-f(u_i))}{q(u_i)},\quad q(x)=(x-u_i)q(x),$$
+
+ 3. 输出$f(x)$.
+</algorithm>
+
+多元多项式的<index>稠密插值</index>基于的思想十分简单,例如我们有一个函数$F(x_1,\ldots,x_n)$,可以求得它在某些点上的函数值,我们的任务是找到一个各个变元次数均不超过$d$的多元多项式$P(x_1,\ldots,x_n)$,使得它们在各整点上的值相同.注意到我们在这里的问题的提法是很具有一般性的,不仅可以将GCD问题化为这种形式,甚至也可以将诸如多项式的乘法等问题化为这种形式.
+稠密插值的基本思想就是递归地依次将各个变元插值回来,假设我们有一初值点$(x_{10},x_{20},\ldots,x_{n0})$,我们首先可以固定$x_{20},\ldots,x_{n0}$,而再取$d$个$x_1$的值,由一元插值方法(Newton法或Lagrange法)求得多项式$P(x_1,x_{20},\ldots,x_{n0})$,依次再确定各变元$x_2,\ldots,x_n$即可. 若我们设$d$次一元多项式插值问题的复杂度为$M(d)$,则可知本算法的复杂度为$O(n(d+1)^{n-1}M(d))$（参见<cite>rz93</cite>）.
+
+** 稀疏插值
+
+*** 问题引入
+
+我们先用一个例子来介绍<index>稀疏插值</index>算法,以便对它有一个更好的了解.
+
+从上节稠密插值算法过程我们可以看出,对$n$个变元次数不超过$d$的多项式的插值我们大约要对函数$F$求值$(d+1)^n$次.例如<cite>rz93</cite>中所用的多项式
+$$P(x,y,z)=x^5z^2+x^5z+xy^4+xyz^5+y^5z,$$
+其需要计算函数值$(5+1)^3=216$次！事实上,这么多插值次数对于这样稀疏的多项式显然是极其不划算的.我们重复一下插值的过程以说明稀疏插值是如何减少插值次数的.
+
+首先可以由赋值点$(x_i,y_0,z_0),i=0,\ldots,5$通过稠密插值得到$P(x,y_0,z_0)=ax^5+bx+c$.下一步即要再选择5个$y$的赋值点$y_i$,计算$P(x,y_i,z_0)$才能由此插值得到$P(x,y,z_0)$.如果是稠密插值法,此时对于每个$y_i$,我们都需取6个$x_i$来插值,但是如果$y_i$选的值恰当(所谓恰当的意义,后文定义##def:preciseevaluationpoint 和定理##th:preciseevaluationpoint 将会给出说明),我们完全可以假设对于$y_i(1\le i\le 5)$,也有
+$$P(x,y_i,z_0)=a_ix^5+b_ix+c,$$
+于是,对每个$y_i$只需取3个$x$的赋值点来插值,通过解方程的方法计算系数$a_i,b_i,c_i$.
+
+这样,我们总共计算函数值的次数为$6+3\times 5=21$,即可得到$P(x,y,z_0)$,注意从这一步开始,我们已经节省了插值次数,从原来的需要求值$6\times 6=36$次降到了21次.并且可设求得的$P(x,y,z_0)$具有形式:
+$$P(x,y,z_0)=ax^5+bxy^4+cxy+dy^5.$$
+
+接下来的步骤就比较顺理成章了,我们同样要再计算$P(x,y,z_i),1\le i\le 5$,此时可假设各多项式具有形式
+$$P(x,y,z_i)=a_ix^5+b_ixy^4+c_ixy+d_iy^5,$$
+则需再求值$4\times 5=20$次,总共求值次数$41$次,比起216次已大大减少了.
+
+*** 稀疏插值算法
+
+为了叙述方便,给出如下记号.设多项式$P(X)=P(X_1,X_2,\ldots,X_n)\in F[X]$,$F$为某个域,每个变元$X_i$的次数都不超过$d$,并且$P$的的单项式项数为$T$(对于稀疏多项式有$T\ll (d+1)^n$).设$v=(v_1,\ldots,v_n)$为一$n$元有序对,定义单项式记号
+$$X^v=X_1^{v_1}X_2^{v_2}\cdots X_n^{v_n},$$
+则多项式$P$可记为
+$$P=c_1X^{e_1}+c_2X^{e_2}+\cdots+c_TX^{e_T},$$
+其中$e_1,\ldots,e_T$均为$n$元序对.
+
+从某种意义上说,集合$\{e_1,e_2,\ldots,e_T\}$反映了多项式$P$的“结构”,因而我们定义下面的:
+<definition  name="模板">
+记多项式指数的集合为
+$$\mathrm{skel}P=\{e_1,e_2,\ldots,e_T\},$$
+简称其<index>模板</index>(也可译作骨架,见<cite>rz93</cite>skeleton定义).并记其在前$k$维上的投影为
+$$\mathrm{skel}_kP=\{(e_1,\ldots,e_k)|\exists e=(e_1,\ldots,e_T)\in\mathrm{skel}P\}.$$
+</definition>
+
+<definition  label="def:preciseevaluationpoint" name="精确求值点">
+设$(x_1,\ldots,x_n)\in F^n$,若$\forall k(1<k<n)$,有
+$$\mathrm{skel}P(X_1,\ldots,X_k,x_{k+1},\ldots,x_n)=\mathrm{skel}_kP(X),$$
+则称其为<index>精确求值点</index>(Precise Evaluation Point).
+</definition>
+
+注意到一般情况下只有
+$$\mathrm{skel}P(X_1,\ldots,X_k,x_{k+1},\ldots,x_n)\subset\mathrm{skel}_kP(X),$$
+欲使两者相等,则必须$x_{k+1},\ldots,x_n$的取值满足以$X_1,\ldots,X_k$为主变元的多项式$P$的各项系数($\in F[X_{k+1},\ldots,X_n]$)均在其上不为零.据此,我们可以给出精确求值点的概率估计.
+
+<theorem label="th:preciseevaluationpoint" name="精确求值点概率估计">
+设$P(X)$是一整环上的$n$元多项式,其每个变元次数不超过$d$,总共有T项,设$S$为一有限赋值点集合,$\#S=s$,取求值点$x=(x_1,\ldots,x_n)\in S^n$,则其不是精确求值点的概率不超过
+$$\frac{n(n-1)dT}{2s}.$$
+</theorem>
+
+<proof>
+根据引理##le:gcdpro1 我们知道对于$P$以$X_1,\ldots,X_k$为主变元的某个系数多项式来说,$x_{k+1},\ldots,x_k$为其零点的概率不超过$(n-k)d/s$.因为系数最多有$T$项,则概率不超过$(n-k)dT/s$.再对$k=1,2,\ldots,n-1$求和即有概率不超过
+$$\frac{(n-1)dT}{s}+\frac{(n-2)dT}{s}+\cdots+\frac{dT}{s}=\frac{n(n-1)dT}{2s}.$$
+
+证毕.
+</proof>
+
+取足够大的$s$可以减小此概率,这正是我们每一步稀疏插值时假设目标多项式具有同样的模板的概率依据.
+
+下面，我们把整个插值还原的过程描述如下:
+
+<algorithm label="sparseinterpolation" name="稀疏插值算法">
+输入:一个可以求值的函数$f(X_1,\ldots,X_n)$，精确求值点$(x_{10},\ldots,x_{n0})$,各变元次数均不超过的$d$,
+
+输出:多项式$P(X_1,\ldots,X_n)\in F[X]$,使得$P$和$f$在求值点上的值相同.
+
+ 1. 随机任取$d$个值$x_{11},x_{12},\ldots,x_{1d}$,利用求得的值$f(x_{1i},x_{20},\ldots,x_{n0})(0\le i\le d)$,用一元插值算法(如算法##al:newtoninterpolation )求出多项式$P(X_1,x_{20},\ldots,x_{n0})$,
+
+ 2. $S=\mathrm{skel}P(X_1,x_{20},\ldots,x_{n0})$,设$S=\{s_1,s_2,\ldots,s_q\}$,
+
+ 3. 将$i$顺次由$2$循环到$n$,做如下4-6步,
+
+ 4. 随机任取$d$个值$x_{i1},x_{i2},\ldots,x_{id}$,对于每个$x_{ij}(1\le j\le d)$,设
+$$P(X_1,\ldots,X_{i-1},x_{ij},x_{i+1,0},\ldots,x_{n0})$$
+具有如下形式
+$$p_1X^{s_1}+p_2X^{s_2}+\cdots+p_qX^{s_q},$$
+取$q$组赋值点$(x_{1k},x_{2k},\ldots,x_{i-1,k})(1\le k\le q)$构造独立的线性方程组来求出$p_1,\ldots,p_q\in F$,于是得到$d$个多项式
+$$P(X_1,\ldots,X_{i-1},x_{ij},x_{i+1,0},\ldots,x_{n0}),(1\le j\le d)$$
+
+ 5. 利用第4步求出的$d$个多项式对每个系数$p_k(1\le k\le q)$进行一元插值算法求出$p_k(X_i)$,则
+$$P(X_1,\ldots,X_i,x_{i+1,0},\ldots,x_{n0})=p_1(X_i)X^{s_1}+p_2(X_i)X^{s_2}+\cdots+p_q(X_i)X^{s_q},$$
+
+ 6. $S=\mathrm{skel}P(X_1,\ldots,X_i,x_{i+1,0},\ldots,x_{n0})$,设$S=\{s_1,\ldots,s_q\}$,
+
+ 7. 输出$P$.
+</algorithm>
+
+<remark>
+在算法第4步取$q$组赋值点时,要使得它们对于要求解的变元$p_1,\ldots,p_q$构成非奇异的独立线性方程组,否则需要重新选取某些赋值点.
+</remark>
+
+<remark>
+我们可以选取一组赋值点$(x_{1},x_{2},\ldots,x_{i-1})$,然后令$q$组赋值点为
+$$(1,\ldots,1),(x_{1}^1,\ldots,x_{i-1}^1),(x_{1}^2,\ldots,x_{i-1}^2),\ldots,(x_{1}^{q-1},\ldots,x_{i-1}^{q-1}),$$
+这样对需求解的$q$个变元来说，可以得到如下Vandermonde线性方程
+$$
+\begin{pmatrix}
+1 &1 &\cdots &1\\
+X^{s_1} &X^{s_2} &\cdots &X^{s_q}\\
+\vdots &\vdots & &\vdots\\
+(X^{s_1})^{q-1} &(X^{s_2})^{q-1} &\cdots &(X_{s_q})^{q-1}
+\end{pmatrix}
+\begin{pmatrix}
+p_1\\p_2\\ \vdots\\p_q
+\end{pmatrix}
+$$
+$$
+=
+\begin{pmatrix}
+f(1,\ldots,1,x_{ij},x_{i+1,0},\ldots,x_{n0})\\
+f(x_1,\ldots,x_{i-1},x_{ij},x_{i+1,0},\ldots,x_{n0})\\
+\vdots\\
+f(x_1^{q-1},\ldots,x_{i-1}^{q-1},x_{ij},x_{i+1,0},\ldots,x_{n0})
+\end{pmatrix}.
+$$
+</remark>
+利用此方法的好处是求解线性方程时,Vandermonde方程其系数矩阵具有特殊性,因而有特别的线性代数的处理方法(参加<cite>rz93</cite>),求解复杂度低于一般的线性方程.另一方面,Vandermonde行列式的非奇异性很容易得到保证,只需$X^{s_1},\ldots,X^{s_q}$各不相同即可.
+
+
+对于特征为零的域,这一点是很容易做到的,只需将$x_1,\ldots,x_{i-1}$取为前$i-1$个素数即可,或者当有限域的特征足够大(特征$p>(2\times 3\times\cdots\times p_n)^d$)时也可如此取赋值点,此时算法仅可能当初始点非精确赋值点时失败,因此根据定理##th:preciseevaluationpoint ,我们知道失败的概率
+$$\varepsilon<\frac{n(n-1)dT}{2s}.$$
+
+另一方面,当域的特征$p$有限时,此时我们随机选取这样$i-1$个赋值点,当其非精确赋值点或Vandermonde行列式奇异时均会失败,其概率(见<cite>rz93</cite>240-242页)
+$$\varepsilon<\frac{n(n-1)dT}{p-1}+\frac{dT(T-1)}{2(p-1)}<\frac{dT(2n^2+T)}{p-1}.$$
+
+如果是有限域$\mathbb{F}_p$,并且$p\le d$或者$p$太小不能提供足够多的插值点,则可以取$\mathbb{F}_p$的扩域,例如$\mathbb{F}_{p^k}$,在其中取插值点来进行计算.
+
+* Euclid算法和一般模算法
+
+** 概述
+
+我们已经解决了一元多项式的GCD问题,现在我们考虑多元情形,即$\mathbb{Z}[X]=\mathbb{Z}[x_1,\ldots,x_n]$中的多项式.首先根据Gauss引理,我们有:
+<latex>
+\begin{align*}
+\gcd(f,g)&=\mathrm{cont}_{x_n}(\gcd\nolimits_{x_n}(f,g))\mathrm{pp}_{x_n}(\gcd\nolimits_{x_n}(f,g))\\
+&=\gcd(\mathrm{cont}_{x_n}(f),\mathrm{cont}_{x_n}(g))\gcd\nolimits_{x_n}(\mathrm{pp}_{x_n}(f),\mathrm{pp}_{x_n}(g)).
+\end{align*}
+</latex>
+
+于是,我们顺利地将$n$元问题化为了$n-1$元子问题.将此过程递归地进行,最终化为一元问题可求解.显而易见,这种算法系数的增长是十分迅速的,不宜采用.
+
+回忆前面处理一元问题采用模算法的思想,我们希望利用$\mathbb{Z}[x_1,\ldots,x_n]$上的模算术来简化问题的计算.若我们取一个一次多项式$p=y-a(a\in\mathbb{Z})$,$D$为UFD,考虑$R=D[y][x]$中的多项式,并记$R$到$R/\idea{p}$的同态像为$\Phi_p(f)$或$\overline{f}$,则有下面的定理:
+
+<theorem>
+$f,g\in R$均为本原多项式,$h=\gcd(f,g)$,设$\overline{h}\neq 0$,则$\overline{h}=h_p(=\gcd(\overline{f},\overline{g}))$当且仅当$p=y-a\nmid \mathrm{res}_x(f/h,g/h)$.
+</theorem>
+
+<proof>
+本定理是定理##th:sdsf 的推广,证明也与其类似. 首先根据模同态的性质,我们显然有$\overline{h}\mid h_p$,若$\deg_xh_p=0$,则$\overline{h}=h_p$显然.设$\deg_xh_p\ge 1$,此是有$s,t$使得$sf/h+tg/h=\mathrm{res}_x(f/h,g/h)$,因此$\overline{s}\overline{f}+\overline{t}\overline{g}=\overline{\mathrm{res}_x(f/h,g/h)}\overline{h}$,由于$\overline{\mathrm{res}_x(f/h,g/h)}\neq 0$,所以$h_p\mid \overline{h}$,即$\overline{h}=h_p$,充分性得证.必要性是容易的，留给读者自行证明.
+</proof>
+
+于是我们可以得到类似于一元情形的一种赋值同态模算法<cite>zsg05</cite>,这里不再详细将算法列出,然而我们需要注意的是这里会有一个领项系数的问题,例如若两多项式的最大公因子为$h(x,y)=(y-1)x$,对$y$进行赋值同态时我们可能会取如下值:
+$$y=5,\quad h(x,5)=4x,$$
+$$y=7,\quad h(x,7)=6x,$$
+这样,通过两次赋值进行插值即得$h(x,y)=(y-1)x$,然而若是我们“不幸”取了一个负值:
+$$y=-5,\quad h(x,-5)=6x,$$
+注意在$\mathbb{Z}[x]$中$\pm 1$为可逆元,因而求其中的GCD问题时可相差正负号,一般情况我们取首项系数为正,此时将$h(x,-5)=6x$和$h(x,5)=4x$插值则得不到正确的结果,只有取$h(x,-5)=-6x$时才是正确的.这个问题仅在最大公因子对主变元$x$的领项系数是一非平凡多项式才会出现,对于这种情况,若要比较好地处理,则须在赋值之前对领项系数进行处理.后面提到的诸多算法中我们将看到一种领项系数正则化的处理方法.
+
+$\mathbb{F}_p$作为一个域较环$\mathbb{Z}$性质更简单，且其能有效抑制$\mathbb{Z}$上系数膨胀问题. 我们可以综合使用模方法和赋值同态的综合算法来解决题.
+
+** $\mathbb{F}_p[x_1,\ldots,x_n]$上最大公因子
+
+<index name="多元多项式最大公因子" sub="有限域上"></index>
+根据前面的分析,我们先要解决$\mathbb{F}_p[x_1,x_2,\ldots,x_n]$上求最大公因子的问题,此要先通过赋值同态将其转化为$\mathbb{F}_p[x_1]$上的问题.
+
+为了说明算法的方便,本算法中提到的容度$\mathrm{cont}$,本原部分$\mathrm{pp}$,首项系数$\lc$等都是就多项式环$\mathbb{F}_p[x_n][x_1,\ldots,x_{n-1}]$而言的,亦即$\mathrm{cont}$及$\lc$都应是$\mathbb{F}_p[x_n]$中的元素.
+
+
+为了处理领项系数的问题,算法中采用了正则化的方法.即对于本原多项式$f,g$,若$h=\gcd(f,g)$,则$h$必然也是本原的,并且$\plc{h}\mid b=\gcd(\plc{f},\plc{g})$,因此将模方法求得的$\overline{h}$领项系数化归到$\overline{b}$上再插值还原,可以得到$bh/\plc{h}$,再对其进行本原化处理,就可以得到结果.后文中GCD算法以及因子分解算法也多次使用了这种正则化方法,到时将不再说明.下面将要给出的算法可参考<cite>aca</cite>.
+
+<algorithm label="al:pgcd" name="有限域上多元多项式最大公因子算法">
+输入:$f$,$g\in\mathbb{F}_p[x_1,\ldots,x_n]$,
+
+输出:$h=\gcd(f,g)$.
+
+ 1. 若$n=1$则是一元问题,直接调用相关算法求得首一的$h=\gcd(f,g)$,输出$h$,
+
+ 2. 初始化$a=\gcd(\mathrm{cont}(f),\mathrm{cont}(g))\in\mathbb{F}_p[x_n]$(注意这是一元问题),$f=\mathrm{pp}(f)$,$g=\mathrm{pp}(g)$,$b=\gcd(\plc{f},\plc{g})\in\mathbb{F}_p[x_n]$,
+
+ 3. 赋初值$q=1$,$h=1$,$m=\min(\deg_1f,\deg_1g)+1$,$vlist=\{\}$,
+
+ 4. 循环做下面5-10步,
+
+ 5. 随机任取$v\in\mathbb{F}_p$使得$b(v)\neq 0$且$v\not\in vlist$,将$v$添入$vlist$中,
+
+ 6. $f_v=f\bmod (x_n-v)$,$g_v=g\bmod (x_n-v)$,递归调用本算法求解$n-1$元子问题$h=\gcd(f_v,g_v)$,令$m_1=\deg_1h_v$,$b_v=b(v)$,
+
+ 7. 将$h_v$正则化使得$\plc{h_v}=b_v$,即令$h_v=b_vh_v/\plc{h_v}$,
+
+ 8. 若$m_1<m$则令$q=x_n-v$,$h=h_v$,$m=m_1$,
+
+ 9. 若上一步不成立且$m_1=m$,则利用中国剩余定理或插值算法其出$h$,使得$h\bmod q$不变且$h\bmod (x_n-v)=h_v$,即令
+$$h=h+\frac{(h_v-h\bmod(x_n-v))q(x_n)}{q(v)},\quad q(x_n)=(x_n-v)q(x_n),$$
+
+ 10. 若$\plc{h}=b$则:若$\mathrm{pp}(h)\mid f$且$\mathrm{pp}(h)\mid g$则输出$a \mathrm{pp}(h)$,否则若$m=0$则输出$a$.
+
+</algorithm>
+
+** 多元多项式的"Mignotte"界
+
+在处理整系数一元多项式最大公因子时我们曾经引进所谓的Mignotte界,这是Mignotte于1974年提出的对一元多项式因子系数界的估计.这一节我们来讨论对于整系数多元多项式同样的问题.为了后文叙述的方便,我们先回忆一下对于一元情形的Mignotte界,并表述为如下定理(见定理##th:MignotteBound ):
+
+<theorem label="th:unibound" name="Mignotte">
+设非零多项式$f,g\in\mathbb{Z}[x]$且$g\mid f$,$\deg g\le d$,则有
+$$\|f\|_2\ge 2^{-d}\|g\|_{\infty}.$$
+</theorem>
+
+为了讨论多元情形,我们给出:
+
+<definition  name="多元多项式$p$-范数">
+设有多元多项式
+$$f=\sum_{i_1,i_2,\ldots,i_n}a_{i_1,i_2,\ldots,i_n}x_1^{i_1}\cdots x_n^{i_n},$$
+则定义其p-范数为:
+$$\|f\|_p=\left(\sum_{i_1,\ldots,i_n}a_{i_1,\ldots,i_n}^p\right)^{1/p}.$$
+</definition>
+
+Coron于2004年提出了二元情形下对Mignotte界的推广,有如下定理(见<cite>mjhdrs06</cite>和<cite>jsc04</cite>3.2节):
+
+<theorem label="th:bibound" name="Coron">
+设有非零多项式$f,g\in\mathbb{Z}[x,y]$,且$g\mid f$,$d=\max(\deg_xf,\deg_yf)$,则有
+$$\|f\|_2\ge 2^{-(d+1)^2}\|g\|_{\infty}.$$
+</theorem>
+
+<proof>
+令$f^*(x)=f(x,x^{d+1})$,则有$\deg f^*\le(d+1)^2$且$f^*(x)$和$f(x,y)$有相同的整系数,因而$\|f^*\|_2=\|f\|_2$,同理令$g^*(x)=g(x,x^{d+1})$,则有$\|g^*\|_{\infty}=\|g\|_{\infty}$.并且有$g(x,y)\mid f(x,y)$可知$g^*(x)\mid f^*(x)$,因此根据Mignotte界有
+$$\|f\|_2\ge 2^{-(d+1)^2}\|g\|_{\infty}.$$
+
+证毕.
+</proof>
+
+我们很容易再从二元情况推广到多元情况,有如下定理:
+
+<theorem label="th:multibound" name="多元多项式因子系数界">
+设有非零多项式$f,g\in\mathbb{Z}[x_1,\ldots,x_n]$,且$g\mid f$,$d=\max\{\deg_1f,\ldots,\deg_nf\}$,则有
+$$\|f\|_2\ge 2^{-(d+1)^n+1}\|g\|_{\infty}.$$
+</theorem>
+
+证明过程是类似的,只需作相应的替换$f^*(x)=f(x,x^{d+1},\ldots,x^{(d+1)^{n-1}})$,并且注意到$f^*$的次数实际上是不超过
+$$d+d(d+1)+\cdots+d(d+1)^{n-1}=d\frac{(d+1)^n-1}{(d+1)-1}=(d+1)^n-1$$
+即可.
+
+有了多元多项式的"Mignotte"界,我们在用模素数方法处理多元多项式时,至少多了一个用对系数界的估计的方法,来帮助判断多项式是否能还原到整系数中.当然,我们知道Mignotte界是对一元情形一个相当好的估计,本节定理对多元情形的估计虽从其推广而来,却不一定是最好的估计,而且其随多项式规模和未定元的个数增长有可能会变得很大,我们在实际算法中仅将其作为一个参考.
+
+** $\mathbb{Z}[x_1,\ldots,x_n]$上最大公因子
+
+<index name="多元多项式最大公因子" sub="整系数"></index>
+在我们计算最大公因子的步骤
+$$\mathbb{Z}[x_1,\ldots,x_n]\rightarrow\mathbb{F}_p[x_1,\ldots,x_n]\rightarrow\mathbb{F}_p[x_1]\rightarrow\mathbb{F}_p[x_1,\ldots,x_n]\rightarrow\mathbb{Z}[x_1,\ldots,x_n]$$
+中,第二环节和第三环节已由算法##al:pgcd 完成,本节将要讨论首尾两个环节,如无特别说明,本节中$\mathrm{cont}$,$\mathrm{pp}$等均是就整系数而言的.
+
+<algorithm label="al:mgcd" name="整系数多元多项式最大公因子算法">
+输入:$f,g\in\mathbb{Z}[x_1,\ldots,x_n]$,
+
+输出:$h=\gcd(f,g)$.
+
+ 1. 初始化$a=\gcd(\mathrm{cont}(f),\mathrm{cont}(g))$,$f=\mathrm{pp}(f)$,$g=\mathrm{pp}(g)$,$b=\gcd(\plc{f},\plc{g})$,
+
+ 2. 赋初值$h=0$,$q=1$,$m=\min(\deg_nf,\deg_ng)$,$limit=2^m|b|\min(\|f\|_{\infty},\|g\|_{\infty})$,$plist=\{\}$,
+
+ 3. 循环做下面4—9步,
+
+ 4. 任取比较大的素数$p$直至$p\nmid b$且$p\not\in plist$,
+
+ 5. 令$f_p=f\bmod p$,$g_p=g\bmod p$,$b_p=b\bmod p$,调用算法##al:pgcd 计算$h_p=\gcd(f_p,g_p)\in\mathbb{F}_p[x_1,\ldots,x_n]$,并令$m_1=\deg_nh_p$,
+
+ 6. $h_p=b_p h_p/\plc{h_p}$,
+
+ 7. 若$m_1<m$则令$q=p$,$h=h_p$,$m=m_1$,
+
+ 8. 若上步判断不成立且$m_1=m$,则用中国剩余定理计算$h$使得$h\bmod q$不变且$h\bmod p=h_p$,再令$q=pq$,
+
+ 9. 若$q>limit$则:令$pph=\mathrm{pp}(h)$,若$pph\mid f$且$pph\mid g$则输出$a pph$,否则若$m=0$则输出$a$.
+</algorithm>
+
+关于本算法需要做一点说明.首先在$m$和$m_1$的计算中都是取了对变元$x_n$的次数<cite>aca</cite>,实际上对所有的变元都取次数来比较也是可行的,并且可能更准确.其次,$limit$的计算本身并不是多元多项式因子系数的界,我们可以用前一节的"Mignotte"界来代替,也可以就用此限制. 这只是一个预判断, 因为当$q>limit$后还有判断.我们还可以加上一项预判断,即$h$在中国剩余定理计算前后是否变化,当不变时再继续后面的算法过程.
+
+* Zippel稀疏插值算法
+
+<index name="多元多项式最大公因子" sub="Zippel稀疏插值算法">Zippel稀疏算法</index>是求多元多项式最大公因子一个相当有效的算法,有关这方面的文献可以参见Zippel本人的论文及著作<cite>rz79</cite>,<cite>rz93</cite>.<cite>wangdongming</cite>80-82页,<cite>aca</cite>312-313页均引用了下面一个具体的例子,鉴于该算法的理论描述比较复杂,为了对此算法有一个直观的认识,我们先看这个具体的例子.它相当于将稀疏插值一节问题引入中的例子具体化,取“黑箱”函数
+$$h(x,y,z)=F(x,y,z)=\gcd(f(x,y,z),g(x,y,z)).$$
+
+** 一个具体的例子
+
+<problem>
+求多项式$f,g$的最大公因子$h$.其中
+<latex>
+\begin{align*}
+f=&x^5+2yzx^4+(13yz^2-21y^3z+3)x^3\\
+&+(26y^2z^3-42y^4z^2+2)x^2+(39yz^2-63y^3z+4yz)x+6,\\
+g=&x^6+(13yz^2-21y^3z+z+y)x^4+3x^3\\
+&+(13yz^3+13y^2z^2-21y^3z^2-21y^4z)x^2\\
+&+(13yz^2-21y^3z+2z+2y)x+2.
+\end{align*}
+</latex>
+</problem>
+
+<solution>
+首先我们取素数$p_1=11$,并得如下关系:
+$$h_{11}(x,1,2)\equiv x^3-x+2\pmod{11},$$
+$$h_{11}(x,3,2)\equiv x^3+x+2\pmod{11},$$
+$$h_{11}(x,5,2)\equiv x^3+4x+2\pmod{11},$$
+$$h_{11}(x,-4,2)\equiv x^3+5x+2\pmod{11},$$
+$$h_{11}(x,4,2)\equiv x^3-5x+2\pmod{11}.$$
+
+用普通的稠密插值算法可以求得$h_{11}(x,y,2)=x^3+(-3y+2y^3)x+2\pmod{11}.$然后我们再对$z$取其它赋值点来计算,此时我们假定$h_{11}(x,y,z_i)$具有形式$x^3+(ay+by^3)x+2$,不必对每个$z$的赋值点$z_i$都取5个$y$的赋值点来算,只需取2个点来计算即可.例如当$z=-5$时,计算得下面两个式子:
+$$h_{11}(x,-3,-5)\equiv x^3-4x+2\pmod{11},$$
+$$h_{11}(x,2,-5)\equiv x^3+5x+2\pmod{11}.$$
+
+于是我们得到下面的方程组:
+$$-3a-5b\equiv -4\pmod{11},$$
+$$2a-3b\equiv 5\pmod{11},$$
+解得$a=b=-5$,因此得到$h_{11}(x,y,-5)=x^3+(-5y-5y^3)x+2\pmod{11}$.同理我们还可以得到
+$$h_{11}(x,y,-3)\equiv x^3+(-4y-3y^3)x+2\pmod{11},$$
+$$h_{11}(x,y,5)\equiv x^3+(-5y+5y^3)x+2\pmod{11}.$$
+
+此时利用$z$在4个赋值点计算的结果,利用稠密插值可以得到
+$$h_{11}(x,y,z)\equiv x^3+(2yz^2+y^3z)x+2\pmod{11}.$$
+
+其次,我们再取素数$p_2=17$,此时也不必取前面那么多赋值点,利用稀疏性假设,我们可以认为$h_{17}(x,y,z)$具有形式$x^3+(cyz^2+dy^3z)x+2$,只需取两组$(y,z)$进行插值,例如:
+$$h_{17}(x,7,-4)\equiv x^3+8x+2\pmod{17},$$
+$$h_{17}(x,-2,4)\equiv x^3+x+2\pmod{17},$$
+于是解方程可得$h_{17}(x,y,z)=x^3+(-4yz^2-4y^3z)x+2\pmod{17}$.
+</solution>
+
+<remark>
+利用中国剩余定理将$\mathbb{F}_{11}$和$\mathbb{F}_{17}$中的结果合起来,即为$h=x^3+(13yz^2-21y^3z)x+2$,经验算,其恰为所欲求的最大公因子.这里只用了13次一元多项式GCD问题求解,而若用通常的模算法,则需将近40次.由此可见,稀疏插值模算法确能有效地减少计算次数.
+</remark>
+
+** 算法描述
+
+上小节中我们介绍了Zippel稀疏插值算法的思想以及具体操作的方法,现在我们只需稍加改动,具体给出求值函数的形式,就可以用来计算最大公因子.本节中将要给出的算法描述可以参考<cite>rz93</cite>15.3节.
+
+先对记号做一些说明,在下面将要介绍的插值算法中,我们保留变元$X_n$,并记之为$Z$.对集合
+$$\{(u_1,v_1),\ldots,(u_n,v_n)\}$$
+的插值即求多项式$f$使得$\forall i(1\le i\le n),f(u_i)=v_i$.
+
+下面的稀疏插值算法1和稀疏插值算法2两者互相递归调用.
+
+<algorithm label="al:sparsegcd1" name="稀疏插值算法1">
+输入:$l(X_1,\ldots,X_k)$,$f(X_1,\ldots,X_k,Z)$,$g(X_1,\ldots,X_k,Z)$,其中$0\le k<n$,
+
+输出:多项式$f,g$的最大公因子的某个倍数,使得其关于$Z$的首项系数为$l$.
+
+ 1. 若$k=0$则输出$l\gcd(f,g)$,
+
+ 2. 令$d=\min(\deg_kf,\deg_kg)+\deg_kl$,并任取一赋值点$x_k$,
+
+ 3. 递归调用本算法计算$f(X_1,\ldots,X_{k-1},x_k,Z),g(X_1,\ldots,X_{k-1},x_k,Z)$的最大公因子$I(X_1,\ldots,X_{k-1},Z)$,其中第一个参数输入$l(X_1,\ldots,X_{k-1},x_k)$,
+
+ 4. 令$T$为多项式$I$关于$Z$的系数($\in F[X_1,\ldots,X_{k-1}]$)中含最多单项式的系数的单项式个数,同时对$j$从$0$循环到$D$顺次命$\mathcal{H}_j=\{(x_k,I\text{关于}Z^j\text{的系数})\}$,
+
+ 5. 对$i$从$1$循环到$d$顺次做下面6,7步,
+
+ 6. 随机取不重复的赋值点$y_i$,调用算法##al:sparsegcd2 ,输入$\mathrm{skel}I$,$l(X_1,\ldots,X_{k-1},y_i)$,$F(X_1,\ldots,X_{k-1},y_i,Z)$,$G(X_1,\ldots,X_{k-1},y_i,Z)$,$T$,得到稀疏插值求得的多项式$W$,
+
+ 7. 对$j$从$0$循环到$D$顺次命$\mathcal{H}_j=\mathcal{H}_j\cup\{(y_i,W\text{关于}Z^j\text{的系数})\}$,
+
+ 8. 对$j$从$0$循环到$D$顺次利用稠密插值算法由$\mathcal{H}_j$计算到到多项式$h_j\in F[X_1,\ldots,X_k]$,令$h=h_DZ^D+\cdots+h_0$,
+
+ 9. 若$h$不能同时整除$f$和$g$则退出整个算法重新选取赋值点（整个算法失败）,否则输出$h$.
+</algorithm>
+
+<algorithm label="al:sparsegcd2" name="稀疏插值算法2">
+输入:模板$S$,多项式$l(X_1,\ldots,X_k)$,$f(X_1,\ldots,X_k,Z)$,$g(X_1,\ldots,X_k,Z)$,$T$,
+
+输出:由它们计算得到稀疏插值的结果$h$,也即$f$,$g$的最大公因子的某个倍数,其关于$Z$的首项系数为$l$.
+
+ 1. 若$k=0$则输出$l\gcd(f,g)$,
+
+ 2. 任取$k$个赋值点$y_1,\ldots,y_k$,
+
+ 3. 对$i$从$1$循环到$T$顺次做下面4,5步,
+
+ 4. 令$W=l(y_1^i,\ldots,y_k^i)\times\gcd(f(y_1^i,\ldots,y_k^i,Z),g(y_1^i,\ldots,y_k^i,Z))$,
+
+ 5. 对$j$从$0$循环到$D$顺次命$\mathcal{H}_j=\mathcal{H}_j\cup\{W\text{关于}Z^j\text{的系数}\}$,
+
+ 6. 对$j$从$0$循环到$D$,由$\mathcal{H}_j$,以及$S$中含$Z^j$的项和$y_1,\ldots,y_k$计算出Vandermonde矩阵各元素,解线性方程组可得$h_j$(具体方法见注##remark:detailofsparse ),
+
+ 7. 输出$h_DZ^D+\cdots+h_0$.
+</algorithm>
+
+<remark>
+算法##al:sparsegcd1 第1步,算法##al:sparsegcd2 第1步,第4步等计算一元GCD时均是指求得其首一化的GCD.其$l\gcd(f,g)$时,可以先乘上$l$再除以原先多项式的领项系数,避免出现分数.
+</remark>
+
+<remark label="remark:detailofsparse">
+算法##al:sparsegcd2 第6步计算的具体方法是:令$S_j$为输入模板$S$中最后一项指标为$j$(即$Z$的次数为$j$)的元素在前$k$维上投影的集合.例如对于模板
+$$\{(1,1),(1,0),(0,0)\}$$
+有$S_0=\{(1),(0)\}$,$S_1=\{(1)\}$.设$S_j$的元素个数为$s_j$,由赋值点$y_1,\ldots,y_k$和指标集$S_j$可以计算得到一个$s_j$阶的Vandermonde矩阵(若此矩阵奇异,则返回算法第2步重新选取赋值点).再取$\mathcal{H}_j$的前$s_j$（肯定小于$T$）项,以此可得一线性方程组.其解配上相应的模板$S_j$即到多项式$h_j$.
+</remark>
+
+如果$f$和$g$都是关于$Z$的首一多项式,则直接调用算法##al:sparsegcd1 ,输入参数$1,f,g$即可,但是对于关于$Z$的首项系数不为1的多项式,我们可如下给出它们的最大公因子.其中为了使我们每一步最后的试除法能够成功,调用算法##al:sparsegcd1 时我们输入$l$,$lf$,$lg$.此时,因为要使稠密插值结果的首项系数为$l$,所以我们在算法##al:sparsegcd1 第2步中令$d=\min(\deg_kf,\deg_kg)+\deg_kl$.
+
+<algorithm label="sparsegcdall" name="稀疏插值算法">
+输入:多项式$f,g\in F[X_1,\ldots,X_n]$,
+
+输出:$f,g$的最大公因子.
+
+ 1. 递归调用本算法计算$f_1=\mathrm{cont}_Z(f)$,$g_1=\mathrm{cont}_Z(g)$,$a=\gcd(f_1,g_1)$,并令$f=f/f1$,$g=g/g1$,
+
+ 2. 递归调用本算法计算$l=\gcd(\mathrm{lc}_Z(f),\mathrm{lc}_Z(g))$,调用算法##al:sparsegcd1 ,输入参数$l,lf,lg$,得到$h$,
+
+ 3. 输出$a\mathrm{pp}(h)$.
+</algorithm>
+
+
+* 求GCD的其它方法
+
+关于多元多项式的GCD问题,前述的一般算法以及Zippel稀疏插值模算法已经能够相当有效地处理,限于篇幅，这一节所说的方法仅是作一些补充说明,算法的细节不再详细说明,有兴趣可以参考列出的一些文献.
+
+** 启发式算法(Heuristic GCD)
+
+<index name="Heuristic GCD"></index>
+启发式算法是一种将多元多项式GCD问题转化为大整数问题的算法.此算法的优势在于它将问题化为整数计算问题, 若能够高效处理整数运算则可以提高计算效率.其次,对于一般的小规模问题来说,用启发式算法还是比插值算法可能来得快. 读者可以参考<cite>zsg05</cite>.至于算法的具体实现,可参考<cite>aca</cite>7.7节.
+
+** EZ-GCD
+
+<index>EZ-GCD</index>算法即Extended Zassenhaus算法(参考<cite>jmdyyy73</cite>),它利用Hensel提升来计算多元多项式的GCD.此算法的具体实现可以参考<cite>aca</cite>7.6节.
+
+* 多元多项式因子分解的Kronecker算法
+
+由多元Mignotte界一节我们很容易想到用$x$的幂次代替其它变元的同态方法,即<index name="多元多项式因子分解" sub="Kroenecker算法">Kronecker算法</index>.
+
+; 此处引文在factoring multivariate polynomials over the integers [10]中
+
+对于给定的多项式$f\in\mathbb{Z}[x_1,x_2,\ldots,x_n]$,我们取主变元为$x_1$,并记之为$x$.设
+$$d=\max_{1\le i\le n}\deg_{x_i}f,$$
+如果我们取多项式
+$$\tilde{f}(x)=f(x,x^{d+1},x^{(d+1)^2},\ldots,x^{(d+1)^{n-1}}),$$
+易知如果有不可约因子分解$f=f_1f_2\cdots f_r$,这里我们假设$f$关于$x$是无平方因子本原多项式,那么有
+$$\tilde{f}=\tilde{f_1}\cdots\tilde{f_r}.$$
+然而当我们对$\tilde{f}$进行因子分解时,得到的不一定是上式,因为$\tilde{f_i}$不一定均是不可约的.设$\tilde{f}$的不可约因子分解为
+$$\tilde{f}=g_1g_2\cdots g_t,$$
+则由因子组合算法可以还原在$\mathbb{Z}[x_1,\ldots,x_n]$中的分解.
+
+由此可见,Kronecker算法的思想本身是简单的,下面给出具体的算法.
+
+<algorithm label="al:kroneckerfactorization" name="Kronecker因子分解算法">
+输入:关于$x=x_1$本原且无平方因子的多项式$f\in\mathbb{Z}[x_1,\ldots,x_n]$,
+
+输出:其各不可约因子$\{f_1,\ldots,f_r\}$.
+
+ 1. 令$d$为各变元次数的上界,求得多项式
+$$\tilde{f}(x)=f(x,x^{d+1},x^{(d+1)^2},\ldots,x^{(d+1)^{n-1}})$$
+的因子分解
+$$\tilde{f}=g_1g_2\cdots g_t.$$
+
+ 2. 令$T=\{1,2,\ldots,t\}$,$s=1$,$result=\{\}$,$h=f$,
+
+ 3. 若$2s\le\# T$,则循环做下面4-6步,否则转第7步,
+
+ 4. 枚举$T$的所有$s$元子集$S$,并做下面第5步,
+
+ 5. 由多项式$\prod_{i\in S}g_i\in\mathbb{Z}[x]$我们可以还原得到多项式$g\in\mathbb{Z}[x_1,\ldots,x_n]$(见注##remark:getback ),若$g\mid h$则令$result=result\cup\{g\}$,$h=h/g$,$T=T\setminus S$,并转第3步,
+
+ 6. $s=s+1$,转第3步,
+
+ 7. 输出$result\cup\{h\}$.
+</algorithm>
+
+<remark label="remark:getback">
+由某一多项式$\tilde{f}(x)$还原得到多项式$f(x_1,\ldots,x_n)$的方法是:对$\tilde{f}$中的任何一个单项式$ax^b$,由连续对$d+1$的除法可以得到$n$元序对$(b_1,\ldots,b_n)$,其中$0\le b_i\le d$使得
+$$b=b_1+b_2(d+1)+b_3(d+1)^2+\cdots+b_n(d+1)^{n-1},$$
+将此单项用$ax_1^{b_1}x_2^{b_2}\cdots x_n^{b_n}$代替即可还原多项式.
+</remark>
+
+* 利用Hensel提升的因子分解算法
+
+** 概述
+
+类似于多元GCD求解,利用赋值同态的方法,我们也可以将多元因子分解问题转化为一元问题.我们很容易会产生如下一般性的想法,这里假设我们考虑$f\in \mathbb{Z}[x_1,x_2,\ldots,x_n]$的分解,并将变元$x_1$视为主变元$x$.
+
+ - 将$f$化为关于主变元$x$本原以及无平方因子的多项式.这一点是很容易做到的,由多元GCD算法可以求出$f$关于$x$各系数多项式的最大公因子,而由$\gcd(f,\partial f/\partial x)$可以将其化为无平方因子多项式的分解问题.
+ - 利用$I=\idea{x_2-a_2,\ldots,x_n-a_n}$对应的赋值同态将$f$化为$\tilde{f}=f\bmod I$,即$\tilde{f}(x)=f(x,a_2,\ldots,a_n)$,使得$\tilde{f}$无平方因子并且$\deg_x\tilde{f}=\deg_xf$.
+ - 处理一元分解问题,得到不可约分解$\tilde{f}=g_1g_2\cdots g_r$,这里可以将$\mathrm{cont}\tilde{f}$任意分配到不可约因子$g_i$上.
+ - 利用类似于Hensel提升的方法,将模$I$下的分解提升到足够高的模$I^k$下的分解,得到多元因子,最后采取诸如因子组合的方法将其还原到整系数多项式中的因子.
+
+关于赋值点和主变元的选取,这里做一些补充.赋值点应优先选择$\pm 1,0$,以保证$\tilde{f}$无平方因子且关于$x$次数不变.选择$\pm 1,0$的好处是使得系数较小,由后面的算法我们看出对于非零赋值点,我们将对变量做一平移,以使提升算法的模运算也便于进行. 其次还要考虑使得$\tilde{f}$的不可约因子数尽可能少,$\tilde{f}$关于$x$的首项系数尽可能小,如果是$1$更好,此时所有的不可约因子的首项系数都将为$1$.
+
+** 扩展Zassenhaus 算法
+
+; Zassenhaus算法就是我们曾经提及的Hensel提升算法.具体可参考<cite>rz93</cite>以及<cite>wang75</cite>第7节.
+
+现在我们要介绍的<index name="多元多项式因子分解" sub="扩展Zassenhaus算法">扩展Zassenhaus算法</index>(<cite>wang75</cite>第8节)解决如下问题.设$\tilde{f}\in Z[x]$有分解$\tilde{f}=gh$,其中$\gcd(g,h)=1$,亦即
+$$f\equiv gh\pmod{I},$$
+现在需找到$g_k$,$h_k$使得
+$$f\equiv g_kh_k\pmod{I^k},\quad f_k\equiv f\pmod{I},\quad g_k\equiv g\pmod{I}.$$
+对于$i=2,3,\ldots,n$,记$y_i=x_i-a_i$,则此时$I=\idea{y_2,\ldots,y_n}$,并记$f^*(x_1,y_2,\ldots,y_n)=f(x_1,y_2+a_2,\ldots,y_n+a_n)$.基于这些符号上的说明,我们可以提出一种归纳的算法如下:
+
+<algorithm label="al:ez" name="EZ算法">
+输入:多项式$f^*$(即$f$),$g_{k-1}$,$h_{k-1}$,并且满足前述相应条件,
+
+输出:提升后的$g_k$,$h_k$.
+
+ 1. 计算$r_{k-1}$,$e_{k-1}$使得
+$$r_{k-1}=g_{k-1}h_{k-1}-f^*,\quad e_{k-1}\equiv r_{k-1}\pmod{I^k},$$
+
+ 2. 利用扩展Euclid算法计算唯一的$\alpha_i(x)$,$\beta_i(x)$使得
+$$\alpha_i(x)g(x)+\beta_i(x)h(x)=x^i,$$
+并且$\deg\alpha_i<\deg h$.(命$\alpha_i=\alpha_0x^i\bmod h$,即可.此时若$i<\deg g+\deg h$则有$\deg\beta_i<\deg g$.并且此步可略去,因为可以在整个算法开始提升的第一步计算足够多的$\alpha_i$,$\beta_i$,保存起来并供后面各步提升时使用.)
+
+ 3. 将$e_{k-1}$中的$x^i$用$\alpha_i(x)$代替得到多项式$A(e_{k-1})$,同理将$e_{k-1}$中的$x^i$用$\beta_i(x)$代替得到多项式$B(e_{k-1})$.
+
+ 4. 令$g_k=g_{k-1}-B(e_{k-1})$,$h_k=h_{k-1}-A(e_{k-1})$并输出$g_k$,$h_k$.
+</algorithm>
+
+<proof  name="算法有效性">
+首先由$A(e_{k-1})$和$B(e_{k-1})$的定义可知有
+$$A(e_{k-1})g(x)+B(e_{k-1})h(x)=e_{k-1}$$
+成立.由$e_{k-1}\bmod I^{k-1}=r_{k-1}\bmod I^{k-1}=0$知$e_{k-1}$是$y_2,y_3,\ldots,y_n$的$k-1$次齐次多项式.因而$A(e_{k-1})$和$B(e_{k-1})$也是它们的$k-1$次齐次式.由
+$$g_{k-1}=g-B(e_1)-B(e_2)-\cdots-B(e_{k-2})$$
+可知
+$$A(e_{k-1})g_{k-1}(x)\equiv A(e_{k-1})g(x)\pmod{I^k},$$
+同理有
+$$B(e_{k-1})h_{k-1}(x)\equiv B(e_{k-1})h(x)\pmod{I^k},$$
+因而
+$$r_{k-1}\equiv e_{k-1}\equiv A(e_{k-1})g(x)+B(e_{k-1})h(x)\pmod{I^k}.$$
+并且我们有$A(e_{k-1})B(e_{k-1})\equiv 0\pmod{I^k}$.
+命$r_k=g_kh_k-f^*$,则
+$$r_k\equiv r_{k-1}-A(e_{k-1})g_{k-1}-B(e_{k-1})h_{k-1}+A(e_{k-1})B(e_{k-1})\equiv 0\pmod{I^k}.$$
+亦即$f^*\equiv g_kh_k\pmod{I^k}$.
+</proof>
+
+在向$I^k$提升的过程中,倘若有某一步$r_l=0$,则之后无须提升.
+
+我们在利用算法##al:ez 处理$\mathbb{Z}[x]$中的多项式时,实际上已经是在$\mathbb{Q}[x]$中进行运算了,这一点可以从算法##al:ez 第2步中要计算Bezout系数可以看出来.在最后进行因子还原时,由于领项系数的处理可以使得求出的因子仍然是在$\mathbb{Z}[x]$中.本章开始曾提到我们不仅利用赋值同态,还可以利用模同态来简化计算,那么扩展Zassenhaus算法还适用吗?事实上,只要成立Bezout等式(未必为Euclid整环)即可.如果多项式的系数在模环$\mathbb{Z}_m$中,其中$m$为一素数幂$p^l$,那么条件是满足的,下面我们来说明这一事实.
+
+<lemma label="le:dyhensel1">
+$a\in\mathbb{Z}_{p^l}$可逆当且仅当$p\nmid a$.
+</lemma>
+
+<proof>
+充分性:若$p\nmid a$,则$\gcd(a,p^l)=1$,由Bezout等式可知$a$在$\mathbb{Z}_{p^l}$中可逆.
+
+必要性:若$p\mid a$, 则在$\mathbb{Z}_{p^l}$中有$p^{l-1}\cdot a=0$，从而$a$不可逆.
+</proof>
+
+下面给出的定理揭示了$\mathbb{Z}_{p^l}[x]$类似于Euclid整环的性质.
+
+<theorem label="th:dyhensel2">
+设$g,h\in\mathbb{Z}_{p^l}[x]$满足$p\nmid \plc{g}$,$p\nmid \plc{h}$,且$\gcd(\Phi_p(g),\Phi_p(h))=1$,则$\forall f\in\mathbb{Z}_{p^l}[x]$都存在唯一的多项式$s,t\in\mathbb{Z}_{p^l}[x]$使得$sg+th\equiv f\pmod{p^l}$,且$\deg s<\deg h$.若$\deg f<\deg g+\deg h$,还有$\deg t<\deg g$.
+</theorem>
+
+<proof>
+存在性:首先由$\mathbb{F}_p[x]$是Euclid整环我们知道$\exists s^{(1)},t^{(1)}\in\mathbb{F}_p[x]$使得
+$$s^{(1)}g+t^{(1)}h\equiv 1\pmod{p}.$$
+设$s^{(k)},t^{(k)}$已求得并使$s^{(k)}g+t^{(k)}h\equiv 1\pmod{p^k}$,则定义迭代算法如下:
+
+设$s_k,t_k\in\mathbb{F}_p[x]$是
+$$s_kg+t_kh\equiv\frac{1-s^{(k)}g-t^{(k)}h}{p^k}\pmod{p}$$
+的解,再令
+$$s^{(k+1)}=s^{(k)}+s_kp^k,\quad t^{(k+1)}=t^{(k)}+t_kp^k.$$
+
+显然
+$$s^{(k+1)}g+t^{(k+1)}h=s^{(k)}g+t^{(k)}h+p^k(s_kg+t_kh)\equiv 1\pmod{p^{k+1}}.$$
+
+因此$fs^{(l)}g+ft^{(l)}h\equiv f\pmod{p^l}$.由题设条件和引理##le:dyhensel1 知$\plc{h}$是$\mathbb{Z}_{p^l}$中可逆元,我们可以作除法:
+$$fs^{(l)}=uh+s\pmod{p^l},$$
+其中$\deg s<\deg h$.再定义$t=ft^{(l)}+ug$,即知$s,t$满足定理.
+
+唯一性:由$s^{(l)},t^{(l)}$的存在知道在$\mathbb{Z}_{p^l}$中$g$和$h$也互素,设满足定理的还有$s',t'$,则易得$(s-s')g=(t'-t)h$,由$\deg (s-s')<\deg h$且$h\mid (s-s')$知$s-s'=t-t'=0$.
+</proof>
+
+于是,在$\mathbb{Z}_{p^l}$中我们可以用扩展Zassenhaus算法,利用该算法之前,我们先取小素数$p$计算$\mathbb{F}_p$中$\tilde{f}=\Phi_I(f)$的分解,再利用Hensel提升算法(Zassenhaus算法)可以得到进行扩展Zassenhaus算法需要输入的分解.
+
+; 我们可以将多元Hensel提升问题写为如下定理.
+
+; <theorem label="th:dyhensel3">
+; 设$f\in\mathbb{Z}[x_1,\ldots,x_n]$,理想$I=\idea{x_2-a_2,\ldots,x_n-a_n}$,且素数$p$满足
+; $$p\nmid \plc{f(x_1,a_2,\ldots,a_n),x_1}=\plc{\Phi_I(f),x_1}.$$
+; 现有多项式$g^{(1)},h^{(1)}$满足
+; $$f\equiv g^{(1)}h^{(1)}\pmod{I,p^l},$$
+; 且$\Phi_p(g^{(1)})$和$\Phi_p(h^{(1)})$在$\mathbb{F}_p[x_1]$中互素.
+
+; 则$\forall k\in\mathbb{Z}(k\ge 1)$,$\exists g^{(k)},h^{(k)}\in\mathbb{Z}_{p^l}[x_1,\ldots,x_n]/I^k$,使得
+; $$f\equiv g^{(k)}h^{(k)}\pmod{I^k,p^l},$$
+; 且
+; $$g^{(k)}\equiv g^{(1)}\pmod{I,p^l},\quad h^{(k)}\equiv h^{(1)}\pmod{I,p^l}.$$
+; </theorem>
+
+; <proof>
+; 命题当$k=1$时显然成立,现在我们归纳假设命题对于$k$是成立的,此时设$e^{(k)}=f-g^{(k)}h^{(k)}\in I^k$,可以将其在$I^k$的基下进行表示,设表示为
+; $$e^{(k)}=\sum_{2\le i_1\le n}\cdots\sum_{i_{k-1}\le i_k\le n}C_{i_1\cdots i_k}\prod_{j=1}^k(x_{i_j}-a_{i_j}),$$
+; 其中$C_{i_1\cdots i_k}\in\mathbb{Z}_{p^l}[x_1]$.于是由定理##th:dyhensel2 我们知道$\forall i=i_1\cdots i_k$,都可以找到满足上面定理的唯一的$s_i,t_i\in\mathbb{Z}_{p^l}[x_1]$满足
+; $$s_ig^{(1)}+t_ih^{(1)}\equiv C_i\pmod{p^l}.$$
+
+; 令
+; $$g^{(k+1)}=g^{(k)}+\sum_{2\le i_1\le n}\cdots\sum_{i_{k-1}\le i_k\le n}t_i\prod_{j=1}^k(x_{i_j}-a_{i_j}),$$
+; $$h^{(k+1)}=h^{(k)}+\sum_{2\le i_1\le n}\cdots\sum_{i_{k-1}\le i_k\le n}s_i\prod_{j=1}^k(x_{i_j}-a_{i_j}),$$
+; 由算法##al:ez 的证明易知$g^{(k+1)},h^{(k+1)}$满足条件.
+; </proof>
+
+; <cite>wangdongming</cite>中给出了如下一个多元Hensel提升求因子分解的简单的例子.
+
+下面给出一个利用扩展Zassenhaus算法求因子分解的简单的例子.
+
+<problem>
+设$f=x^2-3xz^2+2x-yx+3yz^2-2y+zx-3z^3+2z$.取$p=7$,$l=1$,$I=\idea{y,z}$,有
+$$f\equiv x(x+2)\pmod{I,p^l},$$
+记$g=g_1=x$,$h=h_1=x+2$,因为在$\mathbb{Z}_{p^l}[x]$中有$3g_1-3h_1\equiv 1\pmod{p^l}$,即$\alpha_0=3,\beta_0=-3$,这里预先将各个$\alpha_i,\beta_i$计算好,可得
+$$\alpha_1=x\alpha_0\bmod h=1,$$
+$$\beta_1=x\beta_1\bmod g=0.$$
+
+第一步提升,计算得
+$$e_1\equiv g_1h_1-f\equiv (x+2)y-(x+2)z\pmod{I^2,p^l},$$
+因此
+$$A(e_1)=(y-z)\times 1+2(y-z)\times 3=0,$$
+$$B(e_1)=(y-z)\times 0+2(y-z)\times(-3)=y-z,$$
+于是$g_2=g_1-B(e_1)=x-y+z$,$h_2=h_1-A(e_1)=x+2$.
+
+再一次提升计算,可得
+$$e_2\equiv g_2h_2-f\equiv 3z^2x\pmod{I^3,p^l},$$
+因此
+$$g_3=g_2-B(e_2)=g_2-3z^2\times 0=x-y+z,$$
+$$h_3=h_2-A(e_2)=h_2-3z^2\times 1=x+2-3z^2,$$
+此时已有$f=g_3h_3$.
+</problem>
+
+** 因子还原
+
+不妨设我们已得到因子分解
+$$f\equiv g_1g_2\cdots g_t\pmod{m,I^k},$$
+其中模去一个整数$m$,是指在计算提升之前可以选择模掉一足够大的$m$进行运算,以减小系数膨胀.当然也可以直接在整数环中计算,此种情况我们统一用$m=0$表示.
+
+因子还原的过程也是一个因子组合算法,这一算法已经多次出现,因此这里直接给出还原的算法.
+
+<algorithm  name="EZ算法结果的因子还原">
+输入:已知分解$f\equiv g_1\cdots g_t\pmod{m,I^k}$,
+
+输出:$f$的不可约因子集合$\{f_1,f_2,\ldots,f_r\}$.
+
+ 1. 令$T=\{1,2,\ldots,t\}$,$s=1$,$result=\{\}$,$h=f$,$h^*=\plc{h}h$,
+
+ 2. 若$2s\le\#T$,则循环做下面3-5步,否则转第6步,
+
+ 3. 枚举$T$的所有$s$元子集$S$,并做下面第4步,
+
+ 4. $g=\prod_{i\in S}g_i\bmod (m,I^k)$,$g^*=\plc{h}\plc{g}^{-1}g\bmod (m,I^k)$,若$g^*\mid h^*$则令$result=result\cup\{\mathrm{pp}(g^*)\}$,$h=h/\mathrm{pp}(g^*)$,$h^*=\plc{h}h$,$T=T\setminus S$,并转第2步,
+
+ 5. $s=s+1$,转第2步,
+
+ 6. 输出$result\cup\{h\}$.
+</algorithm>
+
+** 预先确定因子的首项系数
+
+前几节组合起来可以给出一个完整的因子分解算法,然而其仍有一些效率上的不足.其中因子还原之后我们要将在模$I^k$中的结果回复到正常的多项式,这涉及到Taylor展开,所以我们前面尽量选择较小的赋值点,以减轻此处计算形如$(x-u)^k$展开的负担.另外,首项系数的不确定使得EZ算法提升时的中间多项式将会比较复杂,我们可以看下面一个因子分解的例子.
+
+<problem>
+考虑多项式$f=(y+2)^2x^2-1$的因子分解.
+</problem>
+
+<solution>
+这里取$x$为主变元,$y$取赋值点$0$,则有分解$f\equiv (2x+1)(2x-1)\pmod{y}$.设$g=2x+1$,$h=2x-1$,提升算法给出
+$$g_2=\frac{1}{2}(2+y+4x(1+y)),\quad h_2=\frac{1}{2}(-2+4x+y),$$
+$$g_3=\frac{1}{2}(2+y)(1+x(2+y)),\quad h_3=\frac{1}{4}(-4+8x+2y-y^2).$$
+这时再经过一次首项系数的处理并取本原部分方可得到真正的因子$(1+x(2+y))$和$(-1+x(2+y))$.
+</solution>
+
+对于上例而言,若我们能预先确定各因子的首项系数,在提升之前就将$g$,$h$中的首项系数代替为实际首项系数,即$g=(2+y)x+1$,$h=(2+y)x-1$,则提升算法大大简化(对于此特例恰好无需任何提升).
+
+Paul S. Wang<cite>wang78</cite>于1978年改进原先的EZ算法,提出了在提升之前预先确定因子首项系数多项式的方法(在<cite>wang78</cite>中,Wang还提出了改进的EZ算法,即EEZ算法,有兴趣的读者可见该文第5,6,7节),下面我们就来介绍这一方法.
+
+设多项式$f$关于主变元的首项系数为$J=\plc{f,x}\in\mathbb{Z}[x_2,\ldots,x_n]$,设其不可约因子分解为
+$$J=\Omega\prod_{1\le i\le k}J_i^{e_i},$$
+其中$\Omega=\mathrm{cont}_{\mathbb{Z}}(J)$,$J_i(1\le i\le k)$为其各不可约因子.
+此时对于$\tilde{f}=f\bmod I$有分解
+$$\tilde{f}=\delta g_1g_2\cdots g_r,$$
+其中$\delta=\mathrm{cont}\tilde{f}$.我们的目的即是要确定各$g_i$的首项系数,并将$\delta$合理地分配到各个$g_i$上.我们在选择赋值点时,需要满足如下几个条件:
+
+<theorem label="th:distributing1">
+选取赋值点$a_2,a_3,\ldots,a_n$,$\tilde{f}=f(x,a_2,\ldots,a_n)$使得:
+
+ 1. $\deg\tilde{f}=\deg f$,即$J(a_2,\ldots,a_n)\neq 0$,
+
+ 2. $\tilde{f}$无平方因子,即$\mathrm{res}_x(f,\partial f/\partial x)(a_2,\ldots,a_n)\neq 0$,
+
+ 3. 对任意$J_i$,$\tilde{J_i}=J_i(a_2,\ldots,a_n)$至少一有个素因子$p_i$,其不能整除$J_j(\forall j<i)$和$\Omega$,$\delta$.
+
+这样的赋值点有无穷多组.
+</theorem>
+
+显然满足前两个条件的有无穷多组,若要说明满足第三个条件的点有无穷多组,可见<cite>wang78</cite>1218页的说明,这里不再花篇幅叙述了.
+
+选取赋值点时要满足前两个条件的原因我们在前文已经论述过了,而第三个条件看上去不那么直观,实际上,它是为了保证各因子首项系数能够正确地定下来.设$g_1,\cdots,g_r$中没有无关的因子,即它们都对应了$f$分解的得到的$r$个因子,无须组合就能还原,设$f$有分解
+$$f=f_1f_2\cdots f_r,$$
+令$C_i=\plc{f_i,x}$,$\tilde{C_i}=C_i(a_2,\ldots,a_n)$,且
+$$\tilde{f_i}=f_i(x,a_2,\ldots,a_n)=\delta_ig_i,$$
+其中$\prod_{1\le i\le r}\delta_i=\delta$.那么,我们有如下的引理:
+
+<lemma label="le:distributing1">
+对任何$i(1\le i\le r)$和$m\in\mathbb{N}$,我们有$J_k^m\mid C_i$当且仅当$\tilde{J_k}^m\mid \plc{g_i}\delta$.
+</lemma>
+
+<proof>
+若$J_k^m\mid C_i$,则$\tilde{J_k}^m\mid \tilde{C_i}=\plc{\tilde{f_i},x}=\plc{g_i}\delta_i\mid \plc{g_i}\delta$.
+
+若$J_k^m\nmid C_i$,可设$\tilde{C_i}=\tilde{J_1}^{s_1}\cdots\tilde{J_k}^{s_k}\omega$,其中$\omega\mid \Omega$,$s_i\ge 0$且$s_k<m$.于是$p_k^m\nmid \tilde{C_i}$,故$\tilde{J_k}^m\nmid \plc{g_i}\delta$.
+</proof>
+
+由引理##le:distributing1 ,我们可以从$J_k$开始分配,一直将$J_1$分配完,这样得到各个$C_i$的本原部分$D_i=\mathrm{pp}(C_i)$.设记号都同前,我们将这一算法叙述如下:
+
+<algorithm  label="al:distributing1" name="分配首项系数算法1">
+
+计算$D_i(1\le i\le r)$.
+
+ 1. 令各个$D_i=1$,
+
+ 2. 命$j$由$k$递减到$1$,依次执行第3步,
+
+ 3. 求出$m_i$使得$\tilde{J_j}^{m_i}\mid\plc{g_i}\delta$且$\tilde{J_j}^{m_i+1}\nmid\plc{g_i}\delta$,命$D_i=D_i J_i^{m_i}$,
+
+ 4. 输出各个$D_i$.
+
+</algorithm>
+
+经过这一算法后,$J$的各个非平凡因子已经分配完,只余下整数容度$\Omega$没有分配.此时有
+$$\Omega D_1D_2\cdots D_r=\delta\plc{g_1}\plc{g_2}\cdots\plc{g_r}.$$
+若要得到最终结果$C_i$,则仍需将$\Omega$和$\delta$合理分配到诸因子上.如果$\delta=1$,则这一过程很简单,只要作一些正则化的手续即可,即命
+$$C_i=\frac{\plc{g_i}}{\tilde{D_i}}D_i,$$
+这样,各个$C_i$就能和分解得到的$g_i$对应上.
+
+但若$\delta\neq 1$,则这一过程稍微复杂一些,我们用下面的算法来求得$C_i$:
+
+<algorithm label="al:distributing2" name="分配首项系数算法2">
+
+ 1. 令$d=\gcd(\plc{g_i},\tilde{D_i})$,$C_i=\plc{g_i}D_i/d$,
+
+ 2. 令$g_i=\tilde{D_i}g_i/d$,
+
+ 3. 令$\delta=\delta/(\tilde{D_i}/d)$.
+
+</algorithm>
+
+算法##al:distributing2 为了将$D_i$对应到相应的$g_i$上,实际上是将$\tilde{D_i}$和$\plc{g_i}$均对应到它们的最小公倍数上去,对应过程中,$D_i$将$\Omega$分配,$g_i$将$\delta$分配.
+
+经过算法##al:distributing2 后,一般情况下$\delta$应该为$1$.如果不为$1$,说明$f$不是本原多项式.此时令$C_i=\delta C_i$,$g_i=\delta g_i$,$f=\delta^{r-1}f$即可.进行Hensel提升之前,将各个$g_i$的领项系数换为$C_i$,后续算法的计算将会得到简化.
+
+现在,我们回到定理##th:distributing1 的第三个条件上来.上文我们已经解释了第三个条件的作用以及怎样利用它完成各因子首项系数的确定,然而如何选取求值点才能满足第三个条件呢?若按照条件所叙述的来进行检测,势必要进行很多整数的因子分解过程,这样不一定划算,下面我们给出一个算法,只需要用到整数的最大公因子计算.
+
+<algorithm label="al:distributing3" name="分配首项系数算法3">
+
+输入:$\Omega$,$\tilde{J_i}$,$\delta$,
+
+输出:定理##th:distributing1 第三个条件是否满足以及整数序列$d_i(1\le i\le k)$,其中$d_i$的任一素因子均可视作满足条件的$p_i$.
+
+ 1. 命$d_0=\delta\Omega$,
+
+ 2. 命$i$由$1$递增到$k$,执行3-8步,
+
+ 3. 命$q=|\tilde{J_i}|$,
+
+ 4. 命$j$由$i-1$递减到$0$,执行5-7步,
+
+ 5. 命$r=d_j$,
+
+ 6. 命$r=\gcd(r,q)$,$q=q/r$,若$r\neq 1$,则一直执行本步,
+
+ 7. 若$q=1$,返回条件不满足,
+
+ 8. 命$d_i=q$,
+
+ 9. 返回条件满足和$d_1,d_2,\ldots,d_k$.
+
+</algorithm>
+
+<remark>
+由于$d_i$中任一素因子均不整除其它的$\tilde{J_j}(j\neq i)$,因此在算法##al:distributing1 第三步通过试除得到$m_i$时完全可以用$d_i$代替$\tilde{J_i}$进行试除.
+</remark>

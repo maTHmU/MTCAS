@@ -1,0 +1,813 @@
+#title 基础数论算法
+
+<contents>
+
+<cite no>cohen</cite>
+本章将讨论素数判定、因子分解以外的许多基础数论算法，包括快速求幂、幂次检测、整数的最大公因子（GCD）、Legendre-Jacobi-Kronecker符号、中国剩余定理、连分数展式及一些常用的数论函数的计算。这些问题和算法不仅有其本身的趣味，而且在计算机代数系统中也起着非常基础性的作用，为许多其他更复杂的问题和算法所依赖。
+
+阅读本章要求读者有基本的初等数论知识（例如<cite>fkq03</cite>），本章的主要参考书为<cite>cohen</cite>和<cite>taocp2</cite>。
+
+* 快速求幂
+
+** 二进方法
+<index name="快速求幂"></index>
+设$G$为一乘法群，$n\in \mathbb{Z}$（$G$可只为乘法半群，此时限定$n\in \mathbb{N}$），计算$g\in G$的幂次$g^n$是在计算机代数系统中到处出现的运算（尤其是$G=\mathbb{Z}/N\mathbb{Z}$的情形），因此快速进行求幂起着非常基本的作用。最平凡的方法需要$n-1$个乘法，不过我们有办法大幅地改进乘法的次数。
+
+一个启发性的想法是二分策略。例如我们要求$g^{11}$，而11的二进制表示为$11=2^3+2+1$，可以依次求出$g^1, g^2, g^4, g^8$，再计算$g^3=g^1\cdot g^2$及$g^{11}=g^3\cdot g^8$，总共只用了5次乘法便得到了结果。这种方法被称为自右向左的二进方法（Right-left Binary）。另外还有一种自左向右的二进方法（Left-right Binary）：对于上面的例子依次求出$g^1$，$g^2$，$g^4=(g^2)^2$，$g^5=g^4\cdot g^1$，$g^{10}=(g^5)^2$，$g^{11}=g^{10}\cdot g^1$，同样用5次乘法得到结果。
+<index name="快速求幂" sub="自右向左的二进方法"></index>
+<algorithm label="al:r2l" name="自右向左的二进方法">
+设二进表示$n=\sum\limits_{k=0}^m\varepsilon_k2^k$（假定$n>0$，否则考虑$(g^{-1})^{|n|}$），$a=1$，重复以下步骤，第$k$步（$k=0, 1, \ldots, m$)执行：
+ 1. 计算$g^{2^k}=(g^{2^{k-1}})^2$。
+ 2. 若$\varepsilon_k=1$，则令$a\leftarrow a\cdot g^{2^k}$。
+ 3. 若$k=m$，输出$g^n=a$，算法终止。
+</algorithm>
+
+<remark>
+实践中$n$的二进表达式不需要预先存储，其计算（通过位操作）可以与$g^{2^k}$的计算同步进行。
+</remark>
+
+<remark>
+不难验证$G$中进行求$n$次幂的乘法次数为$m-1+\sum\limits_{k=0}^m\varepsilon_k=O(\log n)$，这要远小于平凡算法的$n-1$。
+</remark>
+<index name="快速求幂" sub="自左向右的二进方法"></index>
+<algorithm label="al:l2r" name="自左向右的二进方法">
+设二进表示$n=\sum\limits_{k=0}^m\varepsilon_k2^k$（假定$n>0$，否则考虑$(g^{-1})^{|n|}$），$a=g$，重复以下步骤，第$k$步（$k=m-1, m-2,\ldots, 0$)执行：
+ 1. 若$\varepsilon_k=0$，则$a\leftarrow a^2$。
+ 2. 若$\varepsilon_k=1$，则$a\leftarrow a^2$，$a\leftarrow a\cdot g$。
+ 3. 若$k=0$，输出$g^n=a$，算法中止。
+</algorithm>
+
+<remark>
+算法##al:r2l 与算法##al:l2r 求$n$次幂所用的乘法次数相同，但在算法##al:l2r 第二步累乘时乘上的因子$g$要比算法##al:r2l 乘上的因子$g^{2^k}$小一些。
+</remark>
+
+** $m$进方法，窗口方法及加法链
+<index name="快速求幂" sub="$m$进方法"></index>
+二进方法的一个很自然的推广就是$m$进方法，利用$n$的$m$进表示，类似二进方法的平方而不断地进行$m$次幂。$m=2^k$的情形尤其简单，因此在实践中也很常用。不同于二进方法，$m$进方法还需要额外储存$g^2,g^3,\ldots,g^{m-1}$的值。
+<index name="快速求幂" sub="窗口方法"></index>
+$2^k$进方法的进一步改进是所谓窗口方法(Window Method)，取一个固定长度$k+1$的“窗口”，用窗口自左向右扫描$n$的二进表达，计算窗口内的乘幂（往往预先计算好$g^3,\ldots,g^{2^k-1}$），然后通过乘幂将窗口向右平移（遇零即为平方），将下一个窗口内的数乘以已经得到的幂，再重复平移过程。例如考虑$n=26235947428953663183191$。用8进方法需要102次乘法，而通过长度4的窗口方法可以减少到93次（参见<cite>gor98</cite>），包括预先的$2^4-1$次计算、71次平方和14次中间过程中的乘法。下式表示了此窗口方法的过程。其中除去最左边的一条，剩下的14条下划线各代表一次中间过程的乘法：
+
+<latex>
+{\scriptsize$$\ul{1011}{11}000\ul{111}{7}00\ul{1}{1}000000\ul{111}{7}0\ul{1001}{9}0\ul{1001}{9}\ul{1101}{13}0\ul{1}{1}000000\ul{1011}{11}\ul{11}{3}00000\ul{1111}{15}\ul{1001}{9}\ul{1001}{9}0\ul{101}{5}0\ul{111}{7}$$}
+</latex>
+
+二进方法的乘法次数较平凡算法有本质的减少，一个很自然的问题是：计算$n$次幂所需要的最少乘法次数是多少？这等价于求$n$的<index>加法链</index>的最短长度$l(n)$（参见<cite>taocp2</cite>）。构造最短长度的加法链是较为困难的问题，在实践中只能构造“近似”最短的加法链。一个构造方法是通过“<index>幂树</index>”，其构造方法是：首先在第一层置1，当置完$k$层后，从左到右依次取第$k$层每个节点$n$，在其下附加节点$n+1,n+a_1,\ldots,n+a_{k-1}=2n$，其中$1,a_1,a_2,\ldots,a_{k-1}$是树根到$n$的到$n$的通路上的点，但已出现的节点不予添加。下图显示了前4层幂树。
+
+[[images/powertree.png][前4层幂树]]
+
+有了幂树之后，当我们要计算某个$n$次幂时，只需要在该树上找到$n$，依次计算从根节点到$n$的路径上的幂次即可。
+
+幂树构造简单，但对较大的$n$树的规模会很大（实际得到了$n$以下所有数的近似加法链）。有许多启发性的算法来构造直接$n$的近似最短加法链（参见<cite>gor98</cite>,<cite>bos90</cite>）。
+
+另外窗口方法和加法链也可以结合起来使用。由于当窗口长度增加时，需要预先计算的$g$的幂数量增多，可以构造加法序列（含所需幂次的加法链）来减少预先的计算量。使用长度较大的窗口的确能够减少乘法的次数，例如对前面的例子，可以将93次乘法进一步减少到89次。下式显示了长度为8的窗口方法过程。
+
+<latex>
+{\scriptsize$$\ul{1011000111001}{5689}000000\ul{1110100101}{933}00\ul{1110101}{117}000000\ul{101111}{47}00000\ul{111110011}{499}00\ul{101010111}{343}$$}
+</latex>
+
+<remark>
+前面所述的乘幂算法对一般的乘法半群均适用（例如矩阵乘法，多项式乘法）。考虑乘幂运算对象的特性，还有更多可能改进的空间。例如$G$为椭圆曲线的特殊情形（在这里是加法群），由于元素的逆较为容易求得，可以考虑形如$n=\sum\limits_{i\ge0}\varepsilon_i2^i\,(\varepsilon_i\in\{0,\pm1\})$的冗余二进制表示，来减少乘法次数。对于$G=\mathbb{Z}/N\mathbb{Z}$的特殊情形则有下面将要介绍的著名的Montgomery约化过程。
+</remark>
+
+** Montgomery约化
+<index name="Montgomery约化"></index>
+乘幂运算最常见的是出现在$G=\mathbb{Z}/N\mathbb{Z}$中。Montgomery<cite>mon85</cite>提出一个避免试除的计算模乘法的方法，对于$N$固定，需要大量乘法的模幂运算尤其有效。主要想法是将模$N$的运算转化为模机器字长（例如$2^{32}$）的运算，而后者是硬件快速实现的。
+
+<definition>
+记$\overline{x}=x\bmod{N}\in\{0, 1, \ldots, N-1\}$，即$x$模$N$的余数。设$R$为一个进制的基（通常取为机器字长或其幂次），满足$(R, N)=1$，$R>N$。则$\exists\, 0\leq u<N$，$0\leq v<R$成立Bezout等式$u\cdot R-v\cdot N=1$，我们定义$\widetilde{x}:=\overline{xu}$，称为$x$的<index>Montgomery表示</index>。
+</definition>
+
+<remark>
+由定义可知$\overline{uR}=1$以及$\overline{x}=\widetilde{xR}$。并且当$x$跑遍模$N$的一个完全剩余系时，$\widetilde{x}$也跑遍模$N$的完全剩余系，因此$\widetilde{x}$这种表示不会损失信息。
+</remark>
+
+下面的快速计算$\widetilde{x}$的算法是Montgomery模幂乘法的核心。
+
+<algorithm label="al:monredc" name="Montgomery约化">
+设$0\le x<RN$，以下步骤计算$\widetilde{x}$。
+ 1. 计算$m=(x \bmod R)\cdot v \bmod R$，$0\le m<R$。
+ 2. 计算$t=(x+mN)/R$。
+ 3. 若$t\ge N$输出$t-N$，否则输出$t$，算法终止。
+</algorithm>
+
+<remark>
+当$R$取为机器字长时，第一、二步中的模运算和除法运算都可直接通过位操作快速进行。
+</remark>
+
+<proof  name="算法的有效性">
+首先由$x+mN\equiv x+ xv N\equiv x(1+vN)\equiv x uR\equiv0\pmod{R}$知$t$为整数。再由$t=(x+mN)/R$，知$uRt=(xu+umN)$，从而$\overline{uRt}=\overline{xu}$，即有$\overline{t}=\widetilde{x}$。最后由$0\le x<RN$，$0\le m<R$，知$0\le t< 2N$，可得算法的有效性。
+</proof>
+
+
+下面的命题表明，在Montgomery表示下，$\widetilde{mn}$即表示$m$与$n$的乘积。
+<proposition label="pr:tilde">
+设$m, n\in\mathbb{Z}$，则$$\overline{\widetilde{m}\cdot\widetilde{n}}=\widetilde{\widetilde{m\cdot n}}.$$
+</proposition>
+
+<proof>
+由定义，$\overline{\widetilde{m}\cdot\widetilde{n}}=\overline{mu}\cdot\overline{nu}=\overline{mnu^2}=\widetilde{mnu}=\widetilde{\widetilde{m\cdot n}}$。
+</proof>
+
+为求$\overline{x\cdot y}$，首先将$\overline{x}, \overline{y}$逆变换为Montgomery表示$\widetilde{xR}, \widetilde{yR}$，再利用命题##pr:tilde 和算法##al:monredc 即可。
+
+<remark>
+应用算法##al:monredc 时要注意保证输入满足在0和$RN$之间，而$xR\cdot yR$并不满足此条件。可对两乘数先做一个模$N$处理，这可利用$\overline{xR}=\widetilde{x\overline{R^2}}$来完成，而$\overline{R^2}$作为一个固定的常数可预先计算好，反复使用。在求幂的过程中，由于$R, N$固定，只需要在第一步逆变换为Montgomery表示，中间结果全部用Montgomery表示来运算（运用算法##al:r2l 或##al:l2r ），并对最终结果变换回正常表示即可，由此加快了求幂的运算速度。
+</remark>
+<remark>
+当$(R,N)\ne1$，通常即$N$为偶数的情形，模幂运算可通过将$N$分解为$2^d\cdot N_0$（$N_0$为奇数），先对用算法##al:monredc 对$N_0$模幂，再对$2^d$模幂（位操作本身就很快），最后用中国剩余定理##th:crt 重构出结果来。
+</remark>
+
+<remark>
+<cite>hong96</cite>提出了比Montgomery方法更快的模幂算法，执行效率约能提升30%到50%。
+</remark>
+
+* 幂次检测
+
+
+在许多算法中（例如SQUFOF算法##al:SQUFOF ），需要判断一个整数是否是完全平方数（更一般地判断是否为素数幂），如果是的话，还要求出其平方根。对于很大的整数，这些算法都要更有针对性，更高效一些才能满足需要。
+
+** 整数开方
+
+对于<index>整数开方</index>，直接动用浮点数运算显然是低效而且不精确的，但我们可以将经典的Newton迭代法做一个改进使之变得更经济。
+<algorithm label="al:intsqrt" name="整数开方">
+输入整数$n$，以下算法计算$\lfloor\sqrt{n}\rfloor$。
+ 1. 令$x_0=n$。
+ 2. 顺次计算$x_{k+1}=\left\lfloor\dfrac{x_k+\lfloor{n/x_k\rfloor}}{2}\right\rfloor$。
+ 3. 若$x_{k+1}\ge x_k$，输出$x_k$，算法终止，否则跳到第二步。
+</algorithm>
+<remark>
+算法中所有运算均为整数运算，没有动用浮点数运算。
+</remark>
+<proof name="算法的有效性">
+由$$\left\lfloor\dfrac{x_{k-1}+\lfloor{n/x_{k-1}\rfloor}}{2}\right\rfloor>\dfrac{x_{k-1}+n/x_{k-1}-1}{2}-\dfrac{1}{2}\ge\sqrt{n}-1,$$可知对于任意$k$，均有$x_k\ge\lfloor\sqrt{n}\rfloor$。若$x_{k+1}\ge x_k$且$x_k\ne\lfloor\sqrt{n}\rfloor$，则必有$x_k\ge\lfloor\sqrt{n}\rfloor+1$。于是$$x_{k+1}-x_k=\left\lfloor\dfrac{\lfloor n/x_k\rfloor-x_k}{2}\right\rfloor<\left\lfloor\dfrac{n-x_k^2}{2x_k}\right\rfloor<0,$$矛盾！从而必有$x_k=\lfloor\sqrt{n}\rfloor$。
+</proof>
+
+** 平方检测
+
+我们要判断给定的整数$n$是否是一个完全平方数，直接用算法##al:intsqrt 计算$\lfloor\sqrt{n}\rfloor^2$是一个办法，不过我们在这样做之前可以首先排除许多非平方数的情形。以下方法运用一个简单的事实：如果$n$是一个平方数，那么对任意整数$k$，$n$在$\mathbb{Z}/k\mathbb{Z}$中都是一个平方数。
+<index name="平方检测"></index>
+<algorithm label="al:sqrtest" name="平方检测">
+输入整数$n$，判断其是否为平方数，若是，求之。
+ 1. 枚举生成数组$q_{64}$，满足
+<latex>
+\begin{equation*}
+  q_{64}[k]=
+  \begin{cases}
+    1&\text{若}k\text{为}\mathbb{Z}/64\mathbb{Z}\text{中的平方数}, \\
+    0&\text{若}k\text{为}\mathbb{Z}/64\mathbb{Z}\text{中的非平方数}.
+  \end{cases}
+\end{equation*}</latex>
+类似生成另外三个数组$q_{63}, q_{65}, q_{11}$。
+ 2. 若$q_{64}[n\bmod{64}]=0$，输出非平方数，算法终止；否则计算$r=n\bmod{45045(=63\times65\times11})$。
+ 3. 若$q_{63}[r\bmod{63}]=0$或$q_{65}[r\bmod{65}]=0$或$q_{11}[r\bmod{11}]=0$，输出非平方数，算法终止。
+ 4. 用算法##al:intsqrt 计算$\lfloor\sqrt{n}\rfloor^2$，若不等于$n$输出非平方数，否则输出平方根，算法终止。
+</algorithm>
+
+<remark>
+若$n$非平方数，则算法进行到最后一步的可能性非常小，因为模64，63，65，11的平方数个数分别为12，16，21，6，从而这种情况发生的概率大约仅为为$$\dfrac{12}{64}\cdot\dfrac{16}{63}\cdot\dfrac{21}{65}\cdot\dfrac{6}{11}=\dfrac{6}{715}.$$我们从上式也可以看出选取四个数64，63，65，11的缘由。
+</remark>
+
+<remark>
+在实际算法中，我们往往是通过实验来获取更佳的常数选择方案。
+</remark>
+
+; 用途？
+; r:power, gcd, primetest
+** 素数幂检测
+
+我们有时会需要检测一个整数$n$是否为素数幂$p^k$，例如素数幂检测可以作为一般整数因子分解算法的子算法。若$n=p^k$，则由Fermat小定理，对于任意整数$a$都有$p\mid a^p-a$，从而$p\mid (a^n-a, n)$。
+
+<problem>
+取$n=p^k$，我们计算$(a^n-a,n)$：
+ 1. $n=3^3$，取$a=2$，则$(a^n-a, n)=(2^{27}-2, 27)=(134217726, 27)=3$。
+ 2. $n=5^2$，取$a=3$，则$(a^n-a, n)=(3^{25}-3, 25)=(847288609440, 25)=5$。
+ 3. $n=2^6$，取$a=2$，则$(a^n-a, n)=(2^{64}-2, 64)=(18446744073709551614, 64)=2$。
+</problem>
+但实际上通过试算几个例子可以发现大部分情况下都有$(a^n-a, n)=p$。这就启发我们得到如下的算法。
+<index name="素数幂检测"></index>
+<algorithm  name="素数幂检测">
+输入整数$n$，判断其是否为素数幂，若是，输出素数$p$。
+ 1. 取$a=2$。
+ 2. 用算法##al:monredc 计算$b=a^n\bmod{n}$并计算$p=(b-a, n)$。
+ 3. 若$p=1$，输出非素数幂，算法终止；否则用对$p$进行合性检测（例如Rabin-Miller检测，算法##al:rabin  ），若$p$为合数，则令$a\leftarrow a+1$，跳到第二步。
+ 4. 对$p$进行素性检测（例如Lehmer $N-1$检测，定理##th:FermatConverse ），若$p$不一定为素数，则令$a\leftarrow a+1$，跳到第二步。
+ 5. $p$为素数，依次计算$p, p^2,\ldots, p^{2^k}$直到$p^{2^k}>n$。
+   - 若$p^{2^{k-1}}\nmid n$，输出非素数幂，算法终止；
+   - 否则令$n\leftarrow\dfrac{n}{p^{2^{k-1}}}$，重复第五步，直到$n=1$。
+ 6. 输出素数$p$，算法终止。
+</algorithm>
+
+<remark>
+若$p$为素数，第四步的跳转实际上很少发生。
+</remark>
+
+* 最大公因子
+
+
+相对于因子分解，求两个整数$a$，$b$的<index sub="整数">最大公因子</index>$\gcd(a, b)$（Greatest Common Divisor，GCD）要快上许多，甚至往往超出我们的想象。用普通的个人电脑在2秒以内计算两个十万位的整数的最大公因子也不是一件难事。
+
+据<cite>jeb03</cite>的数据，一个典型的代数运算（例如求多元多项式组的Gr\"obner基）通常要花上一半以上时间用来计算某两个大整数的最大公因子，或许正因为最大公因子在计算机代数系统中的重要性，对它的研究才能如此深入。
+
+为了避免混淆，在本节中始终用$\gcd(a, b)$代表最大公因子，而出现在算法的描述中的$(a, b)$则仅仅代表二元有序数对。
+
+** Euclid算法
+
+最平凡的求整数$a$，$b$的GCD的办法是直接将两数分解，但这实在是太慢了，只在$a$，$b$都小于100或者已知其中之一为素数的时候才可能有些用处。早在古希腊时代人们就已经知道如何进行更高效的计算了，经典的<index sub="整数">Euclid算法</index>虽最古老却也是最本质最有效的方法之一。
+
+<algorithm  name="Euclid">
+输入正整数$a$，$b$，计算$\gcd(a, b)$。
+ 1. 若$b=0$，则输出$a$，算法终止。
+ 2. 令$(a, b)\leftarrow (b, a\bmod{b})$，跳到第一步。
+</algorithm>
+
+Knuth<cite>taocp2</cite>通过一系列分析给出了Euclid算法终止前除法步数的精确估计。
+<theorem label="al:euclid" name="Euclid算法的步数">
+设$a$，$b$随机分布于$[1, N]$，则
+ 1. Euclid算法的平均步数为$\dfrac{12\ln2}{\pi^2}\ln N+O(1)\approx0.843\ln N+O(1)$。
+ 2. Euclid算法在最坏情况下的步数至多为$\lfloor\log_\phi(3-\phi)N\rfloor\approx2.078\ln N+0.6723$，其中$\phi=\frac{1+\sqrt{5}}{2}$。
+</theorem>
+
+
+** Lehmer加速算法
+由定理##al:euclid 可见GCD可以在多项式时间内求出，但Euclid算法中每一步的大整数试除还是相当耗费时间，Lehmer针对这一点给出了加速的方法，其基本想法是试除的商$\left\lfloor\dfrac{a}{b}\right\rfloor$很大程度上只与$a$，$b$的前若干位有关，从而可以用单精度的运算代替高精度的大整数试除。
+
+<problem>
+我们想要计算$\gcd(a, b)=\gcd(27182818, 10000000)$，假设计算机的字长为4个十进制数字，令$\hat{a}=2718$，$\hat{b}=1000$，对$\hat{a}+1$，$\hat{b}$进行Euclid算法的试商结果很可能与$a$，$b$进行的结果是一致的，如下表。
+
+ $a$	|| $b$ || $q$ || $\hat{a}+1$ || $\hat{b}$ || $\hat{q}$
+ 27182818 | 10000000 | 2 | 2719 | 1000 | 2
+ 10000000 | 7182818 | 1 | 1000 | 719 | 1
+ 7182818 | 2817182 | 2 | 719 | 281 | 2
+ 2817182 | 1548454 | 1 | 281 | 157 | 1
+ 1548454 | 1268728 | 1 | 157 | 124 | 1
+ 1268728 | 279726 | 1 | 124 | 33 | 3
+
+
+我们看到直到第6步试除，$q$与$\hat{q}$才不相等，因此可以利用$a$与$b$的前若干位来快速求得试除的商。一个存在问题是如何判断试商的正确性？解决方法是可以同时求另一组$\gcd(\hat{a}, \hat{b}+1)=\gcd(2718, 1001)$的试商。
+
+ $\hat{a}+1$ || $\hat{b}$ || $\hat{q}$ ||  $\hat{a}$ || $\hat{b}+1$ || $\hat{q}$ 
+ 2719 | 1000 | 2 | 2178 | 1001 | 2
+ 1000 | 719 | 1 | 1001 | 716 | 1
+ 719 | 281 | 2 | 716 | 285 | 2
+ 281 | 157 | 1 | 285 | 146 | 1
+ 157 | 124 | 1 | 146 | 139 | 1
+ 124 | 33 | 3 | 139 | 7 | 19
+
+
+显然若两组求得的商相同，即可判定试商是准确无误的。上表也验证了这一点。
+</problem>
+<index name="Euclid算法" sub="整数!Lehmer加速算法"></index>
+<algorithm  name="Lehmer加速算法">
+输入正整数$a$，$b$，且$a>b$，计算$\gcd(a, b)$。设$M$为单精度整数的上限（例如$2^{32}$），以下$\hat{a}$，$\hat{b}$，$A$，$B$，$C $，$D$均为单精度整数（即$<M$）。
+ 1. 若$b<M$，直接用Euclid算法计算输出$\gcd(a, b)$，算法终止；若$b\ge M$，记$\hat{a}$，$\hat{b}$为$M$进制下$a$，$b$的最高位，$\displaystyle\left({A \atop B}{C \atop D}\right)\leftarrow\left({1 \atop 0}{0 \atop 1}\right)$。
+ 2. 若$\hat{b}+C\ne0$，$\hat{b}+D\ne0$，则令$q\leftarrow \left\lfloor\dfrac{\hat{a}+A}{\hat{b}+C}\right\rfloor$，否则跳到跳到第四步。若还有$q=\left\lfloor\dfrac{\hat{a}+B}{\hat{b}+D}\right\rfloor$，则跳到第三步，否则跳到第四步。
+ 3. 令$\displaystyle\left({A \atop B}{C \atop D}\right)\leftarrow\left({A \atop B}{C \atop D}\right)\left({0 \atop 1}{1 \atop -q}\right)$，$\displaystyle(\hat{a}, \hat{b})\leftarrow(\hat{a}, \hat{b})\left({0 \atop 1}{1 \atop -q}\right)$，跳到第二步。
+ 4. 若$B\ne0$，令$\displaystyle(a, b)\leftarrow(a, b)\left({A \atop B}{C \atop D}\right)$，跳到第一步；否则用高精度运算直接求出$(a, b)\leftarrow(b, a\bmod{b})$，跳到第一步。
+</algorithm>
+
+<remark>
+Lehmer的加速算法虽然步数和普通的Euclid算法是一样的，但除了第四步后一种情形外，都只需要单精度运算或单精度与高精度数的乘法，这起到了“加速”的作用。
+</remark>
+
+<remark>
+注意算法的陈述中忽略了一种特殊情形，即当$\hat{a}=M-1, A=1$或$\hat{b}=M-1, D=1$时，计算可能超出单精度的范围，可以将$M$取为略小与单精度整数上限即可。
+</remark>
+
+** 二进方法（Binary GCD）
+
+另一种二进方法（<index>Binary GCD</index>）在实践中也很有用，其主要想法是用减法和移位来代替代价较大的试除。尽管需要的运算步数增多了，但由于减法和位移运算的简单性节省出的是时间还是很可观的。
+
+下面的定理精确地叙述了只用减法的合理性（参考<cite>taocp2</cite>）。
+
+<theorem label="th:qdist">
+设$b$固定，$a$随机分布。对$a$，$b$施行Euclid算法，其中间步骤试商为$q$的概率记为$P_b(q)$，则有$$\lim_{b\rightarrow\infty}P_b(q)=\log\frac{(q+1)^2}{(q+1)^2-1}.$$
+</theorem>
+
+<remark>
+由定理##th:qdist ，粗略地估计试商值为1的概率为$\log\frac{4}{3}\approx0.415$，试商值为2的概率为$\log\frac{9}{8}\approx0.170$。可见大部分情况下除数和被除数都是比较接近的，可以用减法来替代试除。
+</remark>
+
+<algorithm  name="Binary GCD">
+输入正整数$a$，$b$，且$a>b$，计算$\gcd(a, b)$。
+ 1. 用高精度直接计算$(a, b)\leftarrow (b, a\bmod{b})$。
+ 2. 若$b=0$，输出$a$，算法终止；否则设$a=2^m a_0$，$b=2^nb_0$，$a_0$，$b_0$为奇数。设$k=\min\{m,n\}$，通过位操作计算$(a, b)\leftarrow(a\cdot2^{-m}, b\cdot2^{-n})$。
+ 3. 令$t\leftarrow a-b$，若$t=0$，输出$a\cdot2^k$，算法终止。
+ 4. 设$t=2^st_0$，$t_0$为奇数，若$t_0>0$，令$a\leftarrow t_0$，否则令$b\leftarrow-t_0$，跳到第三步。
+</algorithm>
+
+<remark>
+由于初始的$a$和$b$可能相差很大，不适宜反复做减法，因此还是需要第一步的高精度试除。
+</remark>
+
+<remark>
+Gosper提出了一个将Binary GCD想法与Lehmer加速算法结合起来的方法，参见<cite>taocp2</cite>。
+</remark>
+
+** 扩展Euclid算法
+<index name="Euclid算法" sub="整数!扩展Euclid算法"></index>
+在很多问题中（例如求模$N$的逆）不仅需要知道$\gcd(a, b)$，还要求出Bezout等式中的系数$u $，$v $，使得成立$$ua+vb=d(:=\gcd(a, b)).$$这样的算法称为扩展Euclid算法。在原始的Euclid算法过程中保留所有的商和余数即可倒推出$u $和$v $来，不过这样做需要较大的空间开销。可以在计算过程中保留类似于Lehmer加速算法中的矩阵$\displaystyle\left({A \atop B}{C \atop D}\right)$，矩阵的列实际上就是新操作数作为$a$，$b$线性组合的系数。
+
+Lehmer加速算法本身就就具有了“扩展”的特性，但Binary GCD的“扩展”能力表面上看来就没有那么直接了。不过仔细追踪算法的行进过程，还是能够求出系数$u $，$v $来的。
+
+<algorithm  name="扩展Binary GCD">
+输入正整数$a$，$b$，且$a>b$，计算三元组$(u, v, d)$。
+ 1. 用高精度直接计算$(a, b)\leftarrow (b, a\bmod{b})$。
+ 2. 若$b=0$，输出$(0, 1, b)$，算法终止；否则设$a=2^m a_0$，$b=2^nb_0$，$a_0$，$b_0$为奇数。设$k=\min\{m,n\}$，通过位操作计算$(a, b)\leftarrow(a\cdot2^{-k}, b\cdot2^{-k})$。
+ 3. 令$(u_1, v_1, d_1)\leftarrow(1, 0 ,a)$，$(u_2, v_2, d_2)\leftarrow(b, 1-a, b)$。若$a$为奇数，令$(u_0, v_0, d_0)\leftarrow(0, -1, -b)$，跳到第五步；否则令$(u_0, v_0, d_0)\leftarrow(1, 0, a)$。
+ 4. 若$u_0, v_0$均为偶数，令$(u_0, v_0, d_0)\leftarrow(u_0, v_0, d_0)/2$；否则令$(u_0, v_0, d_0)\leftarrow(u_0+b, v_0-a, d_0)/2$。
+ 5. 若$d_0$为偶数，跳到第四步。
+ 6. 若$d_0>0$，令$(u_1, v_1, d_1)\leftarrow(u_0, v_0, d_0)$；否则令$(u_2, v_2, d_2)\leftarrow(b-u_0,-a-v_0,-d_0)$。
+ 7. 令$(u_0, v_0, d_0)\leftarrow(u_1-u_2,v_1-v_2,d_1-d_2)$，若$u_0\le0$，令$(u_0,v_0)\leftarrow(u_0+b,v_0-a)$。若$d_0=0$，输出$(u_1,v_1,d_1\cdot2^k)$，算法终止；否则跳到第四步。
+</algorithm>
+
+<proof  name="算法的有效性">
+可以仔细验证每一步后都满足$0\le u_1,u_2,u_0\le b$，$-a\le v_1,v_2,v_0\le0$，$0<d_1\le a$，$0<d_2\le b$，且满足$u_i a+v_i b=d_i$，对$i=1, 2, 3$。算法的终止性是明显的。
+</proof>
+
+<remark>
+与原始的Binary GCD有区别的是第四步，这是为了保证系数也能除以2而做的微小改动。
+</remark>
+
+** dmod与bmod
+
+首先我们引进某种程度上相当于$\bmod$的运算<index>dmod</index>（digit mod）和<index>bmod</index>（bit mod）。
+
+<definition  name="dmod和bmod">
+设$\beta$为一个进制的基，正整数$a$,$b$，满足$a>b$，$\gcd(a,\beta)=1$，$\gcd(b,\beta)=1$，$l_\beta(a)$表示$a$在$\beta$-进制表示下的位数，记$\delta=l_\beta(a)-l_\beta(b)+1$。定义$$a \dmod{\beta} b:=\frac{|a-(ab^{-1}\bmod \beta^\delta)b|}{\beta^\delta}.$$
+
+当$\beta=2$时（最常用的情形），简记为$$a \bitmod b:=a \dmod{2}b.$$
+</definition>
+
+<remark>
+由于$a-(ab^{-1}\bmod\beta^\delta)b\equiv a-a\equiv0\pmod{\beta^\delta}$，故dmod和bmod是可以定义好的。
+</remark>
+
+<problem>
+设$a=155=(10011011)_2$，$b=15=(1111)_2$，则$l_2(a)=8$，$l_2(b)=4$，$2^\delta=2^{l_2(a)-l_2(b)+1}=32$，$15^{-1}\equiv15\pmod{32}$。从而
+<latex>
+\begin{align*}
+  155 \bitmod 15 &=\frac{|155-(155\cdot15 \bmod{32})\cdot15|}{32} \\
+  &=\frac{|155-21\cdot15|}{32}=5.
+\end{align*}
+</latex>
+恰巧有$\gcd(155, 15)=5$。
+</problem>
+
+可以直接验证$\gcd(a \dmod{\beta} b, b)=\gcd(a, b)$，而且$a \dmod{\beta} b<b$，因此新定义的运算的确在某种程度上相当于mod。而且我们可以避免试除，只用减法和位操作来计算出$a \bitmod b$。最关键的是如何快速计算$m=ab^{-1}\bmod2^\delta$，接下来的算法只用减法和位操作解决了这个问题，想法类似于待定系数法求解$bm\equiv a
+\pmod{2^\delta}$，从低到高将$m$的二进表达依次求出。
+
+<algorithm label="al:abinv" name="计算$ab^{-1}\bmod2^\delta$">
+输入正奇数$a$，$b$，计算$ab^{-1}\bmod2^\delta$。
+ 1. 令$d\leftarrow a$，$m\leftarrow0$。
+ 2. 重复以下步骤（$i=0, 1, \ldots\delta-1$）：若$2^{i+1}\nmid d$，则令$d\leftarrow d-2^i\cdot b$，$m\leftarrow m+2^i$。
+ 3. 输出$m$，算法终止。
+</algorithm>
+
+<proof  name="算法的有效性">
+每次第二步的操作后均有$d=a-mb\equiv0\pmod{2^{i+1}}$，可知算法的有效性。
+</proof>
+
+<remark>
+Weber<cite>web95</cite>仅仅采用bmod代替Euclid算法中的mod操作，修改得到的算法比Binary GCD还要快一些。
+</remark>
+
+<remark>
+设$M=2^w$为单精度整数的上界，当$a\gg b$，$l_2(a)-l_2(b)+1\gg w$时，可以将bmod操作限制在$M$下以提高速度，即取$\delta=w$，降低$l_2(a)$若干次直到$l_2(a)-l_2(b)+1\le w$。
+</remark>
+
+
+** Jebelean-Weber-Sorenson加速算法
+
+<index>Jebelean-Weber-Sorenson加速算法</index>的基本想法来自Sorenson<cite>sor94</cite>。设$a$，$b$与$n$互素，如果存在$u $，$v $满足$|u|,|v|<\sqrt{n}$使得$ua\equiv vb\pmod{n}$，为求$\gcd(a, b)$，考虑新的问题$\gcd(\frac{ua-vb}{n}, b)$可以将$a$缩小大约$\sqrt{n}$倍（这类似于Binary GCD中除以2的过程，被称为$n$-约化）。这样的$u $，$v $很可能是存在的，例如考虑满足$|u_0|,|v_0|<\sqrt{n}/2$二元组$(u_0 ,v_0)$，这样的二元组共有$n$个，计算$u_0a-v_0b$其中必有两组模$n$同余，将其相减即得满足条件的$(u ,v)$。下面的算法严格地构造出了$(u, v)$。
+
+<algorithm label="al:uv">
+输入正整数$a$，$b$，$n$，满足$a$，$b$与$n$互素，计算$(u, v)$满足$0<u,|v|<\sqrt{n}$且$ua\equiv vb\pmod{n}$。
+ 1. 计算$c\leftarrow ab^{-1}\pmod{n}$（当$n$为2的幂时可使用算法##al:abinv ）。
+ 2. 令$(u_1, v_1)\leftarrow(n, 0)$，$(u_2, v_2)\leftarrow(c, 1)$。
+ 3. 若$u_2\ge\sqrt{n}$，则令$(u_1, v_1)\leftarrow(u_1, v_1)- \left\lfloor\dfrac{u_1}{u_2} \right\rfloor(u_2, v_2)$，交换$(u_1, v_1)$与$(u_2, v_2)$，跳到第三步。
+ 4. 输出$(u_2, v_2)$，算法终止。
+</algorithm>
+
+<proof  name="算法的有效性">
+算法本质上就是一个Euclid算法。由于正数$u_1$的严格递降，算法必在有限步后终止。终止时有$u_2<\sqrt{n}\le u_1$，而算法过程中始终保持$u_1|v_2|+u_2|v_1|=n$，可知$u_1|v_2|<n$，从而$|v_2|<\sqrt{n}$。
+</proof>
+
+<remark>
+算法##al:uv 的第三步还可以用减法和位操作来避免试除，当$u $，$v $相差不大时更加高效。
+</remark>
+
+现在我们可以高效的计算$\gcd(\frac{ua-vb}{n}, b)$了，不过还有一个问题，一般来说$\gcd(a, b)\mid\gcd(\frac{ua-vb}{n}, b)$，但两者未必相等。如果直接计算前者，可能结果会包含“假因子”。通常情况下可以在最后一步处理假因子，因为根据Dirichlet的优美定理（参考<cite>taocp2</cite>），通常求出的最大公因子都会很小（$\le3$的比例为82.7%），最后一步的处理只花很少时间。
+
+<theorem name="Dirichlet，最大公因子的分布">
+设$q_n(d)$表示在$1\le a, b\le n$范围内使$\gcd(a, b)\le d$的有序数对$(a, b)$的个数，则有$$\lim_{n\rightarrow\infty}\frac{q_n(d)}{n^2}=\frac{6}{\pi^2}\sum_{k=1}^d\frac{1}{k^2}.$$
+</theorem>
+
+<algorithm label="al:jws" name="Jebelean-Weber-Sorenson加速算法">
+设正整数$a_0$，$b_0$满足$a_0>b_0$且$\beta$互素，依据$b_0$的长度选取$s(b)$与$t(b)$（例如当$\beta=2$可固定为10与32）。
+ 1. 令$a\leftarrow a_0$，$b\leftarrow b_0$。
+ 2. 若$b=0$，跳到第五步。
+ 3. 若$l_\beta(a)-l_\beta(b)>s(b)$，则令$a\leftarrow a \dmod{\beta} b$，跳到第三步；否则根据算法##al:uv 求得$(u, v)$使$ua\equiv vb\pmod{\beta^{2t(b)}}$，令$a\leftarrow\dfrac{|ua-vb|}{\beta^{2t(b)}}$。
+ 4. 将$a$中的$\beta$因子去除（当$\beta=2$时移位即可），并交换$a$与$b$，跳到第二步。
+ 5. 计算$x=\gcd(a, b_0 \dmod{\beta} a)$，计算输出$\gcd(x, a_0 \dmod{\beta} x)$，算法终止。
+</algorithm>
+
+<remark>
+第五步相当于用dmod运算快速求得了$\gcd(\gcd(a, b_0), a_0)$。
+</remark>
+
+<remark>
+根据Weber<cite>web95</cite>的实验结果，在8个单精度整数长度时（大约77个十进制位），Jebelean-Weber-Sorenson加速算法开始超过Binary GCD。
+</remark>
+
+尽管一般来说“假因子”都很小，但也有例外的时候，Sedjelmaci<cite>sed07</cite>以相邻的Fibonacci数$(F_N, F_{N+1})$为例，当$N=300$时，假因子为5，$N=2000$时，假因子为122542875，而当$N=3000$时，假因子已高达$1.02\times10^{15}$，而实际上相邻的Fibonacci数总是互素的。
+
+不过Sedjelmaci给出了一个改进来避免假因子的影响，这依赖于以下他证明的命题。
+
+<proposition  name="Sedjelmaci">
+设算法##al:uv 终止时得到了$(u_1, v_1)$，$(u_2, v_2)$，若有$\dfrac{a}{b}<\sqrt{n}$，则满足$$\gcd(a, b)=\gcd\left(\dfrac{|u_1a-v_1b|}{n}, \dfrac{|u_2a-v_2b|}{n}\right).$$
+</proposition>
+
+因此可以的到改进版的<index sub="Sedjelmaci的改进">Jebelean-Weber-Sorenson加速算法</index>：
+
+<algorithm  name="Sedjelmaci改进算法">
+设正整数$a_0$，$b_0$满足$a_0>b_0$且$\beta$互素，依据$b_0$的长度选取与$t(b)$（例如当$\beta=2$可固定为32）。
+ 1. 令$a\leftarrow a_0$，$b\leftarrow b_0$。
+ 2. 若$ab=0$，跳到第五步；否则令$(a, b)\leftarrow(\max\{a, b\},\min\{a, b\})$。
+ 3. 若$\dfrac{a}{b}\ge\beta^{t(b)}$，则令$(a, b)\leftarrow(b, a\dmod{\beta}b)$；否则根据算法##al:uv 求得$(u_1, v_1)$，$(u_2, v_2)$，使$u_2a\equiv v_2b\pmod{\beta^{2t(b)}}$，令$(a, b)\leftarrow\left(\dfrac{|u_1a-v_1b|}{n}, \dfrac{|u_2a-v_2b|}{n}\right)$。
+ 4. 将$a$，$b$中的$\beta$因子去除（当$\beta=2$时移位即可），跳到第二步。
+ 5. 输出$a$，$b$中不为零的数，算法终止。
+</algorithm>
+
+<remark>
+在算法的第三步可能牺牲了一些时间，但保证了最终得到的最大公因子是不掺“假”的。
+</remark>
+
+; r:primetest 一些用到的性质 r:gcd
+* Legendre-Jacobi-Kronecker符号
+
+<index>Legendre符号</index>不仅本身很重要，而且在素性检测、因子分解等领域中也经常被用到。
+
+<definition  name="Legendre符号">
+设$p$为奇素数，$a\in\mathbb{Z}$，Legendre符号定义为
+<latex>
+\begin{equation*}
+  \legendre{a}{p}:=
+  \begin{cases}
+    1&a\text{为模}p\text{的二次剩余}, \\
+    -1&a\text{为模}p\text{的二次非剩余}, \\
+    0&p\mid a.
+  \end{cases}
+\end{equation*}
+</latex>
+</definition>
+
+下面的性质是我们在初等数论教程中熟知的。
+
+<proposition label="pr:legpr" name="Legendre符号的基本性质">
+Legendre符号满足：
+ 1. （积性）$$\legendre{a}{p}\legendre{b}{p}=\legendre{ab}{p}.$$
+ 2. 若$a\equiv b\pmod{p}$，则$$\legendre{a}{p}=\legendre{b}{p}.$$
+ 3. （Euler准则）$$\legendre{a}{p}\equiv a^{(p-1)/2}\pmod{p}.$$
+</proposition>
+
+利用命题##pr:legpr 中的第三条便可以通过模幂运算用来计算Legendre符号，时间复杂度为$O(\log^3 p)$。对此方法本质上的改进依赖于著名的<index sub="Legendre符号">二次互反律</index>。
+
+<theorem name="二次互反律">
+ 1. 若$p$，$q$为不相等的素数，则$$\legendre{p}{q}\legendre{q}{p}=(-1)^{\frac{(p-1)(q-1)}{4}}.$$
+ 2. （二次互反律的补充）$$\legendre{-1}{p}=(-1)^{\frac{p-1}{2}},\quad \legendre{2}{p}=(-1)^{\frac{p^2-1}{8}}.$$
+</theorem>
+
+利用命题##pr:legpr 中的第一、二条及二次互反律可以得到一个直接的计算$\legendre{a}{p}$的方法（这也是我们在初等数论课程中掌握的）。不过此方法依赖于$a$以及某些中间结果的因子分解，而分解往往不是一件易事。但幸运的是我们还有更好的方法，可以将时间复杂度降到$O(\log^2 p)$，这依赖于Legendre符号的推广——<index>Kronecker-Jacobi符号</index>
+。
+
+<definition  name="Kronecker-Jacobi符号">
+设$a, b\in\mathbb{Z}$，定义Kronecker-Jacobi符号：
+  1. 若$b=-1$，
+<latex>
+\begin{equation*}
+  \jacobi{a}{-1}:=
+  \begin{cases}
+    1&a\ge0, \\
+    -1&a<0.
+  \end{cases}
+\end{equation*}</latex>
+  2. 若$b=2$，
+<latex>
+\begin{equation*}
+  \jacobi{a}{2}:=
+  \begin{cases}
+    0&2\mid a, \\
+    (-1)^{\frac{a^2-1}{8}}&2\nmid a.
+  \end{cases}
+\end{equation*}</latex>
+  3. 若$b=1$，$$\jacobi{a}{1}:=1.$$
+  4. 若$b$为奇素数，$\displaystyle\jacobi{a}{b}$定义为Legendre符号。
+  5. 设$b=\varepsilon\cdot\prod\limits_{i=1}^mp_i^{e_i}$，其中$\varepsilon=\pm1$，$p_i$为素数，根据前四条定义$$\jacobi{a}{b}:=\jacobi{a}{\varepsilon}\prod_{i=1}^m\jacobi{a}{p_i}^{e_i}.$$
+  6. 约定当$b=0$时，
+<latex>
+\begin{equation*}
+  \jacobi{a}{0}:=
+  \begin{cases}
+    1&a=\pm1, \\
+    0&a\ne\pm1.
+  \end{cases}
+\end{equation*}</latex>
+</definition>
+
+<remark>
+设$b$为奇数，和Legendre符号一致，若$\jacobi{a}{b}=-1$则$a$必为模$b$的二次非剩余。但需要注意的是，$\jacobi{a}{b}=1$并不意味着$a$为模$b$的二次剩余。
+</remark>
+
+
+Kronecker-Jacobi符号将Legendre符号推广到了所有整数的情形，并且成立以下良好的性质。
+<theorem label="th:ljk" name="Kronecker-Jacobi符号的基本性质">如下几条成立：
+ 1. $\jacobi{a}{b}=0$当且仅当$(a, b)\ne1$。
+ 2. 对任意$a, b, c\in\mathbb{Z}$，有$$\jacobi{ab}{c}=\jacobi{a}{c}\jacobi{b}{c}.$$若还有$b\ne0, c\ne0$，则$$\jacobi{a}{bc}=\jacobi{a}{b}\jacobi{a}{c}.$$
+ 3. 设$b>0$，$x$为任意整数。若$b\not\equiv2\pmod{4}$，则$$\jacobi{x+b}{b}=\jacobi{x}{b},$$若$b\equiv2\pmod{4}$，则$$\jacobi{x+4b}{b}=\jacobi{x}{b}.$$
+ 4. 设$a\ne0$，$x$为任意整数。若$a\equiv0, 1\pmod{4}$，则$$\jacobi{a}{x+|a|}=\jacobi{a}{x},$$若$a\equiv2, 3\pmod{4}$，则$$\jacobi{a}{x+4|a|}=\jacobi{a}{x}.$$
+ 5. 设$a$，$b$为正奇数，则有<index sub="Kronecker-Jacobi符号">二次互反律</index>：$$\jacobi{a}{b}\jacobi{b}{a}=(-1)^{\frac{(a-1)(b-1)}{4}},$$且$$\jacobi{-1}{b}=(-1)^{\frac{n-1}{2}},\quad \jacobi{2}{b}=(-1)^{\frac{n^2-1}{8}}.$$
+</theorem>
+
+有了如上更一般的二次互反律，我们可以得到计算Legendre-Jacobi-Kronecker符号的算法了。
+
+<algorithm label="al:ljk" name="Legendre-Jacobi-Kronecker符号">
+输入$a, b\in\mathbb{Z}$，计算$\jacobi{a}{b}$。
+ 1. 若$b=0$，输出1，算法终止；若$a$，$b$均为偶数，输出0，算法终止。
+ 2. 设$b=\varepsilon\cdot2^d\cdot b_0$，使$b_0$为正奇数。由定义直接计算$m=\jacobi{a}{\varepsilon}\jacobi{a}{2}^d$。
+ 3. 若$a=0$，由定义直接计算$m\leftarrow\jacobi{0}{b_0}\cdot m$，输出$m$，算法终止；若$a\ne0$，设$a=\epsilon\cdot2^ea_0$，$a_0$为正奇数，计算$m\leftarrow\jacobi{\epsilon}{b_0}\jacobi{2}{b_0}^e\cdot m$。
+ 4. 运用二次互反律递归地求$$\jacobi{a_0}{b_0}=\jacobi{b_0 \bmod{a_0}}{a_0}(-1)^{\frac{(a_0-1)(b_0-1)}{4}}.$$计算$m\leftarrow\jacobi{a_0}{b_0}\cdot m$，输出$m$，算法终止。
+</algorithm>
+
+<remark>
+在算法的第四步，我们保证了$a_0$为奇数，从而可以使用定理##th:ljk 的第三条。
+</remark>
+
+<remark>
+$(-1)^{\frac{a-1}{2}}$，$(-1)^{\frac{a^2-1}{8}}$和$(-1)^{\frac{(a-1)(b-1)}{4}}$均可通过位操作和查表获得，例如（$\mathtt{\&}$表示位与操作）：
+<latex>
+\begin{equation*}
+  (-1)^{\frac{(a-1)(b-1)}{4}}=
+  \begin{cases}
+    -1 & \text{若}\ \mathtt{a \& b \& 2}, \\
+    1 & \text{其它情况}.
+  \end{cases}
+\end{equation*}
+</latex>
+</remark>
+
+<remark>
+可以看出算法##al:ljk 与Euclid算法的复杂度相同，为$O(\log^2 n)$，其中$n$为$a$，$b$的一个上界，比直接用Legendre符号计算要高效一些。
+</remark>
+
+<remark>
+算法##al:ljk 中第四步也可以用类似于Binary GCD的方法，不用Euclid算法计算$\displaystyle\jacobi{b_0\bmod{a_0}}{a_0}$，而转而计算$\displaystyle\jacobi{b_0-a_0}{a_0}$，分离$b_0-a_0$中2的幂，再用二次互反律。当$a_0$，$b_0$较大时，也可采用bmod操作。
+</remark>
+
+* 中国剩余定理
+
+<index>中国剩余定理</index>是为数不多以“中国”命名的重要定理——关于交换幺环结构的经典结果。为了完整性，我们以常用的$\mathbb{Z}$上的语言叙述如下。
+
+<algorithm label="th:crt" name="中国剩余定理">
+设整数$m_i$（$i=1, \ldots, n$）两两互素，则对任意的$x_i$（$i=1, \ldots, n$），存在唯一的整数$x$（在模$M=\prod\limits_{i=1}^nm_i$的意义下），满足$x\equiv x_i\pmod{m_i}$（$i=1, \ldots, n$）。
+</algorithm>
+
+<proof>
+记$M_i=M/m_i$，则对于任意$i $，存在$a_i$，满足$a_iM_i\equiv1\pmod{m_i}$，从而$x=\sum\limits_{i=1}^na_iM_ix_i$即满足条件。唯一性是显然的。
+</proof>
+
+这个构造性的证明可以得到一个直接的中国剩余定理算法，不过如果$M_i$很大的话，直接求逆或许不那么划算，我们可以稍作改进。
+
+<algorithm>
+记号如定理##th:crt 。
+ 1. 设$p_i=m_1\cdots m_{i-1}\bmod m_i$（$i=2,\cdots,n$)，用扩展Euclid算法计算$u_i $，$v_i$使得$u_ip_i+v_im_i=1$。
+ 2. 顺次计算
+<latex>
+\begin{align*}
+  y_1&=x_1 \bmod m_1, \\
+  y_2&=(x_2 -y_1)u_2 \bmod m_2, \\
+  &\vdots \\
+  y_i&=(x_i-(y_1+m_1(y_2+m_2(y_2+\cdots m_{i-2}y_{i-1})\cdots)))u_i\bmod m_i.
+\end{align*}
+</latex>
+ 3. 输出$x=y_1+m_1(y_2+m_2(y_3+\cdots m_{n-1}y_n)\cdots)$。
+</algorithm>
+
+算法本质上是求出$x=\sum\limits_{i=1}^ny_ip_i$中的系数$y_i$，用$p_i$代替原来的$M_i$减小了求逆的复杂度。但由于需要第一步较复杂的预处理，因此更适合在$m_i$给定的情况下进行多次求解的问题。如果$m_i$总是变化的话，将$n$个方程的方程组化为$n-1$组两个方程的方程组更适合一些，也就是说先求出满足$x\equiv x_i\pmod{m_i}$（$i=1,2$）的解$x_{12}$，再求出满足
+<latex>
+\begin{equation*}
+  \left\{
+  \begin{aligned}
+    x&\equiv x_{12}\pmod{m_1m_2}, \\
+    x&\equiv x_3\pmod{m_3}.
+  \end{aligned}\right.
+\end{equation*}</latex>
+的解$x_{123}$等等，如此递推即可。
+
+* 连分数展式
+
+任一实数的（简单）连分数展式可以按照定义逐项计算（倒数、取整）。我们熟知数论中一个优美的结论：一个数的<index>连分数</index>展式为循环的当且仅当其为二次无理数（二次整系数方程的根）。代数系统中尤其关心的也是二次无理数的展式可否有高效稳定的算法（例如应用在因子分解的CFRAC方法，Pell方程的求解）。<cite no>fra63</cite>
+
+不失一般性，设$b_0=\dfrac{\sqrt{d}+p_0}{q_0}$为二次无理数，假设$q_0\mid d-p_0^2$（否则考虑$\dfrac{\sqrt{dq_0^2}+p_0|q_0|}{q_0|q_0|}$）且有连分数展式$$b_0=a_0+\dfrac{1}{b_1}=a_0+\cfrac{1}{a_1+\cfrac{1}{b_2}}=\cdots =a_0 + \cfrac{1}{a_1 + \cfrac{1}{a_2 + \cfrac{1}{a_3 + \cfrac{1}{\ddots\,}}}},$$则由定义得到$$b_i=a_i+\frac{1}{b_{i+1}}.$$设$b_i=\dfrac{\sqrt{d}+p_i}{q_i}$，则有$$\frac{\sqrt{d}+p_i}{q_i}=a_i+\frac{q_{i+1}}{\sqrt{d}+p_{i+1}}.$$比较有理部分和无理部分可知
+<latex>
+\begin{equation}
+  \left\{
+    \begin{aligned}
+      d+p_ip_{i+1}&=a_iq_iq_{i+1}+q_iq_{i+1}, \\
+      p_i+p_{i+1}&=a_iq_i.
+    \end{aligned}\right.@@eq:frac
+\end{equation}</latex>
+将式##eq:frac 的第二式乘以$p_{i+1}$减去第一式得到
+<latex>
+\begin{equation}
+  @@eq:frac2
+  d-p_{i+1}^2=q_iq_{i+1}.
+\end{equation}</latex>
+在式##eq:frac2 中以$i $代$i+1$并作差得到$$p_i^2-p_{i+1}^2=q_i(q_{i+1}-q_{i-1}).$$再由##eq:frac 中第二式可知$$a_i(p_i-p_{i+1})=q_{i+1}-q_{i-1}.$$最终得到
+<latex>
+\begin{equation*}
+  \left\{
+      \begin{aligned}
+        a_{i}&=
+        \left\lfloor
+          \frac{\sqrt{d}+p_i}{q_i}
+        \right\rfloor,\\
+        p_{i+1}&=a_iq_i-p_i, \\
+        q_{i+1}&=a_i(p_i-p_{i+1})+q_{i-1}.
+      \end{aligned}\right.
+\end{equation*}</latex>
+其中约定$q_{-1}=\dfrac{d-p_0^2}{q_0}$（利用$\dfrac{d-p_0^2}{q_0}$为整数）。
+
+<remark>
+若$q_i=1$，则$a_i=\lfloor\sqrt{d}\rfloor+p_i$，而若$q_i>1$，不难验证$a_i=\left\lfloor\dfrac{\lfloor\sqrt{d}\rfloor+p_i}{q_i}\right\rfloor$，利用整数开方算法##al:intsqrt 可以只动用整数运算来递推计算展式中的$a_{i}$。
+</remark>
+
+
+; rel:mobius
+
+* 素数计数函数$\pi(x)$
+<index name="素数计数函数$\pi(x)$"></index>
+很早人们就考虑计算小于等于$x$的素数个数$\pi(x)$的问题，并且数论中的一个基本问题便是研究$\pi(x)$的性质（例如著名的素数定理）。古希腊人有一个直接的方法：用Eratosthenes筛将所有$x$以下的素数给找出来，最后统计一下总数。根据Mertens第二定理（参考<cite>yao07</cite>），$$\sum_{p\le x}\frac{1}{p}=\ln\ln x+a+O\left(\frac{1}{\ln x}\right),$$其中$a$为常数，求和针对素数$p$。因此这种完全筛法需要的操作次数为$$\sum_{p\le \sqrt{x}}\frac{x}{p}=x\ln\ln \sqrt{x}+ax+O\left(\frac{x}{\ln \sqrt{x}}\right)=O(x\ln\ln x).$$
+
+除了直接把所有素数求出还有没有其他办法呢？可以使用组合的工具。设$p_i$代表第$i$个素数，根据容斥原理计算$x$以下的合数个数可以得到
+<latex>
+\begin{equation*}
+\begin{split}
+  1+\pi(x)-\pi(\sqrt{x})=\lfloor x\rfloor-\sum_{p_i\le\sqrt{x}}\left\lfloor \frac{x}{p_i}\right\rfloor+\sum_{p_i<p_j\le\sqrt{x}}\left\lfloor \frac{x}{p_ip_j}\right\rfloor\\-  \sum_{p_i<p_j<p_k\le\sqrt{x}}\left\lfloor \frac{x}{p_ip_jp_k}\right\rfloor+\cdots.  
+\end{split}
+\end{equation*}
+</latex>
+等式右端称为<index>Legendre和</index>。然而Lengendre和中的非零项非常多（大约有$\dfrac{6}{\pi}(1-\ln2)x$项，可参考<cite>lag85</cite>），并不适合直接应用于$\pi(x)$的计算。为了减少Legendre和中的项数，19世纪德国天文学家Meissel提出了部分筛法并正确求得了$\pi(10^8)$。1959年，<index name="Meissel-Lehmer算法"></index>Lehmer改进了Meissel的方法，并用计算机求得了$\pi(10^{10})$。1985年，<index name="Lagarias-Miller-Odlyzko算法"></index>Lagarias，Miller，Odlyzko<cite>lag85</cite>用更精细的Meissel-Lehmer方法求得了$\pi(4\times10^{16})$，1996年，Del\'eglise和Rivat<cite>del96</cite>证明了可以在$O\left(\dfrac{x^{2/3}}{\ln^2x}\right)$时间和$O(x^{1/3}\ln^3x\ln\ln x)$空间内计算$\pi(x)$，并将计算记录提高到了$\pi(10^{18})$。目前的世界纪录为分布式计算项目[[http://numbers.computation.free.fr/Constants/Primes/Pix/pixproject.html][pi(x)]]保持的$\pi(4\times10^{22})$。
+
+** 部分筛函数
+
+<index>部分筛函数</index>定义为$$\phi(x,a):=\#\{\text{正整数}~n\le x\mid n~\text{的所有素因子}>p_a\},$$再设$$P_k(x,a):=\#\{\text{正整数}~n\le x\mid n~\text{恰有}~k~\text{个素因子且所有素因子}>p_a\}.$$约定$P_0(x,a):=1$，根据定义可以得到$$\phi(x,a)=\sum_{k=0}^\infty P_k(x,a),$$其中的求和实际上是有限和，因为当$k\ge\log_{p_a}x$时$P_k(x,a)$恒为零。为了减少求和的项数，我们取$y$满足$x^{1/3}\le y\le x^{1/2}$，$a=\pi(y)$，则求和只有三项非零：
+<latex>
+\begin{align*}
+  \phi(x,a)&=P_0(x,a)+P_1(x,a)+P_2(x,a) \\
+  &=1+(\pi(x)-a)+P_2(x,a).
+\end{align*}
+</latex>
+从而$$\pi(x)=\phi(x,a)+P_2(x,a)+a-1,$$我们只需要高效地求出$\phi(x,a)$与$P_2(x,a)$即可。
+
+** 计算$P_2(x,a)$
+
+由定义（总假定$n$为正整数），$$P_2(x,a)=\#\{n\le x\mid n=pq,\text{素数}~p,q>p_a\},$$故有
+<latex>
+\begin{align*}
+  P_2(x,a)&=\sum_{y<p\le\sqrt{x}}\#\{\text{素数}~q\mid p\le q\le\frac{x}{p}\} \\
+  &=\sum_{y<p\le\sqrt{x}}\pi\left(\frac{x}{p}\right)-\pi(p)+1.
+\end{align*}
+</latex>
+由于$\dfrac{x}{p}\le x^{2/3}$，$p\le x^{1/2}$，因此可用直接用$[1, x^{2/3}]$上的完全筛法在$O(x^{2/3+\varepsilon})$时间内求得$P_2(x,a)$。
+
+** 计算$\phi(x,a)$
+
+部分筛函数最重要的组合性质之一是如下的等式$$\phi(x,a-1)=\phi(x,a)+\phi(\frac{x}{p_a},a-1),$$右边第一项的组合意义为$\phi(x,a-1)$对应的数中不含有因子$p_a$的那部分，而第二项则表示含有因子$p_a$的那部分。从而可得递推关系
+<latex>
+\begin{equation*}
+  \left\{
+    \begin{aligned}
+      \phi(x,a)&=\phi(x,a-1)-\phi(\frac{x}{p_a},a-1), \\
+      \phi(x,0)&=\lfloor x\rfloor.
+    \end{aligned}\right.
+\end{equation*}
+</latex>
+由此可画出$\phi(x,a)$的二叉树（仅画出前三层），[[images/btree.png][计算$\phi(x,a)$的二叉树]]
+递归到二叉树的叶结点最终得到
+<latex>
+\begin{equation}
+  @@eq:phixa
+\phi(x,a)=\sum_{n\le x\atop P^+(n)\le y}\mu(n)\left\lfloor\frac{x}{n}\right\rfloor,  
+\end{equation}
+</latex>
+其中$\mu(n)$为M\"obius函数，$P^+(n)$表示$n$的最大素因子。
+
+但##eq:phixa 中的求和项仍然太多，例如有三个素因子均$\le y$的数的个数为$O((x^{1/3}/\ln x^{1/3})^3)=O(x/\ln^3 x)$。因此我们需要对二叉树进行剪枝，例如可以采取如下的剪枝规则：
+ 1. $a=0$且$n\le y$；（叶结点）
+ 2. $n>y$。（层数过深）
+
+由如上的剪枝规则可得$\phi(x,a)=S_0+S$，其中$$S_0=\sum_{n\le y}\mu(n)\left\lfloor\frac{x}{n}\right\rfloor,$$
+<latex>
+\begin{equation}
+  @@eq:sums
+S=\sum_{n/P^-(n)\le y<n}\mu(n)\phi\left(\frac{x}{n},\pi(P^-(n))-1\right),  
+\end{equation}
+</latex>
+$P^- (n)$表示$n$的最小素因子。
+
+由于$n\le x^{1/2}$，$\dfrac{x}{n}\le x^{2/3}$，可以在$O(x^{2/3})$的时间内计算$S_0$。
+
+** 计算$S$
+
+设$p=P^-(n)$，$n=mp$，则$\mu(n)=-\mu(m)$且$P^-(m)>p$，式##eq:sums 变为$$S=-\sum_{p\le y}\sum_{P^-(m)>p\atop m\le y<mp}\mu(m)\phi\left(\frac{x}{mp},\pi(p)-1\right).$$可将$S$的外层求和拆为三项$S_1+S_2+S_3$，求和分别对$x^{1/3}<p\le y$，$x^{1/4}<p\le x^{1/3}$及$p\le x^{1/4}$。注意到当$p>x^{1/4}$时，若$m$非素数，由$P^-(m)>p$可知$m>p^2>x^{1/2}\ge y$，从而内层的求和为零，因此对$S_1$和$S_2$可以考虑$m$为素数$q$的情形，且此时$\mu(m)=-1$。
+
+
+** 计算$S_1$
+
+我们需要计算$$S_1=\sum_{x^{1/3}<p\le y}\,\sum_{p<q\le y}\phi\left(\frac{x}{pq},\pi(p)-1\right).$$注意到当$q>p>x^{1/3}$时，$\dfrac{x}{pq}<x^{1/3}<p$，故$\phi\left(\dfrac{x}{pq},\pi(p)-1\right)=1$。由$x^{1/3}<p<q\le y$可知$$S_1={\pi(y)-\pi(x^{1/3})\choose 2},$$可直接计算。
+
+** 计算$S_3$
+
+我们需要计算$$S_3=-\sum_{p\le x^{1/4}}\sum_{P^-(m)>p\atop m\le y<mp}\mu(m)\phi\left(\frac{x}{mp},\pi(p)-1\right).$$可以如下进行：首先用$x^{1/4}$以下的素数对$[1,\frac{x}{y}]$进行一次筛法，每次用一个素数$p_k$筛选过后，对所有$[\frac{y}{p},y]$中的无平方因子且还没有被之前素数筛出的的$m$累加$\mu(m)\phi\left(\frac{x}{mp},\pi(p)-1\right)$（这些值可在前面量的计算过程中进行保存）。由于$m\le y$，$p\le x^{1/4}$，计数过程的时间复杂度为$O(yx^{1/4})$。
+
+** 计算$S_2$
+
+我们需要计算$$S_2=\sum_{x^{1/4}<p\le x^{1/3}}\,\sum_{p<q\le y}\phi\left(\frac{x}{pq},\pi(p)-1\right).$$注意到当$q>\dfrac{x}{p^2}$时，有$\dfrac{x}{pq}<p$，从而$\phi(\frac{x}{pq},\pi(p)-1)$恒为1。从而可将内层的求和分为$q>\dfrac{x}{p^2}$与$q\le\dfrac{x}{p^2}$两段，记为$S_2=U+V$。立即可知
+<latex>
+\begin{align*}
+  U&=\sum_{x^{1/4}<p\le x^{1/3}}\#\{\text{素数}~q\mid \frac{x}{p^2}<q\le y\} \\
+  &=\sum_{x^{1/4}<p\le x^{1/3}}\pi(y)-\pi(\frac{x}{p^2}).
+\end{align*}
+</latex>
+由于$\dfrac{x}{p^2},y\le\sqrt{x}$，因此可以通过完全筛法在$O(x^{1/2+\varepsilon})$时间内求得$U$。
+
+** 计算$V$
+
+此时有$q\le \dfrac{x}{p^2}$，即$p\le\dfrac{x}{pq}<x^{1/2}<p^2$，从而
+<latex>
+\begin{align*}
+  \phi\left(\frac{x}{pq},\pi(p)-1\right)&=P_0\left(\frac{x}{pq},\pi(p)-1\right)+P_1\left(\frac{x}{pq},\pi(p)-1\right) \\
+  &=1+\pi\left(\frac{x}{pq}\right)-(\pi(p)-1) \\
+  &=2-\pi(p)+\pi\left(\frac{x}{pq}\right).
+\end{align*}
+</latex>
+因此有
+<latex>
+\begin{align*}
+  V&=\sum_{x^{1/4}<p\le x^{1/3}}\sum_{p<q\le y\atop q\le x/p^2}(2-\pi(p))+\sum_{x^{1/4}<p\le x^{1/3}}\sum_{p<q\le y\atop  q\le x/p^2}\pi\left(\frac{x}{pq}\right) \\
+  &=:V_1+V_2.
+\end{align*}
+</latex>
+由于$p\le x^{1/3}$，$V_1$可以通过之前的筛法结果直接求得。
+
+** 计算$V_2$
+
+我们需要计算$$V_2=\sum_{x^{1/4}<p\le x^{1/3}}\sum_{p<q\le y\atop  q\le x/p^2}\pi\left(\frac{x}{pq}\right).$$这里求和的项数非常之多，因此也是算法中最复杂的部分。首先简化关于$q$的两个限制，改写为$$V_2=\sum_{x^{1/4}<p<\sqrt{\frac{x}{y}}}\,\sum_{p<q\le y}\pi\left(\frac{x}{pq}\right)+\sum_{\sqrt{\frac{x}{y}}<p<x^{1/3}}\,\sum_{p<q\le y}\pi\left(\frac{x}{pq}\right).$$将内外层求和分为五段，分别记为（省去求和项）
+<latex>
+\begin{align*}
+  W_1&=\sum_{x^{1/4}<p\le\frac{x}{y^2}}\ \sum_{p<q\le y}, \\
+  W_2&=\sum_{\frac{x}{y^2}<p\le\sqrt{\frac{x}{y}}}\ \sum_{p<q\le\sqrt{\frac{x}{p}}}, \\
+  W_3&=\sum_{\frac{x}{y^2}<p\le\sqrt{\frac{x}{y}}}\ \sum_{\sqrt{\frac{x}{p}}<q\le y}, \\
+  W_4&=\sum_{\frac{x}{y^2}<p\le x^{1/3}}\ \sum_{p<q\le\sqrt{\frac{x}{p}}}, \\
+  W_5&=\sum_{\frac{x}{y^2}<p\le x^{1/3}}\ \sum_{\sqrt{\frac{x}{p}}<q\le \frac{x}{p^2}}.
+\end{align*}
+</latex>
+
+$W_1$，$W_2$中的求和项满足$y<\frac{x}{pq}<x^{1/2}$，可以通过的筛法结果进行计算，而$W_3$，$W_4$，$W_5$只能“老老实实”地通过求和进行计算了。由于$W_3$与$W_5$中当固定$p$遍历时$\pi\left(\frac{x}{pq}\right)$变化不大，因此可以做一个略微的改进：通过查表来确定下一个$\pi\left(\frac{x}{pq}\right)$值改变的$q$，从而减小计算量。至此我们已经得到了计算$\pi(x)$的完整算法。
+
+<remark>
+1987年Lagarias和Odlyzko<cite>lag87</cite>提出了完全不同的分析方法来计算$\pi(x)$，方法基于对Riemann $\zeta$函数的积分变换的数值积分，其中一个版本的算法需要$O(x^{3/5+\varepsilon})$时间与$O(x^{\varepsilon})$空间，另一个版本的算法需要$O(x^{1/2+\varepsilon})$时间与$O(x^{1/4+\varepsilon})$空间。但目前为止还没有被真正实现，并且估计在$10^{17}$以下还是要比Lagarias-Miller-Odlyzko方法慢。
+</remark>
+
+<remark>
+Gourdon<cite>gou01</cite>在2001年提出了一个新的改进方法（主要是针对$V_2$的计算），并给出了可行的并行化算法。
+</remark>
+
+
+* 第$n$个素数$p_n$
+
+相对对给定的数进行素性判定来说，给出第$n$个素数是更为困难的事情，对于很大的$n$来说，纯粹使用素性检测挨个找素数，或者利用筛法找出所有素数，都不切实际。不过我们已经知道$\pi(n)$如何计算，而$p_n$在某种意义上是$\pi(n)$的“反函数”（$\pi(p_n)=n$，$p_{\pi(n)}\le n$且当$n$为素数时等号成立），我们利用这一点可以反过来计算$p_n$。
+
+Lehmer<cite>leh32</cite>提出了一个一般的求此类“逆函数”的算法，他考虑迭代$$S_k=S_{k-1}+n-\pi(S_{k-1}),$$取适当的初值$S_0<\pi(n)$，容易看出$S_k$严格单调递增，直到$S_k=\pi(n)$后恒为常数。然而此迭代过程收敛过慢，例如求$n=1000$时的$p_n=7919$，取$S_0=7000$仍需要49步迭代。
+
+我们可以考虑二分搜索的办法，估计一个区间范围$[a,b]$使得$p_n$落在其中，（可通过计算$\pi(a)\le n\le\pi(b)$来确证）。然后二分区间$[a,b]$为$[a,\lfloor\frac{a+b}{2}\rfloor]$，$[\lfloor\frac{a+b}{2}\rfloor,b]$，并计算$\pi(\lfloor\frac{a+b}{2}\rfloor)$判断$p_n$落在哪一个子区间中，如此续行，最终搜索出$p_n$的位置。
+
+* M\"obius函数$\mu(n)$和Euler函数$\varphi(n)$
+
+<index>M\"obius函数$\mu(n)$</index>和<index>Euler函数$\varphi(n)$</index>均为重要的数论函数。M\"obius函数定义为
+<latex>
+\begin{equation*}
+  \mu(n)=
+  \begin{cases}
+    0 & \text{若}~n~\text{有平方因子}, \\
+    1 & \text{若}~n=1, \\
+    (-1)^k & \text{若}~n~\text{为}~k~\text{个不同素因子的乘积}.
+  \end{cases}
+\end{equation*}
+</latex>
+Euler函数定义为$$\varphi(n)=n\prod_{p\mid n}(1-\frac{1}{p}).$$
+
+可以用类似于计算$\pi(x)$的方法计算$M(n)=\sum\limits_{k=1}^n\mu(k)$，从而反求出$\mu(n)$（参见<cite>del96m</cite>）。这种组合方法的时间复杂度为$O(x^{2/3+\varepsilon})$，但实践中未必比直接对$n$分解根据定义计算更优，因为就算$n$很大（例如$n>10^{20}$），往往也有机会可以快速地分解，然而组合方法则由于规模太大而无法使用。
+
+对于Euler函数，我们熟知理论上重要的<index>反演公式</index>$$\varphi(n)=\sum_{d\mid n}\mu(d)\cdot\frac{n}{d},$$但同样无法直接用于$\varphi(n)$的计算。实践中宜直接采取分解并根据定义计算的方法。
+

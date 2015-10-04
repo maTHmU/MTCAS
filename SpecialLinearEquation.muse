@@ -1,0 +1,419 @@
+#title 特殊线性方程组
+
+<contents>
+
+数值分析的一个基本原则是:求解任何问题都应充分利用它的特殊的结构特性.在数值线性代数中,这意味着当问题中出现诸如对称性,定型性和稀疏性等特性时,需要将适用于求解一般矩阵的算法修改,使其效率更高.这将是本章的主题.我们的主要目的是设计一些特殊的$LU$分解的专用算法.
+
+* $LDM^T$和$LDL^T$分解
+
+由前述$LU$分解容易证明以下的$LDM^T$分解定理:
+
+<theorem>如果$A\in\mathbb{R}^{n\times n}$的所有顺序主子阵都是非奇异的,则存在唯一的单位下三角阵$L$和$M$和唯一的对角阵$D=\mathrm{diag}\{d_1,\cdots,d_n\}$满足$A=LDM^T$.
+</theorem>
+
+
+特别地,在$A$为对称方阵的情形,成立以下$LDL^T$分解:
+<theorem>
+如果$A=LDM^T$是非奇异对称阵$A\in\mathbb{R}^{n\times n}$的$LDM^T$分解,则$L=M$.
+</theorem>
+
+由以上定理可知,对对称阵施行$LU$或$LDL^T$分解时,工作量可减半.在第$j $步,由于$M=L$且假定$L$的前$j-1$列已知,则$L(j,1:j-1)$也为已知.定义$v(1:j)$为$DL^Te_j$的前$j $个分量,则
+<latex>
+\begin{equation*}
+  v(1:j)=
+  \begin{bmatrix}
+    d(1)L(j,1)\\
+    \vdots\\
+    d(j-1)L(j,j-1)\\
+    d(j)
+  \end{bmatrix}.
+\end{equation*}
+</latex>于是,向量$v(1:j-1)$可通过对$L$的第$j $行做简单数乘得到.由$L(1:j,1:j)v=A(1:j,j)$的第$j $个方程,有关系式$v(j)=A(j,j)-L(j,1:j-1)v(1:j-1)$.
+
+相应地有以下算法:
+<algorithm  name="$LDL^T$">
+如果$A\in\mathbb{R}^{n\times n}$对称且存在$LDL^T$分解,则本算法计算单位下三角阵$L$和对角阵$D $,其元素覆盖$A$.
+<latex>
+\begin{align*}
+  \label{eq:LDLT}
+  &\text{在算法的第}j\text{步,计算}v(1:j).\\
+  &\text{由}v(j)=A(j,j)-L(j,1:j-1)v(1:j-1)\text{计算}v(1:j).\\
+  &A(j,j)\leftarrow v(j).\\
+  &A(j+1:n,j)\leftarrow (A(j+1:n,j)-A(j+1:n,1:j-1)v(1:j-1))/v(j).
+  \end{align*}
+</latex>
+</algorithm>
+
+本算法大约减少了一半的工作量,需要$n^3/2$个flop.可以证明,当$A$对称且正定时,以上算法不但能够顺利执行完,而且非常稳定<cite>??</cite>.如果$A$对称但非正定,则需要结合对称地选主元,即在算法的第$j $步比较$A(j:n,j:n)$得到其中绝对值最大的元素并通过置换阵$P$的对称作用$A\leftarrow P^TA^TP$将其换到$A(j,j)$位置,使之后的算法稳定执行.
+
+* Cholesky分解
+
+<definition  name="正定矩阵">
+若对所有非零向量$x\in\mathbb{R}^n$有$x^TAx>0$,则称矩阵$a\in\mathbb{R}^{n\times n}$是正定的.
+</definition>
+
+可以证明,若$A$是正定的,则在$A$的分解$A=LDM^T$中,$D$的对角元均大于$0$.然而,仅仅存在$LDM^T$分解仍不足以保证分解算法的稳定性.
+
+以下着重介绍对称正定阵的Cholesky分解.
+
+<theorem  name="Cholesky分解">
+如果$A\in \mathbb{R}^{n\times n}$是对称正定的,则存在唯一的一个对角元大于$0$的下三角阵$G\in \mathbb{R}^{n\times n}$,满足$A=GG^T$.
+</theorem>
+<proof>
+由$LDL^T$分解及$A$的正定性容易得到$D $对角元大于$0$,从而得到本定理.
+</proof>
+
+我们下面导出一个含有大量Gaxpy运算的Cholesky分解算法.比较等式$A=GG^T$的第$j $列得到
+<latex>
+\begin{equation*}
+  A(:,j)=\sum\limits_{k=1}^nG(j,k)G(:,k),
+\end{equation*}
+</latex>也就是说,
+<latex>
+\begin{equation*}
+  G(j,j)G(:,j)=A(:,j)-\sum\limits_{k=1}^{j-1}G(j,k)G(:,k)\equiv v.
+\end{equation*}
+</latex>如果$G$的第$j-1$列已知,则可计算出$v$.由上式中各元素间的相等关系推出
+<latex>
+\begin{equation*}
+  G(j:n,j)=v(j:n)/\sqrt{v(j)}.
+\end{equation*}
+</latex>
+于是得到以下算法:
+<algorithm  name="Cholesky分解:基于Gaxpy运算">
+给出对称正定阵$A\in \mathbb{R}^{n\times n}$,本算法计算出一个下三角阵$G\in \mathbb{R}^{n\times n}$满足$A=GG^T$.对所有$i\geqslant j$,$G(i,j)$覆盖$A(i,j)$.
+
+<latex>
+\begin{align*}
+  &A(1:n,1)\leftarrow A(1:n,1)/\sqrt{A(1,1)}.\\
+  &\text{对}j>1,\text{通过以下步骤计算}G(j:n,j)\text{并覆盖}A(j:n,j):\\
+  &A(j:n,j)\leftarrow A(j:n,j)-A(j:n,1:j-1)A(j,1:j-1)^T.
+\end{align*}
+</latex>
+</algorithm>
+
+本算法共需$n^3/2$个flop.这一算法在$A$正定时相当稳定.
+
+* Vandemonde方程组
+
+Vandemonde方程组与下一节将要讲到的正定对称的Toeplitz阵问题是两类重要的能在$O(n^2)$的计算量内稳定求解的问题.
+
+设$x(0:n)\in \mathbb{R}^{n+1}$,形如
+<latex>
+\begin{equation*}
+  V=V(x_0,\cdots,x_n)=
+  \begin{bmatrix}
+    1& 1& \cdots& 1\\
+    x_0& x_1& \cdots& x_n\\
+    \vdots& \vdots& & \vdots\\
+    x_0^n& x_1^n& \cdots & x_n^n
+  \end{bmatrix}
+\end{equation*}
+</latex>的矩阵$V\in \mathbb{R}^{(n+1)\times(n+1)}$被称作Vandemonde矩阵.下面我们讨论线性方程组$V^Ta=f$及$Vx=b$的求解.
+
+Vandemonde矩阵与多项式插值有密切的联系.首先注意到,若有$V^Ta=f$,并定义$p(x)=\sum\limits_{j=0}^na_jx^j$,则对于$i=0:n$,$p(x_i)=f_i$.故若$x_i$是互异的,则可通过构造插值多项式$p(x)$求解.
+
+第一步是计算插值多项式$p$的Newton表达式:
+<latex>
+\begin{equation*}
+  p(x)=\sum\limits_{k=0}^nc_k \left(\prod\limits_{i=0}^{k-1} (x-x_i)\right),
+\end{equation*}
+</latex>常数$c_k$是差商,可按以下步骤确定:
+<latex>
+\begin{align*}
+  &c(0:n)\leftarrow f(0:n).\\
+  &\text{for } k=0:n-1\\
+  &~~~~\text{for } i=n:-1:k+1\\
+  &~~~~~~~~c_i\leftarrow (c_i-c_{i-1})/(x_i-x_{i-k-1}).\\
+  &~~~~\text{end}\\
+  &\text{end}
+\end{align*}
+</latex>
+下一步是由$c(0:n)$产生$a(0:n)$.通过迭代
+<latex>
+\begin{align*}
+  &p_n(x)\leftarrow c_n,\\
+  &\text{for } k=n-1:-1:0\\
+  &~~~~p_k(x)\leftarrow c_k+(x-x_k)p_{k+1}(x).\\
+  &\text{end}
+\end{align*}
+</latex>来定义多项式$p_k(x) (x=n:-1:0)$.可求得$p(x)\equiv p_0(x)$.于是系数$a_i\equiv a_i^{(0)}$可如下求得
+<latex>
+\begin{align*}
+  &a(0:n)\leftarrow c(0:n),\\
+  &\text{for } k=n-1:-1:0\\
+  &~~~~\text{for } i=k:n-1\\
+  &~~~~~~~~a_i\leftarrow a_i-x_ka_{i+1}.\\
+  &~~~~\text{end}\\
+  &\text{end}
+\end{align*}
+</latex>
+以上两步骤合并即得到求解$V^Ta=f$的算法,共需$5n^2/2$个flop.
+
+该算法事实上即多项式插值问题的一般算法.它事实上利用了如下分解
+<latex>
+\begin{equation*}
+  (V^T)^{-1}=L^TU^T= (L_0(x_0)^T \cdots L_{n-1}(x_{n-1})^T) (D_{n-1}^{-1}L_{n-1} (1)\cdots D_0^{-1}L_0 (1)),
+\end{equation*}
+</latex>其中
+<latex>
+\begin{displaymath}
+L_k (\alpha)=
+\left[\begin{array}{c|c}
+    I_k& O\\
+    \hline\\
+    O&
+    \begin{matrix}
+      1& \cdots& & O\\
+      -\alpha& \ddots\\
+      \vdots& \ddots& \ddots\\
+      0& \cdots&\ -\alpha& 1
+    \end{matrix}
+  \end{array}\right],
+\end{displaymath}
+\begin{equation*}
+  D_k=\mathrm{diag} (\underbrace{1,\cdots, 1}_{k+1},x_{k+1}-x_0,\cdots,x_n-x_{n-k-1}).
+\end{equation*}
+</latex>于是对于方程组$Vz=b$,只要利用$V^{-1}=UL$即可得到其三角阵分解,从而求解方程组.
+
+* 对称正定Toeplitz阵及相关问题
+
+设$T\in \mathbb{R}^{n\times n}$,存在$r_{-n+1},\cdots,r_0,\cdots,r_{n-1}$对所有$i$和$j$满足$a_{ij}=r_{j-i}$,则$T$称为Toeplitz阵.Toeplitz阵属于一个更大的反向对称(persymmetric)矩阵类 (即沿反对角线进行"转置"不改变).容易验证,Toeplitz阵及非奇异Toeplitz阵的逆也是反向对称的.本节将利用这一特性给出对称正定Toeplitz阵的$O(n^2)$的算法.不失一般性,以下均设$r_0=1$.
+
+** Yule-Walker问题的Durbin算法
+
+Yule-Walker问题是系数矩阵为Toeplitz阵$T_n$,非齐次项$-r=- (r_1,\cdots,r_n)^T$的线性方程组$T_ny=-r$.可以看到,这种问题具有很大的特殊性,即它的非齐次项与系数矩阵有密切关系,但它是进一步讨论的基础.设我们已经求解了$k$阶的Yule-Walker方程组$T_ky=-r=- (r_1,\cdots,r_k)$.下面给出如何在$O(k)$内求解$(k+1)$阶Yule-Walker方程组,其中$E_k$为$k$阶反向置换阵:
+<latex>
+\begin{equation*}
+  E_k=
+  \begin{bmatrix}
+    & & 1\\
+    & \adots& \\
+    1& & 
+  \end{bmatrix}
+\end{equation*}
+</latex>
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    T_k& E_kr\\
+    r^TE_k& 1
+  \end{bmatrix}
+  \begin{bmatrix}
+    z\\
+    \alpha
+  \end{bmatrix}
+=-
+\begin{bmatrix}
+  r\\
+  r_{k+1}
+\end{bmatrix}.
+\end{equation*}
+</latex>
+注意到
+<latex>
+\begin{gather*}
+  z=T_k^{-1} (-r-\alpha E_kr)=y-\alpha T_k^{-1}E_kr,\\
+\alpha=-r_{k+1}-r^TE_kz,
+\end{gather*}
+</latex>由于$T_kE_k=E_kT_k$,故有
+<latex>
+\begin{equation*}
+  z=y-\alpha E_kT_k^{-1}r=y+\alpha E_ky.
+\end{equation*}
+</latex>代入$\alpha$表达式
+<latex>
+\begin{equation*}
+  \alpha=-r_k-r^T (y+\alpha E_ky)=- (r_{k+1}+r^TE_ky)/(1+r^Ty),
+\end{equation*}
+</latex>其中$\beta\equiv 1+r^Ty$是大于$0$的,因Toeplitz阵$T_{k+1}$为正定的:
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    I& E_ky\\
+    0& 1
+  \end{bmatrix}
+^T
+\begin{bmatrix}
+  T_k& E_kr\\
+  r^TE_k& 1
+\end{bmatrix}
+\begin{bmatrix}
+  I& E_ky\\
+  0& 1
+\end{bmatrix}
+=
+\begin{bmatrix}
+  T_k& \\
+  & 1+r^Ty
+\end{bmatrix}.
+\end{equation*}
+</latex>进一步利用$\beta^{(k)}=1+ (r^{(k)})^Ty^{(k)}= (1-\alpha_{k-1}^2)\beta_{k-1}$,即得到完整的Durbin算法,需$2n^2$个flop.
+
+** 一般右端向量的Levinson算法
+
+可以用类似方法求解右端为任意向量的Toeplitz方程组$T_nx=b$.
+
+假设已解出$k$阶Toeplitz方程组$T_kx=b= (b_1,\cdots,b_k)^T$,现需求解
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    T_k& E_kr\\
+    r^TE_k& 1
+  \end{bmatrix}
+  \begin{bmatrix}
+    v\\
+    \mu
+  \end{bmatrix}
+=
+\begin{bmatrix}
+  b\\
+  b_{k+1}
+\end{bmatrix},
+\end{equation*}
+</latex>同时假定$k$阶Yule-Walker方程组$T_ky=-r$的解也已得到.由$T_kv+\mu I_kr=b$可知
+<latex>
+\begin{gather*}
+  v=T_k^{-1} (b-\mu E_kr)=x-\mu T_k^{-1}E_kr=x+\mu E_ky,\\
+  \mu=b_{k+1}-r^TE_kv= (b_{k+1}-r^TE_kx)/ (1+r^Ty).
+\end{gather*}
+</latex>这样,我们可在$O(k)$个flop内完成$k+1$阶方程组的求解.全部算法共需$4n^2$个flop.
+
+** 正定对称Toeplitz阵求逆Trench算法
+
+对称正定的Toeplitz阵$T_n$的最令人吃惊的性质之一是它的逆可以在$O(n^2)$个flop内算出.为了得到这个算法,我们将$T_n^{-1}$做如下划分:
+<latex>
+\begin{equation*}
+  T_n^{-1}=
+  \begin{bmatrix}
+    A& Er\\
+    r^TE& 1
+  \end{bmatrix}
+^{-1}=
+\begin{bmatrix}
+  B& v\\
+  v^T& \gamma
+\end{bmatrix},
+\end{equation*}
+</latex>由
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    A& Er\\
+    r^TE 1
+  \end{bmatrix}
+  \begin{bmatrix}
+    v\\
+    \gamma
+  \end{bmatrix}
+=
+\begin{bmatrix}
+  0\\ 1
+\end{bmatrix}
+\end{equation*}
+</latex>得到
+<latex>
+\begin{gather*}
+  Av=-\gamma Er,\\
+  \gamma=1-r^TEv.
+\end{gather*}
+</latex>若$y$是$n-1$阶Yule-Walker方程组$Ay=-r$的解,则
+<latex>
+\begin{gather*}
+  \gamma=1/(1+r^Ty),\\
+  v=\gamma Ey.
+\end{gather*}
+</latex>于是我们得到了$T_n^{-1}$的最后一列.
+
+因为$AB+Erv^T=I_{n-1}$,故$B=A^{-1}- (A^{-1}Er)v^T=A^{-1}+vv^T/\gamma$.由于$A=T_{n-1}$是非奇异的Toeplitz阵,其逆是反向对称的,于是
+<latex>
+\begin{equation*}
+\begin{split}
+  b_{ij}&= (A^{-1})_{ij}+\frac{v_iv_j}{\gamma}\\
+  &= (A^{-1})_{n-j,n-i}+\frac{v_iv_j}{\gamma}\\
+  &= b_{n-j,n-i}-\frac{v_{n-j}v_{n-i}}{\gamma}+\frac{v_iv_j}{\gamma}\\
+  &=b_{n-j,n-i}-\frac{1}{\gamma} (v_iv_j-v_{n-j}v_{n-i}),
+\end{split}
+\end{equation*}
+</latex>于是我们可以"从外向里"地确定$B $,以$6$阶矩阵为例形象地描述如下:
+
+假定$T_n^{-1}$的最后一行和最后一列已知
+<latex>
+\begin{equation*}
+  T_n^{-1}=
+  \begin{bmatrix}
+    *& *& *& *& *& k\\
+    *& *& *& *& *& k\\
+    *& *& *& *& *& k\\
+    *& *& *& *& *& k\\
+    *& *& *& *& *& k\\
+    k& k& k& k& k& k
+  \end{bmatrix},
+\end{equation*}
+</latex>这里$*$和$k$分别代表未知元素和已知元素.交替利用$T_{n-1}^{-1}$的反向对称性和前述递推式,可求出$(n-1)\times(n-1)$的顺序子块$B$如下:
+
+<latex>
+\begin{gather*}
+  \underrightarrow{\text{反向对称}}
+  \begin{bmatrix}
+    k& k& k& k& k& k\\
+    k& *& *& *& *& k\\
+    k& *& *& *& *& k\\
+    k& *& *& *& *& k\\
+    k& *& *& *& *& k\\
+    k& k& k& k& k& k
+  \end{bmatrix}
+\underrightarrow{\text{递推关系}}
+\begin{bmatrix}
+  k& k& k& k& k& k\\
+  k& *& *& *& k& k\\
+  k& *& *& *& k& k\\
+  k& *& *& *& k& k\\
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k
+\end{bmatrix}\\
+\underrightarrow{\text{反向对称}}
+\begin{bmatrix}
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k\\
+  k& k& *& *& k& k\\
+  k& k& *& *& k& k\\
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k
+\end{bmatrix}
+\underrightarrow{\text{递推关系}}
+\begin{bmatrix}
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k\\
+  k& k& *& k& k& k\\
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k
+\end{bmatrix}\\
+\underrightarrow{\text{反向对称}}
+\begin{bmatrix}
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k\\
+  k& k& k& k& k& k
+\end{bmatrix}.
+\end{gather*}
+</latex>
+当然,当求解一个既对称又反对称的矩阵时,只需求解矩阵的"上楔形"即可,即
+<latex>
+\begin{equation*}
+\begin{matrix}
+  *& *& *& *& *& *\\
+   & *& *& *& *\\
+   &  & *& *
+\end{matrix}
+(n=6).
+\end{equation*}
+</latex>
+由以上分析,不难得到对于$n$阶正定对称Toeplitz阵的求逆算法,称为Trench算法.它需要$13n^2/4$个flop.
+
+Cybenko(1978)年对上述各算法做了误差分析,认为其稳定性与Cholesky方法相当.
+
+最后指出,以上两节涉及到的Vandermonde矩阵和Toeplitz矩阵与快速Fourier变换(FFT)有密切的关系，使得特定形式的矩阵与向量乘法可以FFT速度计算。可参见<cite>GolVan01</cite>和<cite>Van92</cite>.

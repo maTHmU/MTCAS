@@ -1,0 +1,892 @@
+#title 代数方程组求解
+
+<contents>
+
+本章名为<index>代数方程组</index>的求解,所以我们将从求解代数方程组的角度来引出一系列概念和算法.根据我们从解线性方程组得到的经验,我们需要发展一套消元方法,以使将方程组化为类似于三角阵的形状,这样引出两种算法.一是吴文俊院士于上世纪七十年代为实现几何定理机器证明而提出的<index>吴方法</index>,它不仅能进行机器证明,同时特征列是一种三角列,也可以用于代数方程组的求解.另外一种是<index>Gr\"obner基</index>方法,它除了将多项式组化为三角形的基可用于解方程外,还可用于多项式理想的计算等.
+
+如果只从几何证明的角度,吴方法无疑比Gr\"obner基要高效很多,正是如此,吴方法在几何证明领域中在世界上都是十分有名的.然而,吴方法毕竟相当于一种不完全的约化,其除法用的是伪除法,因而在解方程、多项式理想计算等方面不如Gr\"obner基方法.
+
+另外,由高等代数学<cite>ZhaXu04</cite>我们知道还可以利用结式的计算来进行消元,这一过程及其理论本身比较简单,因此本章第一节我们先介绍<index>结式消元</index>法,第二节和第三节分别介绍吴方法和Gr\"obner基.
+
+在介绍消元方法之前,我们简单说明一下多元方程组求解的思路.首先经过消元方法,将问题化为一元方程,利用上一章介绍的各种数值方法和精确求解方法可以分别求解.这里值得一提的是如果要求精确解,设$n$个变元为$x_1,x_2,\ldots,x_n$,一般我们将方程组消元$n$次,每次化为只含其中某一变元$x_i$的一元方程,以此求出$x_i$的精确解.实际中,我们有可能对每个$x_i$都求出了一系列的解,剩下的任务是将它们搭配成$n$元序对,即原方程组的解.如果是根式解或单位根,我们可以很容易地用一定精度的数值方法来搭配.如果没有根式解或不是单位根,一般情况下我们表示代数数的方法是用极小多项式$f$(或者化零多项式)和$i$表示$f$的第$i$个根(我们可以自己规定一种根的排序).于是配对的过程可以用数值方法,即在一定精度数值求解此根,或者用区间隔离的方法,将区间分得足够小来逼近根,用区间算术代替根的运算以搭配.我们举一个简单的例子来说明:
+
+<latex>
+\begin{equation*}
+\begin{cases}
+x^2+y^2-1&=0\\
+x^2-2x+y^2-2y+1&=0
+\end{cases}
+\end{equation*}
+</latex>
+
+消元方法给出$x^2-x=0$和$y^2-y=0$,因此$x=0,1$且$y=0,1$,我们需要将$2\times 2$共四种情况进行搭配,当然,这里举的例子很简单,更多的情况下解为复杂的根式或者为一高次不可约方程的某个根.我们很容易搭配出两组解$(x,y)=(0,1)$或$(1,0)$.
+
+* 结式
+
+我们所说的结式一般都是指Sylvester结式,利用结式进行消元基于我们以前提过的一个命题(见推论##cor:resultantforeq ),现在重述如下:
+
+<theorem>
+设$R$是UFD,且有非零多项式$f,g\in R[x]$,则$\gcd(f,g)$非平凡当且仅当$\mathrm{res}(f,g)=0$.
+</theorem>
+
+现在我们考虑一个二元多项式方程组.设$f,g\in\mathbb{C}[x,y]=\mathbb{C}[y][x]$,我们可以把它们看成$\mathbb{C}[y]$上关于$x$的一元多项式.那么利用上面的定理,我们有$\gcd_x(f,g)$非平凡当且仅当$\mathrm{res}_x(f,g)=0$.现在我们要求它们的公共根,不妨设$x_0$是其一根,则有$(x-x_0)|\gcd_x(f,g)$,故有关于$y$的方程
+$$\mathrm{res}_x(f,g)=0.$$
+由此,我们实际上进行了消元,将方程组化为一个只含有$y$的方程.
+
+事实上,我们可以将这种消元方法推广到$n$个变元的情形.设变元分别为$x_1,x_2,\ldots,x_n$,则我们首先可以从$n$个方程中取出$(n-1)$对方程,两两用结式法消去$x_1$,之后得到$(n-1)$个关于$x_2,\ldots,x_n$的方程,再将此过程递归做下去,最终可求出方程的解.
+
+<problem label="ex:resultantelimination">
+考虑多项式方程组
+<latex>
+\begin{equation*}
+\begin{cases}
+f_1(x,y,z)=x^2+y^2+z^2-1=0,\\
+f_2(x,y,z)=x+y+z=0,\\
+f_3(x,y,z)=x^2-2x+y^2-2y+z^2+2z=0.
+\end{cases}
+\end{equation*}
+</latex>
+计算得
+$$f_4=\mathrm{res}_z(f_1,f_2)=2x^2+2xy+2y^2-1,$$
+$$f_5=\mathrm{res}_z(f_2,f_3)=2x^2+2xy+2y^2-4x-4y,$$
+可见变元$z$已被消去,再计算上面二式关于$y$的结式可将$y$消去:
+$$f_6=\mathrm{res}_y(f_4,f_5)=4(16x^2-4x-7).$$
+于是得到一元方程$16x^2-4x-7=0$.
+</problem>
+
+* <index>吴方法</index>
+
+** 一些基本概念
+
+吴方法也称为特征列方法,这原本是由J. F. Ritt 在他的关于微分代数的工作中引入, 上个世纪70年代末,吴文俊在建立几何定理机器证明时大大发展了这一领域.它同Gr\"obner基类似,也是一种消元方法,在几何定理证明,代数方程求解等方面均有很重要的应用.关于吴方法,可以参考<cite>wangdongming</cite>,<cite>zsg05</cite>,也可见吴文俊本人的著作<cite>wwj84</cite>4.3节.
+
+下面设$k$是一特征为0的域,$k[X]=k[x_1,\ldots,x_n]=R$,并取字典序为$x_1<x_2<\cdots<x_n$.
+
+<definition>
+对于单项式$t$,记$t$中含$x_i$最大的下标$i$为$p$,定义它的类$\cl{t}=p$.即$$\cl{t}=p=\max\{i:x_i|t\},$$其中非0常数的类定义为0.
+</definition>
+
+<definition>
+对于多项式$f\in R$,定义其类为$\cl{f}=\cl{\lt{f}}$.
+</definition>
+
+<definition>
+定义一种全序关系$<\subset R\times R$,对于$f,g\in R$,称$f<g$如果下列条件之一满足:
+
+ 1. $\cl{f}<\cl{g}$,
+
+ 2. $\cl{f}=\cl{g}=p>0\wedge\deg_pf<\deg_pg$.
+
+若$f\not<g\wedge g\not<f$,则称$f$和$g$级别相同,记作$f\sim g$.
+</definition>
+
+<remark>
+若$f<g$,则$\lt{f}<\lt{g}$.反之则不然,例如$f=x_1x_2^2x_3$,$g=x_1^2x_3$级别相同.
+</remark>
+
+<remark>
+这样的序不仅是全序,而且是良序.
+</remark>
+
+<definition>
+设$\cl{f}=p>0$,若$\deg_pg<\deg_pf$,则称$g$对$f$是约化的,记为$g\red{f}$.
+</definition>
+
+<remark>
+若$g<f$,则显然$g\red{f}$.但当$g\red{f}$时,不一定有$g<f$.例如$g=x_1x_3$,$f=x_2$.
+</remark>
+
+下面记$\cl{f}=p>0$,且$$f=f_0x_p^m+f_1x_p^{m-1}+\cdots+f_m,$$ $$g=g_0x_p^M+g_1x_p^{M-1}+\cdots+g_M,$$ 首先
+
+<definition>
+$f_0\in k[x_1,x_2,\ldots,x_{p-1},x_{p+1},\ldots,x_n]$称为$f$的<index>初式</index>.
+</definition>
+
+当$g$相对$f$不约化时,即$M>m$,我们可由下面定义的伪除法将其约化.
+
+<definition>
+$\exists s\in\mathbb{N}$使得$f_0^sg=qf+r$,其中$r\red{f}$.将$g$化为$r$的过程称为约化,此处$s$宜取$M-m+1$.
+</definition>
+
+** 升列
+
+我们引入一系列的定义.
+
+<definition>
+多项式序列$F=\{f_1,f_2,\ldots,f_r\}$称为<index>升列</index>(ascending set),若下列条件之一满足:
+
+ 1. $r=1$且$f_1\neq 0$,
+
+ 2. $r>1$,且$0<\cl{f_1}<\cl{f_2}<\cdots<\cl{f_r}$,且$\forall j>i$,有$f_j\red{f_i}$.
+</definition>
+
+由升列的定义我们知道升列的项数$r$必然不大于未定元个数$n$.
+
+<definition>
+升列称为<index>矛盾列</index>,如果升列只由一个非零常数组成.矛盾列构成的多项式方程组是无解的.
+</definition>
+
+<definition>
+设$F$是升列,对多项式$g\in R$,若$\forall f\in F$有$g\red{f}$,则称$g$相对于$F$是约化的,记为$g\red{F}$.
+</definition>
+
+<definition>
+定义升列上的全序关系$\prec$,对于两个升列$F=\{f_1,\ldots,f_r\}$,$G=\{g_1,\ldots,g_s\}$,称$F\succ G$,若下列条件之一满足:
+
+ 1. $\exists j\le\min(r,s)$,使得$$f_1\sim g_1,f_2\sim g_2,\ldots,f_{j-1}\sim g_{j-1},f_j>g_j,$$
+
+ 2. $s>r$且$f_1\sim g_1,\ldots,f_r\sim g_r$.
+
+若$F\not\prec G\wedge G\not\prec F$,则称二者级别相同,记为$F\sim G$.
+</definition>
+
+<remark>
+若$F\sim G$,显然有$r=s$且$f_i\sim g_i(\forall i)$.
+</remark>
+
+下面的定理很重要,是特征列方法的基础.
+
+<theorem  name="Ritt引理">
+设$F_1,F_2,\ldots,F_q,\cdots$是不增升列的序列,即$\forall q$,有$F_{q+1}\prec F_q\vee F_{q+1}\sim F_q$,则$\exists q'$,$\forall q>q'$,有$F_q\sim F_{q'}$,即有极小升列$F_{q'}$.
+</theorem>
+
+<proof>
+记$r_q=\#F_q$,$f_q\in F_q$是每个升列中第一个多项式,则$$f_1,f_2,\ldots,f_q,\cdots$$是一个不增列.对于良序下的不增列我们显然有$q_1\in\mathbb{N}$使得$\forall q>q_1$时,$f_{q_1}\sim f_q$.
+
+我们再考虑$q\ge q_1$时$F_q$中第2个多项式构成的序列$$f_{q_1}^{(1)},\ldots,f_{q}^{(1)},\cdots,$$同样的分析给出$q_2\in\mathbb{N}$使得$q\ge q_2$时有$f_{q}^{(1)}\sim f_{a_2}^{(1)}$.由于每个升列都有$r_q\le n$,我们将这个过程继续下去总会终止,于是可找到$q'\in\mathbb{N}$,使得$q\ge q'$时,$r_q=r_{q'}$且$F_q\sim F_{q'}$.
+</proof>
+
+<corollary>
+严格下降的升列序列必为有限的.
+</corollary>
+
+** <index>基本列</index>
+
+设$A$是一有限非零多项式的集合,其中必含有升列,我们记从中选出的升列的全体集合为$AS(A)$.
+
+<definition>
+若$F\in AS(A)$是当中的一个极小元,则称$F$是$A$的基本列(basic set).
+</definition>
+
+<theorem label="th:basicset">
+$A$上的基本列存在,且能在有限步内构造出来.
+</theorem>
+
+<proof>
+我们只需给出构造性的证明即可.设$A_1=A$.
+
+先取$f_1$为$A_1$中的某个最小元,若$\cl{f_1}=0$则$\{f_1\}$已是基本列.若$\cl{f_1}>0$,记$B_1=A_1\setminus\{f_1\}$.若$B_1$中元素对$f_1$均未约化,则$\{f_1\}$仍然是基本列,否则记$B_1$中对$f_1$约化的多项式全体为$A_2$.
+
+$\forall f_2\in A_2$,显然有$f_2\ge f_1$.倘若$f_2\sim f_1$,则与$f_2\red{f_1}$矛盾.故$f_2>f_1$,由于$f_2\red{f_1}$,则只能$\cl{f_2}>\cl{f_1}$.
+
+再取$f_2$为$A_2$中的某个最小元,若$B_2=A_2\setminus\{f_2\}$中元素关于$f_2$都未约化,则$\{f_1,f_2\}$已是基本列,否则可以构造出$A_3\cdots$
+
+由于$f_1,f_2,\cdots$的类是严格增加的,则上述过程必能有限步终止,得到基本列.
+</proof>
+
+鉴于基本列的存在性,我们记集合$A$的全体基本列的集合为$BS(A)$.定理##th:basicset 的构造性证明过程实际上已给出了求多项式集合$A$的基本列的方法.
+
+<theorem label="th:thofbs">
+$A$是由非零多项式构成的有限集,$F=\{f_1,\ldots,f_r\}\in BS(A)$,$\cl{f_1}>0$,设$g$是一非零多项式,且$g\red{f_i}(\forall f_i\in F)$,设$B=A\bigcup\{g\}$,则$\exists G\in BS(B),G\prec F$.
+</theorem>
+
+<proof>
+若$\cl{g}=0$,则$G=\{g\}$满足要求.
+
+若$\cl{g}=p>0$,则$\exists s(1\le s\le r)$使得$\cl{f_{s-1}}<p\le\cl{f_s}$,又由于$g\red{f_s}$,则$g<f_s$,故$G=\{f_1,f_2,\ldots,f_{s-1},g\}$满足要求.
+
+若$\cl{g}>\cl{f_r}$,则$G=\{f_1,\ldots,f_r,g\}$满足要求.
+</proof>
+
+** <index>特征列</index>与解方程
+
+<definition>
+若$g$对升列$F=\{f_1,\ldots,f_r\}$不是约化的,设$I_i$为$f_i\in F$的初式,则有带余除法:$$I_r^{s_r}g=Q_rf_r+R_r,\quad R_r\red{f_r},$$ $$I_{r-1}^{s_{r-1}}R_r=Q_{r-1}f_{r-1}+R_{r-1},\quad R_{r-1}\red{f_{r-1}},$$ $$\cdots$$ $$I_1^{s_1}R_2=Q_1f_1+R_1,\quad R_1\red{f_1}.$$ 显然$R_1$对$F$是约化的,我们称其为$g$对$F$的余式,记为$g\rem F$.
+</definition>
+
+下面给出特征列的定义:
+
+<definition>
+设$P$为由非零多项式构成的有限集,称升列$C\in AS(P)$为其特征列(characteristic set),如果$C\subset\idea{P}$且$\forall p\in P$有$p\rem C=0$.
+</definition>
+
+<algorithm  name="求特征列的算法">
+
+输入:非零有限多项式集合$P$,
+
+输出:$P$的特征列$F$.
+
+ 1. $P_1=P$,$i=1$,
+
+ 2. 求出$P_i$的一个基本列$F_i\in BS(P_i)$,
+
+ 3. 将$P_i\setminus F_i$中的多项式对$F_i$求余式,其非零项构成集合$R_i$,
+
+ 4. 若$R_i\neq\emptyset$,令$P_{i+1}=P_i\bigcup R_i$,$i=i+1$,转2步,
+
+ 5. 输出$F_i$.
+</algorithm>
+
+对于上面的算法过程,设其在$i=m$时终止,我们很容易有如下断言:$$V(P_1)=V(P_2)=\cdots=V(P_m).$$
+而对于算法的终止性,由定理##th:thofbs 可知我们得到如下的递降基本列:$$F_1\succ F_2\succ\cdots$$ 由于Ritt引理,我们可以断言在某一步,例如$i=m$时,算法会终止,即此时会得到$R_i=\emptyset$.
+
+关于特征列和多项式零点的关系,有如下的定理:
+
+<theorem>
+设$F=\{f_1,f_2,\ldots,f_r\}$为求得的基本列,且$f_i$的初式为$I_i$,$J=I_1I_2\cdots I_r$,则$V(P)=(V(F)\setminus V(J))\bigcup V(P,I_1)\bigcup V(P,I_2)\bigcup\cdots\bigcup V(P,I_r)$.
+</theorem>
+
+<proof>
+由伪除法的定义,我们知道对于多项式$p\in P$,由于$p\red{F}$,则存在$q_r,\ldots,q_1$使得$$I_r^{s_r}\cdots I_1^{s_1}p=q_rf_r+\cdots+q_1f_1,$$
+由此等式显然可以看出右边任何一项都是左边的子集,因此右$\subset$左.现在$\forall a\in V(P)$,若$a\in V(J)$,则必有某个$i$使得$a\in V(I_i)$,此时易知$a\in V(P,I_i)$,若$a\not\in V(J)$,则$a\in V(F)\setminus V(J)$,因此有左$\subset$右.
+</proof>
+
+<remark>
+若$F$是矛盾列,则有$V(P)\subset V(F)=\emptyset$.
+</remark>
+
+<theorem>
+对于有限非零多项式集合$P$,存在一系列的特征列$F_1,F_2,\cdots$使得$$V(P)=\bigcup[V(F_i)\setminus V(J_i)],$$其中$J_i$为$F_i$中各多项式初式之积.
+</theorem>
+
+<proof>
+根据前面定理,我们已有分解$$V(P)=(V(F)\setminus V(J))\bigcup(\bigcup V(P,I_i)).$$
+
+首先我们证明若$I_i\neq 0$,则$I_i\red{P}$.由于$I_i$是特征列$F$中$f_i$的初式,则显然有$I_i\red{F}$.因此$I_i\red{P}$.
+
+再用递归思想,对每个不为零的$I_i$,分解$V(P,I_i)$,若其特征列不是矛盾列,则可得到递减的特征列序列,由定理##th:thofbs 可知其必有限终止,$V(P)$可化为本定理形式.
+</proof>
+
+* Gr\"obner基
+
+<index>Gr\"obner基</index>是Buchberger于1965年在其博士毕业论文中提出,最初是用来解决多项式方程组的问题.其后经过发展,它在多元多项式环的理想等问题上也有重要的应用.<cite>wwapl94</cite>一书对此有详细介绍,另外<cite>mca</cite>,<cite>zsg05</cite>对此也有介绍.
+
+** 一些概念与介绍
+
+我们主要是为了处理多元多项式而引入Gr\"obner基,为了方便起见,我们先给出一些记号上的说明.
+
+设$F$为一域,以$X$表示$n$个不定元$x_1,x_2,\ldots,x_n$,则记多项式环$R=F[X]=F[x_1,x_2,\ldots,x_n]$,设有$s$个多项式$f_1,\ldots,f_s\in R$,由它们生成的理想记作$$I=\langle f_1,f_2,\ldots,f_s\rangle=\left\{\sum_{1\le i\le s}q_if_i|q_i\in R\right\}.$$
+
+<definition label="de:variety">
+对于上面的理想$I$,定义其<index>仿射簇</index>为$$V(I)=\{a=(a_1,a_2,\ldots,a_n)\in F^n|f_i(a)=0,i=1,2,\ldots,s\}.$$
+</definition>
+
+显然我们有$V(f_1,f_2,\ldots,f_s)=\bigcap_{i=1}^sV(f_i)$,且$\forall f\in I(f(V(I))=0)$.
+
+采用上面的记号,$f_1,\ldots,f_s$显然是$I$的基,我们知道,在一元多项式环中,由于其是主理想环,我们有$$\langle f_1,\ldots,f_s\rangle=\langle\gcd(f_1,\ldots,f_s)\rangle=\langle g\rangle,$$ 且对于任何一个多项式$f$,将其对$g$作Euclid除法得到$f=qg+r$,则$f\in\langle g\rangle\Leftrightarrow r=0$.但对于多元情形,这些良好的性质未必成立,比如$$\langle x,y\rangle\neq F[x,y]=\langle 1\rangle=\langle\gcd(x,y)\rangle.$$
+
+对于指标$\alpha=(\alpha_1,\alpha_2,\ldots,\alpha_n)\in\mathbb{N}^n$,定义$X^{\alpha}=x_1^{\alpha_1}x_2^{\alpha_2}\cdots x_n^{\alpha_n}$,称为单项式(Monomial),将全体单项式集合记作$M\subset R$.
+
+我们可以定义$M$中的一种良序$<$,使其满足与加法的和谐性,即对任何三个指标$\alpha$,$\beta$,$\gamma\in\mathbb{N}^n$,有$\alpha<\beta\Rightarrow\alpha+\gamma<\beta+\gamma$.下面给出几个序的例子:
+
+<problem>
+$M$上的字典序(Lexicographic order) ${<}_{lex}$ : $\alpha{<}_{lex}\beta\Leftrightarrow\alpha-\beta$左边第一非零分量为负.
+</problem>
+
+<problem>
+$M$上的分级字典序(Graded lexicographic order)${<}_{lex1}$:$\alpha{<}_{lex1}\beta\Leftrightarrow\|\alpha\|<\|\beta\|\vee (\|\alpha\|=\|\beta\|\wedge\alpha{<}_{lex}\beta)$,其中$\|\cdot\|$是1-范数.
+</problem>
+
+<problem>
+$M$上的分级逆字典序(Graded reverse lexicographic order)${<}_{lex2}$:$\alpha{<}_{lex2}\beta\Leftrightarrow\|\alpha\|<\|\beta\|\vee (\|\alpha\|=\|\beta\|\wedge\alpha-\beta\text{最右非零分量为零})$.
+</problem>
+
+我们一般取字典序即可,就以$<$来表示.在该序下,我们可以定义多项式$f$的领项$\lt{f}$为$f$最大的单项式,类似地可定义领项系数$\plc{f}$和领项单项式$\lm{f}$.一个多项式次数的定义为$\deg f=\deg \lt{f}\in\mathbb{N}^n$.有了这些概念,我们可以像在一元多项式环中那样做带余除法,下面给出$R$中带余除法的算法:
+
+<algorithm label="al:division1" name="带余除法">
+
+输入:$f,f_1,f_2,\ldots,f_s\in R$,
+
+输出:$q_1,q_2,\ldots,q_s,r\in R$使得$f=q_1f_1+\cdots+q_sf_s+r$且$r$中任何单项不被$\lt{f_1},\ldots,\lt{f_s}$中任何一个整除,即不可再约化.
+
+ 1. $r=0$,$p=f$,$q_i=0(i=1,\ldots,s)$,
+
+ 2. 当$p\neq 0$时,循环做第3步,
+
+ 3. 若存在某个$i$使$\lt{f_i}|\lt{p}$则$$q_i=q_i+\frac{\lt{p}}{\lt{f_i}},\quad p=p-\frac{\lt{p}}{\lt{f_i}}f_i,$$否则$r=r+\lt{p}$,$p=p-\lt{p}$,
+
+ 4. 输出$q_1,q_2,\ldots,q_s,r$.
+</algorithm>
+
+<problem>
+考虑$f=x^2y+xy^2+y^2$,$f_1=xy-1$,$f_2=y^2-1$.
+</problem>
+
+<solution>
+用上面的算法计算除法,我们发现,第一步只可以用$f_1$来约化,得到$f=xf_1+(xy^2+x+y^2)$,第二步我们可以用$f_1$或$f_2$来约化,简单计算我们发现若这一步用$f_1$来约化,得到结果$$f=(x+y)f_1+f_2+(x+y+1),$$反之则得到$$f=xf_1+(x+1)f_2+(2x+1),$$ 我们看到,约化的顺序不同会导致结果不同,这也是多元多项式环区别于一元多项式环的性质之一.
+</solution>
+
+<definition>
+在算法##al:division1 第3步中若选取满足领项能整除$\lt{p}$的最小的指标$i$对应的多项式进行约化,则定义此时得到的$r$为余式$f\rem (f_1,f_2,\ldots,f_s)=r$.
+</definition>
+
+由前面约化结果的不唯一性我们知道,并不能用余式是否为零来判断一个多项式是否在所考察的理想中,为了解决种种在多元多项式环中出现的问题,我们需要引入Gr\"obner基.
+
+** 单项式理想及一些准备定理
+
+单项理想即是指由一些单项式生成的理想,若$A$是$N^n$的一个子集,定义$\idea{x^A}=\idea{\{x^{\alpha}|\alpha\in A\}}$.
+
+<lemma>
+$x^{\beta}\in I\Leftrightarrow\exists\alpha\in A(x^{\alpha}|x^{\beta})$.
+</lemma>
+
+<lemma>
+设$I$是一个单项理想,以下三个命题是等价的:
+
+(1)$f\in I$,
+
+(2)$f$中每个单项都属于理想$I$,
+
+(3)$f$是$I$中某些多项式的$F$-线性组合.
+</lemma>
+
+<proof>
+(1)$\Rightarrow$(2) 设$I=\idea{x^A}$,则必有$f=\sum_{\alpha\in A}q_{\alpha}x^{\alpha}$,其中$q_{\alpha}$是多项式.由此可知$f$中每个单项必可被某个$x^{\alpha}$整除.
+
+(2)$\Rightarrow$(3)和(3)$\Rightarrow$(1)均显然.
+</proof>
+
+由引理第二个等价条件得到:
+<corollary>
+两个单项理想$I_1$,$I_2$相等的充要条件是它们含有相同的单项式.
+</corollary>
+
+<index name="Dickson引理"></index>
+<theorem name="Dickson引理">
+$\forall A\subset\mathbb{N}^n,\exists$有限集$B\subset A$使得$\idea{x^A}=\idea{x^B}$.
+</theorem>
+
+<proof>
+为了便于证明,我们引入$\mathbb{N}^n$上的偏序$\preccurlyeq$满足$\alpha\preccurlyeq\beta\Leftrightarrow\forall i\in\{1,2,\ldots,n\}(\alpha_i\le\beta_i)$.由此我们知道$\alpha\preccurlyeq\beta\Leftrightarrow x^{\alpha}|x^{\beta}$.
+
+设$B$为$A$的极小元集合,即$B=\{\beta\in A|\forall\alpha\in A(\alpha\not\prec\beta)\}$.
+
+于是$\forall\alpha\in A,\exists\beta\in B(\beta\preccurlyeq\alpha)$,如若不然,首先$\beta\neq\alpha\Rightarrow\alpha\not\in B$,即$\alpha$非极小元,必存在$\beta'\in B(\beta'\prec\alpha)$,矛盾.因此$\forall\alpha\in A,\exists\beta\in  B(x^{\beta}|x^{\alpha})$,即$x^{\alpha}\in\idea{x^B}\Rightarrow\idea{x^A}\subset\idea{x^B}$.又$B\subset A\Rightarrow\idea{x^B}\subset\idea{x^A}$,因而$\idea{x^A}=\idea{x^B}$.
+
+下面我们证明$B$是有限集.对于$n=1$的情况,由于$\preccurlyeq$是全序,则$B$是单元集,命题显然成立.下面假设命题对于$n-1$的情况也是成立的,命$$A^*=\{(\alpha_1,\alpha_2,\ldots,\alpha_{n-1}\in\mathbb{N}^{n-1}|\exists\alpha_n\in\mathbb{N},(\alpha_1,\ldots,\alpha_n)\in A\},$$ 则$A^*$的极小元集$B^*$是有限集.$\forall\beta^*=(\beta_1,\ldots,\beta_{n-1})\in B^*$,我们可取$b_{\beta^*}\in\mathbb{N}$使得$(\beta^*,b_{\beta^*})\in A$,由于$B^*$的有限性,我们可取最大值$$b=\max\{b_{\beta^*}|\beta^*\in B^*\}.$$ 于是$\forall\alpha\in A$,$\exists\beta^*\in B^*$使得$\beta^*\preccurlyeq(\alpha_1,\ldots,\alpha_{n-1})$,假设$\alpha_n>b$,则$$(\beta^*,b_{\beta^*})\preccurlyeq(\beta^*,b)<\alpha,$$ 即$\alpha$不是极小元.因此$A$中任一极小元$\alpha$必满足$\alpha_n\le b$,那么$\#B\le (\#B^*)\times(b+1)$是有限的.由归纳法,本定理得证.
+</proof>
+
+<lemma label="le:g1">
+$I$是$R$中任一理想,若$G\subset I$是有限集且$\idea{\lt{G}}=\idea{\lt{I}}$,则$\idea{G}=I$.
+</lemma>
+
+<proof>
+设$G=\{g_1,\ldots,g_t\}$,则$\forall f\in I$,由带余除法可得到$$f=q_1g_1+\cdots+q_tg_t+r,$$其中$r$不可再被$G$约化.而由于$r=f-q_1g_1-\cdots-q_tg_t\in I$,于是$\lt{r}\in\lt{I}\Rightarrow\lt{r}\in\idea{\lt{G}}$,即$r$中每个单项都在$\idea{\lt{G}}$中,因此$r=0$,则$f\in\idea{G}\Rightarrow\idea{G}=I$.
+</proof>
+
+由于任何单项理想均可有限生成,我们有下面的:
+<index name="Hilbert基定理"></index>
+<theorem name="Hilbert基定理">
+$R$中任何理想$I$均可有限生成.
+</theorem>
+
+<index name="理想升链定理"></index>
+<corollary name="理想升链定理">
+设$R$中有一理想升链$I_1\subset I_2\subset\cdots\subset I_n\subset\cdots$,则存在$n\in\mathbb{N}(\forall m>n,I_m=I_n)$.
+</corollary>
+
+这可由$I=\bigcup_{i=1}^{\infty}I_i$是有限生成的得到.满足这样条件的环也叫<index>Noether环</index>(Noetherian Domain).
+
+** Gr\"obner基及其性质
+
+现在引入<index>Gr\"obner基</index>的定义:
+
+<definition>
+设有多项式环$R$中的理想$I$和某一单项序$<$,$I$的有限子集$G$当满足$\idea{\lt{G}}=\idea{\lt{I}}$时,称为$I$的Gr\"onber基.
+</definition>
+
+我们记理想$I$的全体Gr\"obner基为$GB(I)$,即$$GB(I)=\{G\in 2^{I}|G\text{是}I\text{的Gr\"onber基}\}.$$
+Gr\"obner基的存在性是由Hilbert基定理和引理##le:g1 保证的,它有如下的性质:
+
+<theorem>
+设$G\in GB(I)$,$\forall f\in R$,存在唯一的$r\in R$使得$f-r\in I$且$r$中无单项可被$\lt{G}$中元素整除,即不可被$G$约化.
+</theorem>
+
+当考察的$G$是Gr\"obner基时,我们也记$f\rem G=\overline{f}^G$或$\overline{f}$.
+
+<proof>
+存在性由带余除法算法得到,对于唯一性,可令$f=h_1+r_1=h_2+r_2$,其中$r_1$,$r_2$分别是两种不同途径约化的结果.则$r_1-r_2=h_2-h_1\in I\Rightarrow \lt{r_1-r_2}$可被$\lt{G}$中元素整除.由$r_1,r_2$的定义可知$r_1-r_2=0$.
+</proof>
+
+<corollary label="cor:beautifulgb">
+$f\in I\Leftrightarrow r=\overline{f}=f\rem G=0$.
+</corollary>
+
+至此,我们得到了Gr\"obner基的一个优美的性质.
+
+构造理想的Gr\"obner基需要所谓的<index>S-多项式</index>,下面简要讨论之.
+
+<definition>
+对于非零多项式$g,h$,设$\alpha=\deg g$,$\beta=\deg h$,$x^{\gamma}=\mathrm{lcm}(x^{\alpha},x^{\beta})$,即$\gamma=(\max(\alpha_1,\beta_1),\ldots,\max(\alpha_n,\beta_n))$,则定义$g,h$的S-多项式为$$S(g,h)=\left(\frac{x^{\gamma}}{\lt{g}}g-\frac{x^{\gamma}}{\lt{h}}h\right)\in R.$$
+</definition>
+
+<lemma label="le:g2">
+设$g_1,\ldots,g_s\in R$,$\alpha_1,\ldots,\alpha_s\in\mathbb{N}^n$,$c_1,\ldots,c_s\in F\setminus\{0\}$,$$f=\sum_{1\le i\le s}c_ix^{\alpha_i}g_i\in R,$$ 且有$\delta\in\mathbb{N}^n$使$\alpha_i+\deg g_i=\delta(1\le i\le s)$,$\deg f<\delta$,即这些多项式求和后领项消去(Leading term cancellation).
+
+令$x^{\gamma_{ij}}=\mathrm{lcm}(\lm{g_i},\lm{g_j})$,则存在$c_{ij}\in F$使得$x^{\gamma_{ij}}|x^{\delta}$且$$f=\sum_{1\le i<j\le s}c_{ij}x^{\delta-\gamma_{ij}}S(g_i,g_j),$$ 且$\deg x^{\delta-\gamma_{ij}}S(g_i,g_j)<\delta,(1\le i<j\le s)$.
+</lemma>
+
+<proof>
+可假定$\plc{g_i}=1$,否则可将其归并入$c_i$中而使定理条件形式仍不变,于是$\lt{g_i}=\lm{g_i}=x^{\deg g_i}$.由于$x^{\delta}=x^{\alpha_i}\lm{g_i}=x^{\alpha_j}\lm{g_j}$,则有$x^{\gamma_{ij}}|x^{\delta}$.
+
+由于$$S(g_i,g_j)=\frac{x^{\gamma_{ij}}}{\lt{g_i}}g_i-\frac{x^{\gamma_{ij}}}{\lt{g_j}}g_j,$$ 首项消去告诉我们$\deg S(g_i,g_j)<\gamma_{ij}$,因此$\deg x^{\delta-\gamma_{ij}}S(g_i,g_j)\prec\delta$.
+
+不妨设$s\ge 2$, 则
+<latex>
+\begin{align*}
+g&=f-c_1x^{\delta-\gamma_{ij}}S(g_1,g_2)\\
+&=c_1x^{\alpha_1}g_1+c_2x^{\alpha_2}g_2+\sum_{3\le i\le s}c_ix^{\alpha_i}g_i-c_1x^{\delta-\gamma_{12}}\left(\frac{x^{\gamma_{12}}}{\lt{g_1}}g_1-\frac{x^{\gamma_{12}}}{\lt{g_2}}g_2\right)\\
+&=c_1(x^{\alpha_1}-x^{\delta-\deg g_1})g_1+(c_2x^{\alpha_2}+c_1x^{\delta-\deg g_2})g_2+\sum_{3\le i\le s}c_ix^{\alpha_i}g_i\\
+&=(c_1+c_2)x^{\alpha_2}g_2+\sum_{3\le i\le s}c_ix^{\alpha_i}g_i,
+\end{align*}
+</latex>
+显然$\deg g<\delta$,由此时$g$的形式和归纳法,我们可以证明$f$可以表成定理中的形式.
+</proof>
+
+下面的定理给出了判别Gr\"obner基的一个充要条件:
+
+<theorem label="th:g1">
+$G=\{g_1,\ldots,g_s\}\in GB(I)\Leftrightarrow\forall(1\le i<j\le s),S(g_i,g_j)\rem G=0$.
+</theorem>
+
+<proof>
+$\Rightarrow$.$S(g_i,g_j)\in I=\idea{G}\Rightarrow\overline{S(g_i,g_j)}=0$.
+
+$\Leftarrow$.令$f\in I\setminus\{0\}$,由定义只需证明$\lt{f}\in\idea{\lt{G}}$即可.
+
+不妨设$f=\sum_{1\le i\le s}q_ig_i$,$\delta=\max\{\deg(q_ig_i)|1\le i\le s\}$,则显然$\deg f\le\delta$.倘若等号不成立,即$\deg f<\delta$,定义$$f^*=\sum_{1\le i\le s,\deg(q_ig_i)=\delta}\lt{q_i}g_i,$$ 它显然满足引理##le:g2 的条件,可写为$S(g_i,g_j)$的线性组合,因而其在$G$下约化为零.由带余除法,存在$q_i^*$使得$f^*=\sum_{1\le i\le s}q_i^*g_i$且$\max\{\deg(q_i^*g_i)|1\le i\le s\}\le\deg f^*<\delta$.由$f^*$的定义可知$f-f^*=\sum_{1\le i\le s}q_i^{**}g_i$,$\max\{\deg(q_i^{**}g_i)|1\le i\le s\}<\delta$.于是$f$也可以表示成$$f=\sum_{1\le i\le s}q_ig_i,\quad\max\{\deg(q_ig_i)|1\le i\le s\}<\delta,$$ 这与$\delta$的定义矛盾,故$\deg f=\delta$,即$\exists i$使$\deg f=\deg(q_ig_i)$,因此$$\lt{f}=\sum_{1\le i\le s,\deg(q_ig_i)=\delta}\lt{q_i}\lt{g_i}\in\idea{\lt{G}}.$$
+
+证毕.
+</proof>
+
+** Buchberger算法及约化Gr\"obner基
+
+Buchberger提出了Gr\"obner基的概念并给出了计算它的方法,即下面的<index>Buchberger算法</index>:
+
+<algorithm label="al:buchberger1" name="Buchberger算法">
+
+输入:$f_1,\ldots,f_s\in R$,
+
+输出:$I=\idea{f_1,\ldots,f_s}$的一个Gr\"onber基$G$.
+
+ 1. $G=\{f_1,\ldots,f_s\}$,
+
+ 2. 循环作后面所有步骤,
+
+ 3. $S=\emptyset$,将$G$中元素编号为$G=\{g_1,\ldots,g_t\}$,
+
+ 4. 对于所有的序对$(i,j),1\le i<j\le t$计算$r=S(g_i,g_j)\rem G$,若$r\neq 0$则$S=S\bigcup\{r\}$,
+
+ 5. 若$S=\emptyset$则输出$G$,否则$G=G\bigcup S$.
+</algorithm>
+
+<proof name="算法有效性">
+我们只需证明该算法循环是可以终止的,因为终止时由定理##th:g1 可知$G$即是Gr\"obner基.因为每步循环之后我们都可以得到一个新的集合$G$,我们给它们编上号,记为$G_1\subset G_2\subset\cdots$,显然$$\idea{\lt{G_1}}\subset\idea{\lt{G_2}}\subset\cdots,$$ 由理想升链定理,$\exists n\in\mathbb{N}$使得$\forall m>n$有$\idea{\lt{G_n}}=\idea{\lt{G_m}}$,此时$\forall g,h\in G_n$,令$r=S(g,h)\rem G_n$,则显然$r=0\vee r\in G_{n+1}$,于是$\lt{r}\in\idea{\lt{G_{n+1}}}=\idea{\lt{G_n}}$,由$r$是多项式对$G_n$的约化结果知道$r=0$,于是算法终止.
+</proof>
+
+多项式理想的Gr\"obner基并不是唯一的,而且在上面的算法中$G$的规模的增长是十分迅速的,求出的结果中可能含有大量的多项式,因此我们要对Gr\"obner基做一定的优化,下面我们一步一步对其进行约化化简.
+
+<lemma label="le:minimalgb">
+设$G\in GB(I)$,$g\in G$且$\lt{g}\in\idea{\lt{G\setminus\{g\}}}$,则$G\setminus\{g\}\in GB(I)$.
+</lemma>
+
+<proof>
+$\lt{g}\in\idea{\lt{G\setminus\{g\}}}\Rightarrow\idea{\lt{G\setminus\{g\}}}=\idea{\lt{G}}=\idea{\lt{I}}\Rightarrow G\setminus\{g\}\in GB(I)$.
+</proof>
+
+<definition>
+设$G\in GB(I)$,且$\forall g\in G$,有$\plc{g}=1\wedge\lt{g}\not\in\idea{\lt{G\setminus\{g\}}}$,则称$G$是$I$的极小<index sub="极小">Gr\"obner基</index>(Minimal Gr\"obner basis),并简记为$G\in MGB(I)$.
+</definition>
+
+<definition>
+设$G\in MGB(I)$,若对于$g\in G$,$g$不可再被$G\setminus\{g\}$约化,即$g$中任何一单项均不在理想$\idea{\lt{G\setminus\{g\}}}$中,则称$g$关于$G$是约化的.若$\forall g\in G$,$g$关于$G$都是约化的,则称$G$是约化<index sub="约化">Gr\"obner基</index>(Reduced Gr\"obner basis),并简记为$G\in RGB(I)$(或由下面的唯一性可记为$G=RGB(I)$).
+</definition>
+
+<theorem label="th:reducedgb">
+每个多项式理想$I$都有唯一的约化Gr\"obner基.
+</theorem>
+
+<proof>
+存在性.由引理##le:minimalgb 可将$G$化为$I$的极小Gr\"obner基,设此时$G=\{g_1,g_2,\ldots,g_s\}$,然后对$1\le i\le s$归纳地做$h_i=g_i\rem\{h_1,\ldots,h_{i-1},g_{i+1},\ldots,g_s\}$.由极小Gr\"obner基的条件知道$\lt{h_i}=\lt{g_i},(1\le i\le s)$.于是由$h_i$相对于$\{h_1,\ldots,h_{i-1},g_{i+1},\ldots,g_s\}$约化可知其相对于$G_s=\{h_1,\ldots,h_s\}$也是约化的.
+
+唯一性.设$G,G^*$均是$I$的约化Gr\"obner基,则$\forall g\in\lt{G}\subset\idea{\lt{G}}=\idea{\lt{G^*}}$,$\exists g^*\in G^*$使$\lt{g^*}|\lt{g}$,同样地,$\exists g^{**}\in G$使$\lt{g^{**}}|\lt{g^*}$,因此$\lt{g^{**}}|\lt{g}$,由于约化Gr\"obner基也是极小Gr\"obner基,我们知道$\lt{g}=\lt{g^{**}}=\lt{g^*}\in\lt{G^*}\Rightarrow\lt{G}\subset\lt{G^*}$，再由对称可证$\lt{G}=\lt{G^*}$.
+
+$\forall g\in G$,取$g^*\in G^*$使得$\lt{g}=\lt{g^*}$.由于$G,G^*$约化,则$g-g^*\in I$中任一单项式均不能被$\lt{G\setminus\{g\}}=\lt{G^*\setminus\{g^*\}}$中元素约化.于是$g-g^*=g-g^*\rem G=0\Rightarrow g=g^*\in G^*\Rightarrow G\subset G^*\Rightarrow G=G^*$.
+</proof>
+
+引理##le:minimalgb 给出了由Gr\"obner基求极小Gr\"obner基的方法,定理##th:reducedgb 的存在性证明中也给出了极小Gr\"obner基构造约化Gr\"obner基的方法.
+
+** Buchberger算法的两个改进
+
+<index>Buchberger算法</index>计算过程中集合$G$中的多项式会越来越多,呈指数规模增长,因而需要对其作一定的优化.<cite>wwapl94</cite>3.3节提出了两种改进的方法.首先我们将算法##al:buchberger1 重新描述如下,以便于我们后面叙述改进算法.
+
+<algorithm label="al:buchberger2" name="Buchberger算法">
+
+输入输出同算法##al:buchberger1 ,
+
+ 1. $G=\{f_1,\ldots,f_s\}$,$H=\{\{i,j\}|i\neq j\wedge 1\le i,j\le s\}$,
+
+ 2. 当$H\neq\emptyset$时循环做后面两步,
+
+ 3. 任取$h=\{i,j\}\in H$,$H=H\setminus \{h\}$,$r=S(f_i,f_j)\rem G$,
+
+ 4. 若$r\neq 0$则$f_{s+1}=r$,$H=H\bigcup\{\{i,s+1\}|1\le i\le s\}$,$G=G\bigcup\{f_{s+1}\}$,$s=s+1$,
+
+ 5. 输出$G$.
+</algorithm>
+
+<remark>
+设$E=\{f_1,\ldots,f_s\}$,如果我们要得到矩阵$M$使得$G=EM$,那么首先令$M_s=I_{s\times s}$,然后在上面算法每次第4步判断成功后,设带余除法给出$r=S(f_i,f_j)\rem G=S(f_i,f_j)-q_1f_1-\cdots-q_sf_s$,设$S(f_i,f_j)=\sum_{1\le k\le s}S_kf_k$,其中$S_i=x^{\gamma_{ij}}/\lt{g_i}$,$S_j=-x^{\gamma_{ij}}/\lt{g_j}$,其余的$S_k=0$.则由$$(f_1,\ldots,f_s,r)=(f_1,\ldots,f_s)\begin{pmatrix}1 & & & &S_1-q_1\\ &1 & & &S_2-q_2\\ & &\ddots & &\vdots\\ & & &1 &S_s-q_s \end{pmatrix}=:(f_1,\ldots,f_s)Q_s,$$ 可知有迭代$M_{s+1}=M_sQ_s$,输出最后的$M=M_s$即可.
+</remark>
+
+<remark>
+产生极小Gr\"obner基时只要从$M$中去掉相应的列,而对于约化过程,同样由带余除法得到$q_1,\ldots,q_s$,乘以相应的迭代矩阵.
+</remark>
+
+*** 第一个改进
+
+<lemma label="le:g22"> 
+设有多项式$f_1,\ldots,f_s$和$d$,$I=\idea{f_1,\ldots,f_s}$,$J=\idea{f_1d,\ldots,f_sd}$,则$\{f_1,\ldots,f_s\}\in GB(I)\Leftrightarrow \{f_1d,\ldots,f_sd\}\in GB(J)$.
+</lemma>
+
+此引理由Gr\"obner基的定义$\idea{\lt{G}}=\idea{\lt{I}}$可证.
+
+<lemma>
+设有非零多项式$f,g$,$I=\idea{f,g}$,$d=\gcd(f,g)$,则下面两个条件等价:
+
+(1) $\lm{f/d}$与$\lm{g/d}$互素,
+
+(2) $S(f,g)\rem\{f,g\}=0$,即$\{f,g\}\in GB(I)$.
+</lemma>
+
+<proof>
+(1)$\Rightarrow$(2).先设$d=\gcd(f,g)=1$,且$f=aX+f'$,$g=bY+g'$,其中$\plc{f}=a,\lm{f}=X,\lc{g}=b,\lm{g}=Y$,$f'$,$g'$是余下的部分,于是$$X=\frac{f-f'}{a},\quad Y=\frac{g-g'}{b}.$$
+
+(I)若$f'=g'=0$,则$S(f,g)=0$,
+
+(II)若$f'=0,g'\neq 0$,由$\gcd(\lm{f},\lm{g})=1$得$$S(f,g)=\frac{1}{a}Yf-\frac{1}{b}Xg=\frac{1}{ab}(g-g')f-\frac{1}{ab}fg=-\frac{1}{ab}g'f,$$ 若它能被$g$约化,则由$\lm{g}|\lm{g'f}\wedge\gcd(\lm{g},\lm{f})=1$知$\lm{g}|\lm{g'}$,这与$\deg g'<\deg g\wedge g'\neq 0$矛盾.
+
+(III)若$f'\neq 0,g'$ $=0$,这与情形(II)类似.
+
+(IV)若$f'\neq 0\wedge g'\neq 0$,此时经过计算可知$$S(f,g)=\frac{1}{ab}(f'g-g'f),$$ 我们断言$\lm{f'g}\neq\lm{g'f}$.假设二者相等,则$\lm{f'}\lm{g}=\lm{g'}\lm{f}$,由于$\lm{f}$和$\lm{g}$互素,我们得到$\lm{f}|\lm{f'}$,矛盾.不妨设此时$\lm{f'g}>\lm{g'f}$,则第一步仅可通过$g$约化,其结果为$$S(f,g)\rightarrow\frac{1}{ab}[(f'-\lt{f'})g-g'f],$$ 对于相反的情形如法炮制,得到第一步的约化结果仍然可进行同样的讨论,只需将其中的$f'-\lt{f'}$看作$f'$即可.于是这样的约化过程可一直继续,直至约化为0.
+
+综上,我们在$d=1$的情况下证明了(1)$\Rightarrow$(2).当$d\neq 1$时,我们有$\gcd(f/d,g/d)=1$,于是$S(f/d,g/d)\rem\{f/d,g/d\}=0$,即$\{f/d,g/d\}$是Gr\"obner基,由引理##le:g22 可知$\{f,g\}$也是Gr\"obner基,命题得证.
+
+(2)$\Rightarrow$(1).(I)首先我们仍然设$d=\gcd(f,g)=1$,取单项式$D,X,Y\in M$满足$$\lm{f}=DX,\quad\lm{g}=DY,\quad \gcd(X,Y)=1,$$ 于是$S(f,g)=\frac{Y}{\plc{f}}f-\frac{X}{\plc{g}}g$,由假设$\{f,g\}$是Gr\"obner基,我们进行带余除法可以得到多项式$u,v$使得$S(f,g)=uf+vg$,且$\lm{uf},\lm{vg}\le\lm{S(f,g)}$.整理可得$$\left(\frac{X}{\plc{g}}+v\right)g=\left(\frac{Y}{\plc{f}}-u\right)f,$$因此$g|(Y/\plc{f}-u)$,又$$\lm{u}DX=\lm{uf}\le\lm{S(f,g)}<\lm{Yf}=\lm{Xg}=DXY\Rightarrow\lm{u}<Y,$$ 则$g|(Y/\plc{f}-u)\Rightarrow DY|Y\Rightarrow D=1$,亦即$\lm{f}$,$\lm{g}$互素.
+
+(II)当$d\neq 1$时,则$\gcd(f/d,g/d)=1$,于是由$\{f,g\}$是Gr\"obner基可知$\{f/d,g/d\}$是Gr\"obner基,因而$\lm{f/d}$,$\lm{g/d}$互素.
+</proof>
+
+<theorem>
+$S(f,g)\rem\{f,g\}=0$的一个充分条件是$\gcd(\lm{f},\lm{g})=1$.
+</theorem>
+
+<remark>
+只需注意到$\gcd(\lm{f},\lm{g})=1\Rightarrow\gcd(f,g)=1$.
+</remark>
+
+我们可以由此得到Buchberger算法的第一个修正,在计算S-多项式并约化之前由$\lm{f},\lm{g}$是否互素来决定是否要计算.
+
+*** 第二个改进
+
+<definition>
+对于多项式$f_1,\ldots,f_s$,设$f=(f_1,\ldots,f_s)\in R^s$,定义$\mathrm{Syz}(E)=\{h=(h_1,\ldots,h_s)\in R^s|h\cdot f=0\}$.
+</definition>
+
+<theorem>
+设$c_1,\ldots,c_s\in F\setminus\{0\}$,$X_1,\ldots,X_s\in M$,$X_{ij}=\mathrm{lcm}(X_i,X_j)$,则$\mathrm{Syz}(c_1X_1,\ldots,c_sX_s)$由$$\left\{\tau_{ij}=\frac{X_{ij}}{c_iX_i}e_i-\frac{X_{ij}}{c_jX_j}e_j\in R^s|1\le i<j\le s\right\}$$生成,其中$e_i,e_j$为$R^s$中的自然基矢.
+</theorem>
+
+<proof>
+首先易验证$\idea{\tau_{ij}}\subset\mathrm{Syz}(c_1X_1,\ldots,c_sX_s)$.现在假设$h=(h_1,\ldots,h_s)\in\mathrm{Syz}(c_1X_1,\ldots,c_sX_s)$,于是有$$h_1c_1X_1+\cdots+h_sc_sX_s=0.$$ 考虑任一单项式$X\in M$,则在上式中含$X$的同类项合并之后为$0$,因此我们可只考虑这些项,将其分离出来.可设$h_i=c_i'X_i'$,其中$c_i'=0$或$X_i'X_i=X$,设$c_{i_1}',\ldots,c_{i_t}'$是$c_i'$中不为零的系数重新编号,于是有$c_1'c_1+\cdots+c_s'c_s=c_{i_1}'c_{i_1}+\cdots+c_{i_t}'c_{i_t}=0$,则
+<latex>
+\begin{align*}
+h=&(h_1,\ldots,h_s)=c_{i_1}'X_{i_1}'e_{i_1}+\cdots+c_{i_t}'X_{i_t}'e_{i_t}\\
+&=c_{i_1}'c_{i_1}\frac{X}{c_{i_1}X_{i_1}}e_{i_1}+\cdots+c_{i_t}'c_{i_t}\frac{X}{c_{i_t}X_{i_t}}e_{i_t}\\
+&=c_{i_1}'c_{i_1}\frac{X}{X_{i_1i_2}}(\frac{X_{i_1i_2}}{c_{i_1}X_{i_1}}e_{i_1}-\frac{X_{i_1i_2}}{c_{i_2}X_{i_2}}e_{i_2})\\
+&+(c_{i_1}'c_{i_1}+c_{i_2}'c_{i_2})\frac{X}{X_{i_2i_3}}(\frac{X_{i_2i_3}}{c_{i_2}X_{i_2}}e_{i_2}-\frac{X_{i_2i_3}}{C_{i_3}X_{i_3}}e_{i_3})+\cdots\\
+&+(c_{i_1}'c_{i_1}+\cdots+c_{i_{t-1}}'c_{i_{t-1}})\frac{X}{X_{i_{t-1}i_t}}(\frac{X_{i_{t-1}i_t}}{c_{i_{t-1}}X_{i_{t-1}}}e_{i_{t-1}}-\frac{X_{i_{t-1}i_t}}{c_{i_t}X_{i_t}}e_{i_t})\\
+&+(c_{i_1}'c_{i_1}+\cdots+c_{i_t}'c_{i_t})\frac{X}{c_{i_t}X_{i_t}}e_{i_t}.
+\end{align*}
+</latex>
+
+注意到上式最后一项为零,得证.
+</proof>
+
+<theorem>
+设$G=\{g_1,\ldots,g_s\}$,$B\{\tau_{ij}|1\le i<j\le s\}$是$\mathrm{Syz}(\lt{g_1},\ldots,\lt{g_s})$的生成元集,则$G\in GB(\idea{G})\Leftrightarrow\forall h=(h_1,\ldots,h_s)\in B(h_1g_1+\cdots+h_sg_s\rem G=0)$.
+</theorem>
+
+<proof>
+注意到$\tau_{ij}\cdot(g_1,\ldots,g_s)=S(g_i,g_j)$,则命题显然.
+</proof>
+
+<lemma>
+记$X_{ij}=\mathrm{lcm}(X_i,X_j)$,$X_{ijl}=\mathrm{lcm}(X_i,X_j,X_l)$,则$$\frac{X_{ijl}}{X_{ij}}\tau_{ij}+\frac{X_{ijl}}{X_{jl}}\tau_{jl}+\frac{X_{ijl}}{X_{li}}\tau_{li}=0,$$若$X_l|X_{ij}$,则$\tau_{ij}$在$\tau_{jl}$和$t_{li}$生成的$R^s$的子模中.
+</lemma>
+
+<remark>
+等式可以由$\tau_{ij}$的定义式直接验证,对于第二个断言利用$X_l|X_{ij}$时$X_{ijl}=X_{ij}$代入等式直接得.
+</remark>
+
+<corollary>
+设$B\subset\{\tau_{ij}|1\le i<j\le s\}$是$\mathrm{Syz}(c_1X_1,\ldots,x_sX_s)$的生成元集,若$\exists i,j,l$使$\tau_{ij},\tau_{jl},\tau_{li}\in B$,且$X_l|X_{ij}$,则$B\setminus\{\tau_{ij}\}$也是$\mathrm{Syz}(c_1X_1,\ldots,c_sX_s)$的生成元集.
+</corollary>
+
+由此推论我们可以得到Buchberger算法的第二个改进,即某些S-多项式可能是其它两个S-多项式的线性组合,可以不予计算.这一步,能够显著提高Buchberger算法的效率.
+
+*** 改进后的算法
+
+鉴于前文的分析,我们现在可以给出Buchberger算法的改进算法.<index name="Buchberger算法" sub="改进算法"></index>
+
+<algorithm label="al:buchberger3" name="改进Buchberger算法">
+
+输入:多项式$f_1,\ldots,f_s$,
+
+输出:理想$\idea{f_1,\ldots,f_s}$的Gr\"obner基$G$.
+
+ 1. $G=\{f_1,\ldots,f_s\}$,$C=\emptyset$,$NC=\{\{1,2\}\}$,$i=2$,
+
+ 2. 当$i<s$时,循环做:$NC=NC\bigcup\{\{j,i+1\}|1\le j\le i\}$,$NC=\mathrm{crit}(NC,C,i+1)$,$i=i+1$,
+
+ 3. 当$NC\neq\emptyset$时,循环做后面所有步骤,否则输出$G$退出,
+
+ 4. 任选$\{i,j\}\in NC$,令$NC=NC\setminus\{\{i,j\}\}$,$C=C\bigcup\{\{i,j\}\}$,
+
+ 5. 若$\gcd(\lm{f_i},\lm{f_j})\neq 1$,则做下面6、7步,
+
+ 6. $r=S(f_i,f_j)\rem G$,
+
+ 7. 若$r\neq 0$则$f_{s+1}=r,G=G\bigcup\{f_{s+1}\}$,$s=s+1$,$NC=NC\bigcup\{\{i,s\}|1\le i\le s-1\}$,$NC=\mathrm{crit}(NC,C,s)$.
+</algorithm>
+
+上面算法中$\mathrm{crit}$函数是第二个改进判别法,由下面算法给出,其中的$X_i=\lm{f_i}$:
+
+<algorithm  name="crit函数">
+
+$\mathrm{crit}(NC,C,s)$,输出简化后的$NC$.
+
+ 1. $l=1$,
+
+ 2. 当$l<s$时循环做下面3-7步,否则转8步,
+
+ 3. 若$\{l,s\}\in NC$则令$i=1$并做下面4-6步,否则转7步,
+
+ 4. 当$i<s$时循环做下面5,6步,否则转7步,
+
+ 5. 若$\{i,l\}\in NC\bigcup\wedge \{i,s\}\in NC$则看$X_l|\mathrm{lcm}(X_i,X_s)$是否成立,是则令$NC=NC\setminus\{\{i,s\}\}$,
+
+ 6. $i=i+1$,
+
+ 7. $l=l+1$,
+
+ 8. $i=1$,
+
+ 9. 若$i<s$则做下面10-14步,否则转15步,
+
+ 10. 若$\{i,s\}\in NC$则令$j=i+1$并做下面11-13步,否则转14步,
+
+ 11. 当$j<s$时做下面12,13步,否则转14步,
+
+ 12. 若$\{j,s\}\in NC\wedge\{i,j\}\in NC$则看$X_s|\mathrm{lcm}(X_i,X_j)$是否成立,是则令$NC=NC\setminus\{\{i,j\}\}$,
+
+ 13. $j=j+1$,
+
+ 14. $i=i+1$,
+
+ 15. 输出$NC$.
+</algorithm>
+
+** Gr\"obner基的应用
+
+*** 一些简单的应用
+
+现在我们可以回到本章开头所提出的一些关于多元多项式理想的问题上来了.我们要解决的第一个问题是对于任何一个多项式$f$,如何判断它在不在一个已知的理想$I=\idea{f_1,\ldots,f_s}$中,以及找出多项式$v_1,\ldots,v_s$使得$f=v_1f_1+\cdots+v_sf_s$.
+
+首先我们根据前面生成Gr\"obner基的算法,不仅得到了约化的Gr\"obner基$G=\{g_1,\ldots,g_t\}$,而且可以得到变换矩阵$M_{t\times s}$使得$(g_1,\ldots,g_t)=(f_1,\ldots,f_s)M$.由推论##cor:beautifulgb 利用带余除法可判定$f$是不是在理想$I$中.若$f\in I$,设利用除法算法得到的多项式为$u_1,\ldots,u_t$,满足$f=u_1g_1+\cdots+u_tg_t$,于是由$$f=(g_1,\ldots,g_t) \begin{pmatrix}u_1\\ \vdots\\ u_t\end{pmatrix}=(f_1,\ldots,f_s)M\begin{pmatrix}u_1\\ \vdots\\ u_t\end{pmatrix}$$知$(v_1,\ldots,v_s)^T=M(u_1,\ldots,u_t)^T$.
+
+对于两个多项式理想是否相等的判定,也可由它们唯一的约化Gr\"obner基来进行.而在商环$R/I$中的算术需要用到代表元,我们也可取为$\overline{f}=f\rem G$.下面定理给出了商环$R/I$的一组基.
+
+<theorem>
+$\mathcal{B}=\{\overline{g}|g\in M\wedge g\not\in\idea{\lt{G}}\}$是$R/I$在$F$上的一组基.
+</theorem>
+
+$R/I$中的求逆问题.设$f\in R/I$,我们既已知道了该环的基,则可设$f^{-1}$为$\mathcal{B}$的元素的线性组合来求解,这比较复杂.我们设$g$是$f$的逆,注意到$$fg-1\in I\Leftrightarrow 1\in\idea{I,f}\Leftrightarrow\idea{I,f}=R,$$则我们可以求$\idea{I,f}$的Gr\"obner基,看1是否在其中来确定是否存在逆.再求出$1$在$\idea{I,f}$中的线性表示,即$1=v_1f_1+\cdots+v_sf_s+gf$,$g$即是$f$在$R/I$中的逆.
+
+*** Hilbert零点定理及Gr\"obner基在解方程中的应用
+
+<index name="Hilbert零点定理"></index>
+现在考虑$F$的某个扩域$k\supset F(\text{或}k=F)$.
+
+<definition>
+$V_k(I)=\{a\in k^n|\forall f\in I(f(a)=0)\}$.
+
+对于$F^n$中子集$V$,定义$R$的理想$I(V)=\{f\in R|f(V)=0\}$.
+</definition>
+
+<theorem label="weakhilbert" name="弱Hilbert零点定理">
+$I\subset R$,$k$是$F$的代数闭域,则$V_k(I)=\emptyset\Leftrightarrow I=R=F[x]$.
+</theorem>
+
+<definition>
+定义多项式理想$I$的根理想(radical)为$\sqrt{I}=\{f\in R|\exists e\in\mathbb{N}(f^e\in I)\}$.
+</definition>
+
+显然有$\forall k\supset F$,$V_k(I)=V_k(\sqrt{I})$.
+
+<theorem label="stronghilbert" name="强Hilbert零点定理">
+$I(V_k(I))=\sqrt{I}$.
+</theorem>
+
+<corollary>
+$V_k(I)=V_k(J)\Leftrightarrow\sqrt{I}=\sqrt{J}$.
+</corollary>
+
+<remark>
+强、弱Hilbert零点定理的证明见有关代数几何的书,如<cite>hun74</cite>及其中译本<cite>fkq85</cite>.
+</remark>
+
+<theorem label="th:hilbert">
+设$G=\{g_1,\ldots,g_t\}\in GB(I)$,下面三个命题等价:
+
+(1)$V_k(I)$是有限集,
+
+(2)$\forall i\in\{1,\ldots,n\}$,$\exists v_i\in\mathbb{N},j\in\{1,\ldots,t\}$使得$\lm{g_j}=x_i^{v_i}$,
+
+(3)$R/I$有限维.
+
+当上面任何一个条件满足时,我们也称理想$I$是<index>零维理想</index>(zero-dimensional).
+</theorem>
+
+<proof>
+(1)$\Rightarrow$(2).若$V_k(I)=\emptyset$则$1\in G$,取$v_i=0$即可.下面假设$V_k(I)\neq\emptyset$,取某个$i\in\{1,\ldots,n\}$,对于$l=\#V_k(I)$,取$a_{im}(m=1,2,\ldots,l)$为$V_k(I)$中点的第$i$个分量,取非零多项式$f_m\in F[x_i]\subset F[x]$使得$f_m(a_{im})=0$,令$f=f_1\cdots f_l\in F[x_i]\subset F[x]$,则$f\in I(V_k(I))=\sqrt{I}$,于是$\exists e\in\mathbb{N}$使得$f^e\in I$,则$\lm{f^e}$是$x_i$的幂,$G$中有元素$g_j$满足$g_j=x_i^{v_i}$为$x_i$的幂.
+
+(2)$\Rightarrow$(3).对于$R/I$的基$\prod_{1\le i\le n}x_i^{\alpha_i}$,一定满足$\alpha_i<v_i$,维数不超过$\prod_{1\le i\le n}v_i$,因此它是有限维的.
+
+(3)$\Rightarrow$(1).考虑多项式集合$\{\overline{x_i^j}|j\in\mathbb{N}\}$,由于在$R/I$中维数有限,则它们一定线性相关,即存在$m\in\mathbb{N}$使得$\sum_{0\le j\le m}c_j\overline{x_i^j}=0$,亦即$\sum_{0\le j\le m}c_jx_i^j\in I$,该多项式在$F[x_i]$中零点有限,至多为$m$个,不妨设其零点集为$V_i$,于是$V_k(I)\subset\prod_{1\le i\le n}V_i$是有限集.
+</proof>
+
+<corollary label="cor:groebnerforequation">
+设$I$是零维理想,$G=\{g_1,\ldots,g_t\}=RGB(I)$,规定的字典序为$x_1<x_2<\cdots<x_n$,则$t\ge n$,并可将$g_1,\ldots,g_t\in G$重新编号使得$g_i(1\le i\le n)$只含$x_1,x_2,\ldots,x_i$且$\lm{g_i}$为$x_i$的幂.
+</corollary>
+
+<problem>
+考虑由$f_1=x^2+y^2+z^2-1,f_2=x+y+z,f_3=x^2-2x+y^2-2y+z^2+2z$生成的理想的Gr\"obner基.
+</problem>
+
+<solution>
+由Buchberger算法可得其Gr\"obner基为$$G=\{g_1,g_2,g_3\}=\{16x^2-4x-7,4x+4y-1,4z+1\}.$$
+
+显然,$V(I)$是一有限集,此基的形式正如推论所说,由此我们可以由第一个一元多项式方程解出其根,代入第二个方程解出第二个变元,依次迭代下去即可解出所有的根.这里消元的结果和例##ex:resultantelimination 利用结式消元得到的结果是一样的.
+</solution>
+
+*** 方程组解的结构的一些讨论
+
+现在为了方便起见,将所讨论的域限定为复数域$\mathbb{C}$,由上一小节所讨论的内容,我们很容易推广到如下结论:
+
+<theorem>
+$I$是零维理想当且仅当$\forall i\in\{1,\ldots,n\}$,消元理想$I\bigcap\mathbb{C}[x]\neq\{0\}$.
+</theorem>
+
+<proof>
+$(\Rightarrow)$显然.我们只要选取相应的字典序$x_i<x_1<\cdots<x_{i-1}<x_{i+1}<\cdots<x_n$即可.
+
+$(\Leftarrow)$.当消元理想是非平凡理想时,其是一元多项式环$\mathbb{C}[x_i]$上的理想,因而是一个主理想,可设其由$f_i$生成,$f_i$首一且$\deg f_i=m_i$,则对任何单项序有$x_i^{m_i}\in\idea{\lt{I}}=\idea{\lt{G}}$.由此易得$R/I$是$\mathbb{C}$上有限维线性空间.
+</proof>
+
+<remark>
+$f_i$可由满足$\sum_{j=0}^{m_i}c_j\overline{x_i}^j=\overline{0}$的极小多项式得到.
+</remark>
+
+<definition>
+记$p_{red}$为多项式$p$的无平方部分,即$p_{red}:=p/\gcd(p,p')$.
+</definition>
+
+<theorem>
+当$p$是一元多项式时,有$\sqrt{\idea{p}}=\idea{p_{red}}$.
+</theorem>
+
+<proof>
+首先由$V(p)=V(p_{red})\Rightarrow\sqrt{\idea{p}}=I(V(p_{red}))=\sqrt{\idea{p_{red}}}$.而显然有$\sqrt{\idea{p_{red}}}=\idea{p_{red}}$.
+</proof>
+
+<cite>zm02</cite>46页给出了如下定理:
+
+<theorem>
+设$I\subset\mathbb{C}[x_1,x_2,\ldots,x_n]$是一多项式理想,则有$$\sqrt{I}=I+\idea{p_{1,red},p_{2,red},\ldots,p_{n,red}},$$其中$p_i$是消元理想$I\bigcap\mathbb{C}[x_i]$的唯一首一生成元,且$p_{i,red}$是$p_i$的无平方部分.
+</theorem>
+
+<proof>
+设上面等式右边的理想为$J$,先证其为一根理想.我们先将诸$p_i$(记$n_i=\deg p_i$)进行$\mathbb{C}$上的因子分解,得到$$p_{i,red}=\prod_{1\le j\le n_i}(x_i-a_{ij}),$$其中由无平方部分的性质可知$a_{i1},a_{i2},\ldots,a_{in_i}$互不相同.由$p_{1,red}\in J$可得$$J=J+\idea{p_{1,red}}=\bigcap_{1\le j\le n_1}(J+\idea{x_1-a_{1j}}),$$同样地对于其它$p_{i,red}$可得$$J=\bigcap_{1\le j_i\le n_i,1\le i\le n}(J+\idea{x_1-a_{1j_1},x_2-a_{2j_2},\ldots,x_n-a_{nj_n}}).$$对于每一项,$\idea{x_1-a_{1j_1},\ldots,x_n-a_{nj_n}}$都是极大理想,因而$J$是有限个极大理想的交集,即有限个根理想的交集,仍然是根理想.
+
+由$J$的定义显然有$I\subset J$,又由于$J$的零点全在$V(I)$中,于是$I\subset J\subset\sqrt{I}$,取根理想有$\sqrt{I}=\sqrt{J}=J$.
+</proof>
+
+下面我们给出一个有用的引理:
+
+<lemma label="le:multi-interpolation">
+设$S=\{p_1,p_2,\ldots,p_m\}\subset\mathbb{C}^n$是$m$个互不相同的点的集合,则存在多项式组$g_i\in\mathbb{C}[x_1,\ldots,x_n](1\le i\le m)$,使得$g_i(p_j)=\delta_{ij}$.
+</lemma>
+
+<proof>
+回忆一元多项式情形下的Lagrange插值的构造方法,我们可以类似地构造.首先考虑$p_1,p_2$两个点,两个点肯定有某个分量不同,不妨设$p_{1,k}\neq p_{2,k}$,则定义$$g_{1,2}=\frac{x_k-p_{2,k}}{p_{1,k}-p_{2,k}},$$其满足$g_{1,2}(p_1)=1$,$g_{1,2}(p_2)=0$,同样构造出$g_{1,j}(2\le j\le m)$后,取$g_1=g_{1,2}g_{1,3}\cdots g_{1,m}$即可.
+
+对于$g_i(2\le i\le m)$可类似构造.
+</proof>
+
+下面的定理给出了方程组根的个数的估计(<cite>zm02</cite>47页).
+
+<theorem>
+$I$是$\mathbb{C}[X]$中的零维理想,$A=R/I$,则$\dim A\ge\#V(I)$,取等号当且仅当$I=\sqrt{I}$.
+</theorem>
+
+<proof>
+设$V(I)=\{p_1,\ldots,p_m\}$,其中$m=\#V(I)$,考虑线性映射:$$\delta\subset\mathbb{C}[X]/I\times\mathbb{C}^m:\overline{f}\mapsto(\overline{f}(p_1),\ldots,\overline{f}(p_m)).$$
+
+根据引理##le:multi-interpolation 设$g_1,\ldots,g_m$满足$g_i(p_j)=\delta_{ij}$,则$\overline{g_i}(p_j)=\delta_{ij}$.由于$\forall(\lambda_1,\ldots,\lambda_m)\in\mathbb{C}^m$,$\exists f=\sum_{1\le i\le m}\lambda_ig_i$,使得$\delta(\overline{f})=(\lambda_1,\ldots,\lambda_m)$,因此$\delta$是满射.于是$\dim A\ge\dim\mathbb{C}^m=m=\#V(I)$.
+
+对于第二个等价条件,先设$I=\sqrt{I}$,令$\overline{f}\in\ker\delta$,则$f(V(I))=0\Rightarrow f\in I(V(I))=\sqrt{I}=I\Rightarrow\overline{f}=0$,从而$\delta$是单射,因而是同构,$\dim A=m$.
+
+若$\dim A=m$,首先$I\subset\sqrt{I}$,$\forall f\in\sqrt{I}=I(V(I))$,有$f(V(I))=0$,则$\delta(\overline{f})=(0,\ldots,0)\Rightarrow\overline{f}\in\ker\delta\Rightarrow f\in I\Rightarrow I=\sqrt{I}$.
+</proof>
+
+** Gr\"obner基和特征值法解方程组
+
+在用Gr\"obner基理论将方程组化为三角形列后,采用一步步代入来算会引入累积误差,<cite>zm02</cite>2.4节给出了一种方法,用于求解的任何一个分量,同时也给出了求<index>消元理想</index>$I\bigcap\mathbb{C}[x_i]$的首一生成元的快速方法.设$A=R/I$,首先我们定义
+
+<definition>
+线性映射$m_f\subset A\times A$使得$m_f(\overline{g})=\overline{f}\overline{g}$,显然$m_f=0\Leftrightarrow\overline{f}=0$.以后$m_f$既指线性映射,也可指其在$A$的某组基上的矩阵表示.
+</definition>
+
+很显然可以验证这样定义的线性映射具有一定的和谐性,即$\forall h(t)\in\mathbb{C}[t]$,有$m_{h(f)}=h(m_f)$.只需逐一验证$m_{f+g}=m_f+m_g$,$m_{fg}=m_fm_g$即可.
+
+下面的定理给出了求解的方法:
+
+<theorem>
+设$h_f$是$m_f$的极小多项式,$\forall\lambda\in\mathbb{C}$,$I$是一零维理想,则下面三个命题是等价的:
+ 1. $h_f(\lambda)=0$,
+
+ 2. $\lambda$是$m_f$的特征值,
+
+ 3. $f$在$V(I)$上取得值$\lambda$,即$\lambda\in f(V(I))$.
+</theorem>
+
+<proof>
+由高等代数知识知道1和2等价是显然的.
+
+$2\Rightarrow 3$.不妨设$\lambda\not\in f(V(I))$,由特征值的定义知$\exists \overline{z}\in A\setminus\{0\}$,使得特征方程$\overline{f-\lambda}\overline{z}=0$成立.令$V(I)=\{p_1,\ldots,p_m\}$,则$f(p_i)\neq\lambda(\forall p_i\in V(I))$.令$g=f-\lambda$,有$g(p_i)\neq 0$,设$g_i(1\le i\le m)$满足$g_i(p_j)=\delta_{ij}$,定义$$g'=\sum_{i=1}^m\frac{1}{g(p_i)}g_i,$$ 则$g'(p_i)g(p_i)=1\Rightarrow 1-g'g\in I(V(I))=\sqrt{I}\Rightarrow\exists l\in\mathbb{N}((1-g'g)^l\in I)$.将其做二项式展开,可得$g''$满足$1-g''g\in I$,即$\overline{g''}\overline{g}=1$,故$$\overline{f-\lambda}\overline{z}=0\Rightarrow \overline{g''}\overline{g}\overline{z}=0=\overline{z},$$矛盾.
+
+$3\Rightarrow 1$.设$\lambda=f(p)(p\in V(I))$,由$h_f(m_f)=0\Rightarrow h_f(\overline{f})=0\Rightarrow h_f(f)\in I$,故$h_f(\lambda)=h_f(f(p))=0$.
+</proof>
+
+<corollary>
+设$I$是零维理想,则$m_{x_i}$的特征值集合$V_i$即为$V(I)$中点的$x_i$分量,且$h_{x_i}(x_i)$是消元理想$I\bigcap\mathbb{C}[x_i]$的唯一首一生成元.
+</corollary>
+
+<remark>
+使用上面方法的好处在于,当我们只用Gr\"obner基方法时,由于要求指定的字典序下的Gr\"obner基,其计算是较为复杂的.而我们的定理仅涉及$A$的代数结构,我们可以用计算量较小的分级字典序求出Gr\"obner基,得到$A$上的基,以此来进行特征值的计算<cite>zm02</cite>.
+</remark>
+
+<remark>
+特征值法另一优点是符号求解时不不多次计算多项式组的Gr\"obner基即可得到各个消元理想$I\bigcap\mathbb{C}[x_i]$的首一生成元,从而精确求解出$x_i$.
+</remark>

@@ -1,0 +1,428 @@
+#title 符号积分
+
+<contents>
+
+<index>符号积分</index>是符号计算的重要课题之一，也是计算机代数系统最常用的核心功能之一。众所周知，对一个函数进行符号微分运算是较为简单的事情。早在20世纪50年代计算机诞生之初，Kahrimanian<cite>kah53</cite>和Nolan<cite>nol53</cite>就各自独立地写出了符号微分程序。然而符号微分的反过程——符号积分相对而言却要复杂的多。除了多项式的符号积分是直接的以外，其他函数类的符号积分算法都是相当困难的。1963年，Slagle<cite>sla63</cite>写出了第一个符号积分程序SAINT(Symbolic Automatic INTegrator)，SAINT采用人工模拟求积分的启发性算法，可以成功求解大部分大学一年级微积分考试试题。1967年，Moses<cite>mos67</cite>,<cite>mos71</cite>写出了SIN(Symbolic INtegrator)程序，SIN除了人工智能算法以外，还了使用了一般性的<index>Risch算法</index>求解过程。
+
+Risch算法为符号积分理论的主要突破，由Risch在他的一系列工作中所建立（包括<cite>ris69</cite>,<cite>ris70</cite>,<cite>ris79</cite>及其他一些未正式发表的论文），为近几十年来符号积分理论发展奠定了基础。Risch算法给出一个理论上确定性的过程，用来判定一个给定函数是否有初等积分，并在有初等积分时给出积分结果。Liouville定理（定理##th:liouville ）在Risch算法的构建中起到核心的作用。
+
+尽管Risch算法在理论上十分优美，但算法从来没有被完全地实现过。原因是多方面的，例如Risch算法要求完全分解多项式，而多项式的因子分解往往是十分困难的；在算法过程中可能会引入表示积分结果所不需要的代数数而使积分结果显得相当复杂；代数函数的积分算法需要计算系数在基域代数闭包中、指数为分数的幂级数，因此较为繁琐；被积函数和积分结果也不能包括特殊函数等等。许多后续的工作改进了这些缺陷，并应用到实践中，例如Trager<cite>tra84</cite>，Bertrand<cite>ber94,ber95</cite>在代数函数积分方面的工作，Cherry<cite>che85,che86</cite>，Knowles<cite>kno86</cite>在特殊函数积分方面的工作等等。
+
+本章主要介绍有理函数和初等超越函数的积分理论，需要读者有抽象代数基础。本章主要参考书为<cite>dav88</cite>,<cite no>bro05</cite>和<cite>aca</cite>。关于本章没有涉及的代数函数积分理论及其实现，感兴趣的读者可以参考Trager的原始论文<cite>tra84</cite>，文献<cite>aca</cite>及其他相关文献。
+
+* 有理函数积分
+<index name="有理函数积分"></index>
+** 部分分式分解
+
+最简单的多项式函数的积分算法是直接的。我们下面考虑有理函数$\dfrac{q(x)}{r(x)}$的符号积分，其中$q(x),r(x)\in \mathbb{C}[x]$，满足最大公因子$(q(x),r(x))=1$，不失一般性还可假设$\deg q(x)<\deg r(x)$。求有理函数积分的最朴素的办法是利用部分分式分解。
+
+
+<lemma label="le:partial">
+设$(f(x),g(x))=1$，$\deg h(x)<\deg f(x)g(x)$，则有$$\frac{h(x)}{f(x)g(x)}=\frac{f_1(x)}{f(x)}+\frac{g_1(x)}{g(x)},$$其中$\deg f_1(x)<\deg f(x)$，$\deg g_1(x)<\deg g(x)$。
+</lemma>
+
+<proof>
+由$(f(x),g(x))=1$知存在$u(x) $，$v(x)$满足$f(x)u(x)+g(x)v(x)=1$，于是$$\frac{h(x)}{f(x)g(x)}=\frac{h(x)(f(x)u(x)+g(x)v(x))}{f(x)g(x)}=\frac{h(x)v(x)}{f(x)}+\frac{h(x)u(x)}{g(x)}.$$令$f_1(x)=h(x)v(x)\bmod f(x)$，$g_1(x)=h(x)u(x)\bmod g(x)$即得。
+</proof>
+
+设有因子分解$r(x)=\prod\limits_{i=1}^n(x-a_i)^{n_i}$，反复利用引理##le:partial 则有$$\frac{q(x)}{r(x)}=\sum_{i=1}^n\frac{b_i(x)}{(x-a_i)^{n_i}},$$其中$\deg b_i(x)<n_i$。再将$b_i(x)$在$x=a_i$处展开可得$$\frac{q(x)}{r(x)}=\sum_{i=1}^n\sum_{j=1}^{n_i}\frac{b_{ij}}{(x-a_i)^j},$$其中$b_{ij}$为常数。于是得到
+<latex>
+\begin{equation}
+\int\frac{q(x)}{r(x)}\,dx=\sum_{i=1}^nb_{i1}\ln (x-a_i)-\sum_{i=1}^n\sum_{j=2}^{n_i}\frac{b_{ij}}{(j-1)(x-a_i)^{j-1}}.@@eq:ratint
+\end{equation}
+</latex>
+
+由此有理函数符号积分的问题在理论上就被解决了，即所有有理函数的积分均可由有理函数和对数函数表示，分别称为积分的有理部分和对数部分。但还有几个值得考虑的问题：一方面我们需要在$\mathbb{C}$上完全分解$r(x)$，而精确地做到这一点并不总那么容易；另一方面在计算过程中可能会引入一些系数域扩域中的代数数常数，而这些常数对于表达最终积分结果并不是必需的。
+
+<problem>
+设$q(x)=2x$，$r(x)=x^2+1\in \mathbb{Q}[x]$，则$\displaystyle\int\frac{q(x)}{r(x)}\,dx=\ln(x^2+1)$，而在$\mathbb{C}$上分解$r(x)$需要引入额外的代数数$i$。
+</problem>
+
+
+** Hermite方法
+
+<index>Hermite方法</index>使用多项式的无平方分解来代替完全分解，而无平方分解可以在系数域中完成（参见算法##al:SFD ）。设$r(x)$的无平方分解为$r(x)=\prod\limits_{i=1}^mr_i(x)^i$，其中$r_i(x)$无平方因子且两两互素。从而$$\frac{q(x)}{r(x)}=\frac{q(x)}{\prod\limits_{i=1}^mr_i(x)^i}=\sum_{i=1}^m\frac{q_i(x)}{r_i(x)^i},$$其中$\deg q_i(x)<\deg r_i(x)^i$。因此我们只需要考虑积分$\displaystyle\int\frac{q_i(x)}{r_i(x)^i}\,dx$即可。
+
+由于$r_i(x)$无平方因子，故$(r_i(x),r_i'(x))=1$，可设多项式$a(x),b(x)$满足$a(x)r_i(x)+b(x)r_i'(x)=1$，代入进行分部积分得到
+<latex>
+\begin{align*}
+  \int\frac{q_i(x)}{r_i(x)^i }&\,dx =\int\frac{q_i(x)(a(x)r_i(x)+b(x)r_i'(x))}{r_i(x)^i}\,dx \\
+  &=\int\frac{q_i(x)a(x)}{r_i(x)^{i-1}}\,dx +\int\frac{q_i(x)b(x)r_i'(x)}{r_i(x)^i}\,dx  \\
+  &=\int\frac{q_i(x)a(x)+(q_i(x)b(x))'/(i-1)}{r_i^{i-1}}\,dx -\frac{1}{i-1}\frac{q_i(x)b(x)}{r_i^{i-1}}.
+\end{align*}
+</latex>
+为了简便起见，我们将省略变元$x$与记号$dx$，以下的积分与导数总是对$x$而言的，例如上式即可简写为
+<latex>
+\begin{equation}
+\int\frac{q_i}{r_i^i}=\int\frac{q_ia+(q_ib)'/(i-1)}{r_i^{i-1}}-\frac{1}{i-1}\frac{q_ib}{r_i^{i-1}}.@@eq:hermite
+\end{equation}
+</latex>
+
+此过程称为Hermite约化过程。每进行一次分部积分，被积函数分母中$r_i$的次数便降低一次，如此续行即可完全得到积分的有理部分。
+
+** Horowitz-Ostrogradsky方法
+
+Hermite方法避免了完全分解，但仍要求无平方分解和关于$r_i$的部分分式分解。<index>Horowitz-Ostrogradsky方法</index>则不需要其他工具，通过待定系数法将问题归结为线性方程的求解问题。
+
+设$$\int\frac{q}{r}=\frac{q_1}{r_1}+\int\frac{q_2}{r_2},$$其中$\dfrac{q_1}{r_1}$为积分的有理部分，由部分分式的结果可知$r_1=(r,r')$，$r_2=r/r_1$。求导得到
+<latex>
+\begin{align*}
+  \frac{q}{r}&=\left(\frac{q_1}{r_1}\right)'+\frac{q_2}{r_2} \\
+  &=\frac{q_1'r_1-q_1r_1'}{r_1^2}+\frac{q_2r_1}{r} \\
+  &=\frac{q_1'r_2-q_1r_1'r_2/r_1+q_2r_1}{r}.
+\end{align*}
+</latex>
+从而问题归结为求$q_1$，$q_2$满足$q=q_1'r_2-q_1r_1'r_2/r_1+q_2r_1$且$\deg q_1<\deg r_1$，$\deg q_2<\deg r_2$。以$q_1$，$q_2$的系数作为未知变量，这是一个至多$\deg r$维的线性方程组问题。
+
+<remark>
+设$\deg r=n$，则Hermite方法的时间复杂度为$O(M(n)\log n)$（参见<cite>mca</cite>），其中$M(n)$为多项式乘法的复杂度。而Horowitz-Ostrogradsky方法的复杂度为$O(n^3)$（解线性方程组），尽管渐进意义上后者要比前者慢将近两个量级，但在实践中还是要看具体情况而定。
+</remark>
+
+<remark>
+文献<cite>bro05</cite>2.2节还提供了此原始Hermite约化过程的两个变体——“二次版本”可以将约化步数降为为$O(m^2)$，“线性版本”可以将约化步数降至$O(m)$，其中$m$为$r$的无平方因子的个数。“线性版本”还能够有效避免部分分式分解和无平方分解。
+</remark>
+
+
+** Rothstein-Trager方法
+<index name="Rothstein-Trager方法"></index>
+下面的问题是如何求出对数部分，设$r(x)$为无平方因子的首一多项式，则积分具有形式$$\int\frac{q}{r}=\sum_{i=1}^mc_i\ln v_i,$$其中$c_i$为互不相同的常数，$v_i$为无平方因子的首一多项式，两两互素（可以通过合并项来满足这些条件）。求导得到$$\frac{q}{r}=\sum_{i=1}^m\frac{c_iv_i'}{v_i}.$$由于$v_i$无平方因子且两两互素,可知$$r=\prod\limits_{i=1}^mv_i.$$记$u_i=\prod\limits_{j\ne i}v_j$，则有$$r'=\sum_{i=1}^mu_iv_i'$$及$$q=\sum_{i=1}^mc_iu_iv_i'.$$于是对于$1\le k\le n$，我们有
+<latex>
+\begin{equation}
+  \begin{aligned}
+    (q-c_kr',r)&=(q-c_kr',\prod_{i=1}^mv_i) \\
+    &=\prod_{i=1}^m(q-c_kr',v_i) \\
+    &=\prod_{i=1}^m\left(\sum_{j=1}^m(c_j-c_k)u_jv_j',v_i\right)\\
+    &=v_k.
+  \end{aligned}  @@eq:ckvi
+\end{equation}
+</latex>
+最后一个等式成立是因为
+<latex>
+\begin{equation*}
+  ((c_j-c_k)u_jv_j',v_i)=
+  \begin{cases}
+    v_i & i\ne j, \\
+    1 & i=j, i\ne k, \\
+    v_i & i=j, i=k,
+  \end{cases}
+\end{equation*}
+</latex>
+
+从而
+<latex>
+\begin{equation*}
+  \left(\sum_{j=1}^m(c_j-c_k)u_jv_j',v_i\right)=
+  \begin{cases}
+    1 & i\ne k, \\
+    v_i & i=k.
+  \end{cases}
+\end{equation*}
+</latex>
+
+由式##eq:ckvi 可以看出，当我们找出系数$c_k$后即可通过最大公因子的计算求出$v_k$。那么如何求出$c_k$呢？通过同样的论证我们可以知道$$(q-yr',r)>1\Leftrightarrow \exists 1\le k\le m,y=c_k,$$而由推论##cor:resultantforeq ，$$(q-yr',r)>1\Leftrightarrow\res_x(q-yr',r)=0,$$（此结式称为<index>Rothstein-Trager结式</index>）故求解关于$y$的方程$\res_x(q-yr',r)=0$即可得到所有的系数$c_k$。
+
+<problem>
+设$r=x^3+x+1$，$q=3x^2+1$，则Rothstein-Trager结式$\res_x(q-yr',r)=\res_x((1-y)(3x^2+1),x^3+x+1)=-31(y-1)^3$。从而方程$\res_x(q-yr',r)=0$有唯一的根$y=1$，最大公因子$(q-yr',r)=r=x^3+x+1$，故$$\int\frac{q}{r}=\ln (x^3+x+1)$$即为积分结果。
+</problem>
+
+<remark>
+Rothstein-Trager方法的时间复杂度为$O(nM(n)\log n)$<cite>mca</cite>。
+</remark>
+
+<remark>
+对于高次Rothstein-Trager结式，其根可能无法显式地表达出来。设$r$无平方因子，$n$个根为$a_i$（$i=1,\ldots,n$），不难求得##eq:ratint 中的$b_{i1}$，此时可直接将积分表示为$$\int\frac{q}{r}=\sum_{i=1}^n\frac{q(a_i)}{r'(a_i)}\ln(x-a_i),$$便于进一步的运算。
+</remark>
+
+<remark>
+对于实值函数的积分还应将$c_k$中互为相反数对应的对数项合并为更常见的$\arctan$项。
+</remark>
+
+** Lazard-Rioboo-Trager方法
+
+Rothstein-Trager方法解决了引入不必要的扩张常数的问题，但仍需要计算许多代数扩域上多项式的最大公因子.<index>Lazard-Rioboo-Trager方法</index>是对此的一个改进，其过程只需要无平方分解和若干带余除法。
+
+设$r=\prod\limits_{i=1}^n(x-a_i)$，$h=\res_x(q-yr',r)$，由结式的性质（参见<cite>ZhaXu04</cite>定理3.14）得到$$h=c\cdot\prod_{i=1}^n(q(a_i)-yr'(a_i)),$$其中$c$为非零常数。从而$h$中$c_k$的重数为满足$q(a_i)-c_kr'(a_i)=0$的$i$的个数。而
+<latex>
+\begin{align*}
+  v_k&=(q-c_kr',r)\\
+  &=(q-c_kr',\prod_{i=1}^n(x-a_i)) \\
+  &=\prod_{q(a_i)-c_kr'(a_i)=0}(x-a_i)
+\end{align*}
+</latex>
+可知$\deg v_k$等于$h$中$c_k$的重数。由此出发可知：设被积函数的系数域为$F$，则只需要在$F(y)[x]$中对$q-yr'$和$r$做Euclid除法，设$W_i(x,y)\in F(y)[x]$为余式序列中关于$x$次数为$i$的多项式，则有$v_k=W_{\deg v_k}(x,c_k)$。另外，如果用<index>多项式余式序列算法</index>(PRS)（参见##sec:prsalg 节）来计算结式$h$的话，$W_i(x,y)$的计算可以与结式的计算同时进行。
+; 例子
+* Liouville定理
+
+从直观上来看，所有有理函数总是可以积出。这里“积出”的精确含义是，可以找到一个初等函数作为被积函数的原函数。为了将问题的本质看得更清楚，我们引入如下定义。
+
+<definition>
+设$F $为一个特征为零的域，映射$D:F\rightarrow F$满足$\forall f,g\in F$有
+
+<latex>
+\begin{align*}
+  D(f+g)&=D(f)+D(g), \\
+  D(f\cdot g)&=f\cdot D(g)+g\cdot D(f).
+\end{align*}
+</latex>
+则$D$称为$F$上的微分算子，$(F, D)$称为一个<index>微分代数</index>或者微分域。集合$C(F)=\{c\in F\mid D(c)=0\}$中的元素称为常数。
+</definition>
+容易验证$D$拥有所有分析学教程中求导运算的基本性质，我们在这里仅仅罗列而略去证明（参见<cite>bro05</cite>）。
+
+<proposition name="微分代数的基本性质">
+ 1. $\forall f\in F,c\in C(F)$，$D(cf)=cD(f)$。
+ 2. （除法）$\forall f,g\in F,g\ne 0$，$$D\left(\frac{f}{g}\right)=\frac{gD(f)-fD(g)}{g^2}.$$
+ 3. $C(F)$为$F$的子域。
+ 4. $\forall f\in F^*, n\in \mathbb{Z}$，$D(f^n)=nf^{n-1}D(f)$。
+ 5. （对数导数恒等式）$\forall f_1,\ldots,f_n\in F^*, e_1,\ldots,e_n\in \mathbb{Z}$，$$\frac{D(f_1^{e_1}\cdots f_n^{e_n})}{f_1^{e_1}\cdots f_n^{e_n}}=e_1\frac{D(f_1)}{f_1}+\cdots+e_1\frac{D(f_n)}{f_n}.$$
+ 6. （复合求导）设多项式$P\in C(F)[x_1,\ldots,x_n]$，$f_1,\ldots,f_n\in F$，则有$$D(P(f_1,\ldots,f_n))=\sum_{i=1}^{n}\frac{\partial P}{\partial x_i}(f_1,\ldots,f_n)D(f_i).$$
+</proposition>
+
+微分代数的基本性质使得我们可以完全脱离分析语言，将符号积分的问题视为纯代数问题。而我们关心的“初等函数”，也可以直接用代数语言来描述。
+
+<definition  name="初等函数">
+设$K$为一个微分代数，$K(\theta)$为$K$的微分代数扩张，满足$C(K(\theta))=C(K)$，微分算子$D$简记为'。$\theta$称为在$K$上的<index>初等生成元</index>，若$\theta$满足以下条件之一：
+ 1. $\theta$在$K$上是代数的，即有$f(x)\in K[x]$使得$f(\theta)=0$；
+ 2. $\theta$在$K$上是指数的，即有$\eta\in K$使得$\dfrac{\theta'}{\theta}=\eta'$（此时记$\theta=\exp \eta$）；
+ 3. $\theta$在$K$上是对数的，即有$\eta\in K$使得$\theta'{}=\dfrac{\eta'}{\eta}$（此时记$\theta=\ln \eta$）。
+
+称$K(\theta_1,\ldots,\theta_n)$为$K$上的一个初等函数域，若$\forall 1\le i\le n$，$\theta_i$为$K(\theta_1,\ldots,\theta_{i-1})$上的初等生成元（约定$K(\theta_0)=K$）。任意一个$K$上的初等函数域中的元素称为$K$上的<index>初等函数</index>。
+</definition>
+
+<remark>
+考虑$K=\mathbb{Q}(x)$、$\mathbb{R}(x)$或$\mathbb{C}(x)$时,以上定义的就是分析教程中通常意义下“初等函数”。
+</remark>
+
+<remark>
+定义中的$C(K(\theta))=C(K)$保证了如果$\theta'\in K$的话，$\theta'$必定不是$K$中元素的导数。
+</remark>
+
+
+下面来自Liouville的重要定理，描述了积分为初等函数时必定具有的形式。定理证明需要对三种特殊扩张情形进行讨论，并最终得出一般情（参见形<cite>aca</cite>，<cite>bro05</cite>）。
+<index name="Liouville定理"></index>
+<theorem  name="Liouville" label="th:liouville">
+设$K$为一个微分代数，$f\in K$，若$\int f$为$K$上的初等函数（即$f$有初等积分），则有$$\int f=v_0+\sum_{i=1}^nc_i\ln v_i,$$其中$v_0\in K$，$c_i\in \overline{C(K)}$（代数闭包），$v_i\in \hat K=K(c_1,\ldots,c_n)$。
+</theorem>
+
+<remark>
+可以验证在$K=\mathbb{Q}(x)$、$\mathbb{R}(x)$或$\mathbb{C}(x)$时与我们在上一节的有理函数积分结果是一致的。
+</remark>
+
+* 超越对数函数积分
+
+** 分解引理
+
+设$\theta$为$K$上的一个超越对数函数，我们考虑$f\in K(\theta)$的积分问题。可设$f=p+\dfrac{q}{r}$，其中$p,q,r \in K[\theta]$，$q$，$r$互素且$\deg q<\deg r$，下面的引理使得我们能够沿着和有理函数积分类似的道路走下去。
+<index name="分解引理" sub="超越对数函数"></index>
+<lemma  name="超越对数函数分解引理" label="le:decomp1">
+设$f$为$K$上的超越对数函数，若$f$在$K$上有初等积分，则$p$，$\dfrac{q}{r}$都在$K$上有初等积分。
+</lemma>
+
+<proof>
+以$K(\theta)$代替$K$应用Liouville定理可得$$\int f=v_0+\sum_{i=1}^nc_i\ln v_i,$$其中$v_0\in K(\theta)$，$c_i\in \overline{C(K(\theta))}=\overline{C(K)}$，记$\hat K=K(c_1,\ldots,c_n)$，通过拆分对数项可以保证$v_i\in \hat K[\theta]$为首一多项式。求导得$$f=v_0'+\sum_{i=1}^nc_i\frac{v_i'}{v_i}.$$设$v_0=p_0+\dfrac{q_0}{r_0}$，其中$p_0,q_0,r_0\in K[\theta]$，$q_0,r_0$互素且$\deg q_0<\deg r_0$。根据$v_i$为$\hat K$中元素还是$\hat K[\theta]$中正次数多项式将右端第二项拆为两部分的求和项，可知
+
+<latex>
+\begin{align*}
+p+\frac{q}{r}&=\left(p_0+\dfrac{q_0}{r_0}\right)'+\sum_{i=1}^kc_i\frac{v_i'}{v_i}+\sum_{i=k+1}^nc_i\frac{v_i'}{v_i} \\
+&=\underbrace{\left(p_0'+\sum_{i=1}^kc_i\frac{v_i'}{v_i}\right)}_{\in \hat K[\theta]}+\underbrace{\left(\left(\frac{q_0}{r_0}\right)'+\sum_{i=k+1}^nc_i\frac{v_i'}{v_i}\right)}_{\in \hat K(\theta)\text{为真分式}}.
+\end{align*}
+</latex>
+由于$\theta'{}=\frac{\eta'}{\eta}$，故$\hat K[\theta]$中的多项式的导数仍为$\hat K[\theta]$中的多项式。由$v_i\in \hat K$，可知右端的第一部分为$\hat K[\theta]$中的多项式；又由$v_i$为$\hat K[\theta]$中首一多项式，可验证$\dfrac{v_i'}{v_i}$为$\hat K(\theta)$中的真分式。
+
+由于$\theta$在$K$上超越，等式两端的关于$\theta$的多项式和真分式必定对应相等，从而
+<latex>
+\begin{equation}
+  \left\{
+    \begin{aligned}
+      p&=p_0'+\sum_{i=1}^kc_i\frac{v_i'}{v_i}, \\
+      \frac{q}{r}&=\left(\frac{q_0}{r_0}\right)'+\sum_{i=k+1}^nc_i\frac{v_i'}{v_i}.
+    \end{aligned}\right.@@eq:decomp1
+\end{equation}
+</latex>
+故$p$，$\dfrac{q}{r}$都在$K$上有初等积分。
+</proof>
+
+** 多项式部分
+
+由分解引理，我们可以等价地分别对多项式部分$p$和有理部分$\dfrac{q}{r}$分别求积分，如果其中有一个无初等积分，则$f$也必无初等积分。
+
+<remark>
+一般来说将被积函数$f$拆成两项分别积分与直接积分并不等价。例如$$\int x^x,\quad \int x^x\ln x$$均非初等函数，但$$\int x^x(1+\ln x)=x^x.$$
+</remark>
+
+<remark>
+在下面的算法过程中，为了求得$K(\theta)$中函数的积分，我们预先需要知道如何对基域$K$中的函数作积分。例如我们已经知道有理函数域$K=\mathbb{C}(x)$上的积分方法，因此便可以解决例如$\mathbb{C}(x,\ln x)$中的积分问题。再取$\mathbb{C}(x,\ln x)$作为新的基域$K$，便能得到$\mathbb{C}(x,\ln x, \ln\ln x)$中函数的积分方法。如此可以递归的地做下去，构成了一种“塔状”的求积分过程，我们在后面可以看到（参见定理##th:bro90 ），类似这样的过程最终可以在理论上解决任意复杂形式初等函数积分问题。
+</remark>
+
+
+在式##eq:decomp1 中设$$p=\sum_{i=0}^mA_i\theta^i,\quad p_0=\sum_{i=0}^nB_i\theta^i,$$其中$A_i, B_i\in  K$，则有$$\sum_{i=1}^mA_i\theta^i=\sum_{i=0}^nB_i'\theta^i+\sum_{i=1}^niB_i\theta^{i-1}\theta'+\sum_{i=1}^k\frac{c_iv_i'}{v_i}.$$ 由于$A_i$已知，我们的目标是求出$B_i$和$\sum_{i=1}^k\limits c_i\ln v_i$。利用$\theta$在$K$上超越，可得
+<latex>
+\begin{equation*}
+  n=
+  \begin{cases}
+    m+1 & \text{若}~B_n'=0, \\
+    m & \text{若}~B_n'\ne 0.
+  \end{cases}
+\end{equation*}
+</latex>
+若$B_n'=0$，则$B_{m+1}$为非零常数，否则可约定$B_{m+1}=0$，于是无论何种情况考虑$\theta$的最高次项$\theta^m$可得$$A_m=B_m'+(m+1)B_{m+1}\theta',$$所以$$B_m=-(m+1)B_{m+1}\theta+\int A_m.$$因此若$p$在$K$上初等可积，则必有$\displaystyle\int A_m$为$\hat K[\theta]$中次数不超过一次的多项式，进一步可确定下常数$B_{m+1}$以及$B_m\in  K$。当然，由于$\displaystyle\int A_m$积分常数的存在，$B_m$的确定是在相差一个常数下而言的，设此积分常数为$b_m$。接下来再考虑两边$\theta^{m-1}$项可得$$A_{m-1}=B_{m-1}'+m(B_m+b_m)\theta',$$同样可知$$B_{m-1}=-mb_m\theta+\int A_{m-1}-mB_m\theta',$$于是若$p$在$K$上初等可积，则$\displaystyle\int  A_{m-1}-mB_m\theta'$为$\hat K[\theta]$中次数不超过一次的多项式，可确定常数$b_m$及$B_{m-1}+b_{m-1}$（$b_{m-1}$为积分常数）。如此续行，直到比较$\theta^0$项可得$$A_0=B_0'+(B_1+b_1)\theta'+\sum_{i=1}^k\frac{c_iv_i'}{v_i},$$积分得$$B_0+\sum_{i=1}^kc_i\ln v_i=\int A_0-\int(B_1+b_1)\theta'.$$最终求出常数$b_1$，以及$K$上的对数部分$\sum\limits_{i=1}^kc_i\ln v_i$（注意这最后一步右端积分未必落在$K$中），从而我们（在相差一个常数的意义下）求出了多项式部分的积分。
+; 例子
+** 有理部分与对数部分
+
+我们希望求出##eq:decomp1 中的$\dfrac{q_0}{r_0}$和$\sum\limits_{i=k+1}^nc_i\ln v_i$，求积分的有理部分和对数部分可以和有理函数积分类似地做。为确保类似Hermite约化的过程能够进行，我们验证如下的引理。
+
+<lemma label="le:coprime1">
+设$r\in K[\theta]$为正次数的无平方因子的多项式，则$(r,r')=1$。
+</lemma>
+
+<proof>
+设$r=\prod\limits_{i=1}^n(\theta-a_i)$为$r$在$\overline{K}$上的分解。则由复合函数求导
+<latex>
+\begin{align*}
+  r'&=\sum_{i=1}^n\prod_{j\ne i}(\theta-a_i)(\theta-a_i)' \\
+  &=\sum_{i=1}^n\prod_{j\ne i}(\theta-a_i)(\frac{\eta'}{\eta}-a_i').
+\end{align*}
+</latex>
+若$(r,r')\ne1$，则存在$i$，使得$\theta-a_i\mid \dfrac{\eta'}{\eta}-a_i'$。由于$\dfrac{\eta'}{\eta}-a_i'\in \overline{K}$，而$\theta$在$K$上超越，必有$\dfrac{\eta'}{\eta}=a_i'$。于是$\theta=a_i+c$（$c$为常数）不在$K$上超越，矛盾！
+</proof>
+
+
+有了引理##le:coprime1 中$(r,r')=1$的保证，我们就可以施行Hermite约化过程了。将$r$在$K[\theta]$上作无平方分解$r=\prod\limits_{i=1}^nr_i^i$，完全类似可以得到式##eq:hermite 的约化结果，从而求出积分的有理部分$\dfrac{q_0}{r_0}$。
+
+同样有求对数部分的Rothstein-Trager方法的类似版本。设$r\in K[\theta]$无平方因子，则积分的形式必为$\displaystyle\int\dfrac{q}{r}=\sum\limits_{i=k+1}^nc_i\ln v_i$，其中$c_i\in \overline{C(K)}$为常数，$v_i\in \hat K[\theta]$。求得Rothstein-Trager结式$\res_\theta(q-yr',r)$关于$y$的根$c_i\in \overline{K(\theta)}$，若有$c_i$不是常数，则$\dfrac{q}{r}$在$K(\theta)$上必无初等积分；若$c_i$均为常数，计算最大公因子$(q-c_ir',r)$即可得到$v_i$。
+
+<problem>
+计算$\displaystyle\int\dfrac{1}{x\ln x}$。
+
+令$\theta=\ln x$，为$K=\mathbb{Q}(x)$上的超越对数函数，被积函数为$\dfrac{q}{r}=\dfrac{1}{x\cdot\theta}\in K(\theta)$。$r$无平方因子，可以直接施行Rothstein-Trager方法。$r'{}=\theta+1$，故
+<latex>
+\begin{align*}
+  \res_\theta(q-yr',r)&=\res_\theta(1-y(\theta+1),x\theta) \\
+  &=
+  \begin{vmatrix}
+    -y & x \\
+    1-y & 0
+  \end{vmatrix} \\              
+  &=-(1-y)x.
+\end{align*}
+</latex>
+可知此结式关于$y$只有一个根$c=1$，且为常数。计算最大公因子
+<latex>
+\begin{align*}
+v=(q-cr',r)&=(1-(\theta+1),x\theta ) \\
+&=(\theta,x\theta) \\
+&=\theta.
+\end{align*}
+</latex>
+最终可知$$\int \frac{1}{x\ln x}=c\ln v=\ln \theta=\ln \ln x$$即为积分结果。
+</problem>
+
+<problem>
+计算$\displaystyle\int\dfrac{1}{\ln x}$。
+
+令$\theta=\ln x$，为$K=\mathbb{Q}(x)$上的超越对数函数，被积函数为$\dfrac{q}{r}=\dfrac{1}{\theta}\in K(\theta)$。$r$无平方因子，可以直接施行Rothstein-Trager方法。$r'{}=\dfrac{1}{x}$，故$\res_\theta(q-yr',r)=\res_\theta(1-y\cdot\dfrac{1}{x},\theta)=1-\dfrac{y}{x}$，结式关于$y$的根为$c=x$非常数，可知$\dfrac{1}{\ln x}$不是初等可积的。
+</problem>
+
+; rel:risch
+* 超越指数函数积分
+
+我们沿着有理函数积分的道路顺利地解决了超越对数函数积分的问题，接下来自然要考虑的是超越指数函数积分了，即考虑当$\theta$为$K$上的超越指数函数时$f\in K(\theta)$的积分问题。
+
+但这个问题变得要复杂一些，一方面在计算过程中我们需要在基域$K$中求解微分方程（被称为<index>Risch微分方程</index><cite>ris69</cite>）$$y'+f\cdot y=g,$$其中$f,g\in K$，$y\in K$为未知函数。我们将在[[DifferentialEquation][微分方程符号解]]一章中专门讨论Risch微分方程，而且将看到Risch微分方程和符号积分在某种意义下的相互“纠缠”。现在我们暂时假设已经能够在$K$上完成这样的求解。
+
+复杂性的另一面在于，即使$r\in K[\theta]$无平方因子也不能保证$(r,r')=1$。
+
+<problem>
+考虑$\theta=e^x$，$r=\theta$，$r$无平方因子，但$(r,r')=(\theta,\theta)=\theta\ne1$。
+</problem>
+
+因此我们需要对引理##le:coprime1 做一个小的修订。
+
+<lemma label="le:coprime2">
+设$r\in K[\theta]$为正次数的无平方因子的多项式，且$\theta\nmid r$，则$(r,r')=1$。
+</lemma>
+
+<proof>
+
+设$r=\prod\limits_{i=1}^n(\theta-a_i)$为$r$在$\overline{K}$上的分解。则由复合函数求导
+<latex>
+\begin{align*}
+  r'&=\sum_{i=1}^n\prod_{j\ne i}(\theta-a_i)(\theta-a_i)' \\
+  &=\sum_{i=1}^n\prod_{j\ne i}(\theta-a_i)(\eta'\theta-a_i').
+\end{align*}
+</latex>
+若$(r,r')\ne1$，则存在$i$，使得$\theta-a_i\mid \eta'\theta-a_i'$，从而$\eta'a_i=a_i'$。由于$\theta\nmid r$，故$a_i\ne0$。而$$\left(\frac{a_i}{\theta}\right)'{}=\frac{a_i'\theta-\theta'a_i}{\theta^2}=\frac{a_i'-\eta'a_i}{\theta}=0,$$可知$a_i=c\theta$（$c$为非零常数），这与$\theta$在$K$上超越矛盾！
+</proof>
+
+
+** 分解引理
+
+根据引理##le:coprime2 ，为了能够继续使用Hermite约化，我们需要将分母中的$\theta$因子分离出来，这就引导我们引入如下定义。
+
+<definition  name="广义多项式">
+$K(\theta)$中形如$\sum\limits_{i=-m}^nA_i\theta^i$的元素称为$K(\theta)$中的<index>广义多项式</index>。
+</definition>
+
+在这样的定义下，$f$有广义分解$p+\dfrac{q}{r}$，其中$p$为广义多项式，$q,r\in K[\theta]$，$q$，$r$互素，$\deg q<\deg r$且有$\theta\nmid r$。有类似于引理##le:decomp1 的分解引理，证明过程也是类似的。
+<index name="分解引理" sub="超越指数函数"></index>
+<lemma  name="超越指数函数分解引理">
+设$f$为$K$上的超越指数函数，若$f$在$K$上有初等积分，则$p$与$\dfrac{q}{r}$都在$K$上有初等积分。
+</lemma>
+
+<proof>
+以$K(\theta)$代替$K$应用Liouville定理可得$$\int f=v_0+\sum_{i=1}^nc_i\ln v_i,$$其中$v_0\in K(\theta)$，$c_i\in \overline{C(K(\theta))}=\overline{C(K)}$，记$\hat K=K(c_1,\ldots,c_n)$，通过拆分对数项可以保证$v_i\in \hat K[\theta]$为首一多项式。求导得$$f=v_0'+\sum_{i=1}^nc_i\frac{v_i'}{v_i}.$$设$v_0=p_0+\dfrac{q_0}{r_0}$为广义分解，根据$v_i$为$\hat K$中元素还是$\hat K[\theta]$中正次数多项式将右端第二项拆为两部分。我们要注意$\hat K[\theta]$中多项式求导的特殊性，由于$$(A_i\theta^i)'{}=A_i'\theta^i+A_ii\theta^{i-1}\theta'{}=(A_i'+A_ii\eta')\theta^i,$$因此多项式求导后每个单项的次数都不变，故可不妨假定$\theta\nmid v_i$。由于$\dfrac{v_i'}{v_i}$不再是真分式，因此还需将$v_i'$中的最高次项分离出来（例如减去$n_i\eta'v_i$，其中$\deg v_i=n_i$），则可得
+<latex>
+\begin{align*}
+p+\frac{q}{r}&=\left(p_0+\dfrac{q_0}{r_0}\right)'+\sum_{i=1}^kc_i\frac{v_i'}{v_i}+\sum_{i=k+1}^nc_i\frac{v_i'}{v_i} \\
+&=\underbrace{\left(p_0'+\sum_{i=1}^kc_i\frac{v_i'}{v_i}+\sum_{i=k+1}^nc_in_i\eta'\right)}_{\in \hat K(\theta)\text{为广义多项式}}+\underbrace{\left(\left(\frac{q_0}{r_0}\right)'+\sum_{i=k+1}^nc_i\frac{v_i'-n_i\eta'v_i}{v_i}\right)}_{\in \hat K(\theta)\text{为真分式},\ \theta\nmid v_i}
+\end{align*}
+</latex>
+
+由于$\theta$在$K$上超越，等式两端的关于$\theta$的广义多项式和真分式必定对应相等，从而
+<latex>
+\begin{equation*}
+  \left\{
+    \begin{aligned}
+      p&=p_0'+\sum_{i=1}^kc_i\frac{v_i'}{v_i}+\sum_{i=k+1}^nc_in_i\eta', \\
+      \frac{q}{r}&=\left(\frac{q_0}{r_0}\right)'+\sum_{i=k+1}^nc_i\frac{v_i'-n_i\eta'v_i}{v_i}.
+    \end{aligned}\right.
+\end{equation*}
+</latex>
+故
+<latex>
+\begin{equation}
+  \left\{
+\begin{aligned}
+\int p&=p_0+\sum_{i=1}^kc_i\ln v_i+\sum_{i=k+1}^nc_in_i\eta, \\
+\int\dfrac{q}{r}&=\frac{q_0}{r_0}+\sum_{i=k+1}^nc_i(\ln v_i-n_i\eta),
+\end{aligned}\right.@@eq:decomp2
+\end{equation}
+</latex>
+都在$K$上有初等积分。
+</proof>
+
+** 多项式部分
+
+在式##eq:decomp2 中设$$p=\sum_{i=-m}^nA_i\theta^i,\quad p_0=\sum_{i=-m'}^{n'}B_i\theta^i,$$其中$A_i, B_i\in  K$，则有$$\sum_{i=-m}^nA_i\theta^i=\left(\sum_{i=-m'}^{n'}B_i\theta^i\right)'+\sum_{i=1}^k\frac{c_iv_i'}{v_i}+\sum_{k+1}^nc_in_i\eta'.$$由于$A_i$已知，我们的目标是求出$B_i$和$\sum\limits_{i=1}^kc_i\ln v_i+\sum\limits_{i=k+1}^nc_in_i\eta$。由于多项式求导不改变次数，故必有$n=n'$，$m=m'$。比较对应项系数得到
+<latex>
+\begin{equation}
+A_i=B_i'+iB_i\eta',\quad i=-m,\ldots,n,\ i\ne0.@@eq:rischexp
+\end{equation}
+</latex>
+这些是$K$上的关于未知量$B_i$的Risch方程，我们假定了能够在$K$上求解此类方程或给出无解的结论。若其中有一个方程无解，则$f$在$K(\theta)$上无初等积分；否则可求出$B_i\ (i=-m,\ldots,n,\ i\ne0)$，最后根据$\displaystyle\int A_0$求出$B_0+\sum\limits_{i=1}^kc_i\ln v_i+\sum\limits_{i=k+1}^nc_in_i\eta$。
+
+** 有理部分和对数部分
+
+由于我们有了引理##le:coprime2 的保证，依然可以对广义分解中的$\dfrac{q}{r}$进行Hermite约化过程，从而得到积分的有理部分。
+
+同样可以用类似于Rothstein-Trager的方法计算对数部分，设$r$无平方因子，则$\dfrac{q}{r}$形如$\sum\limits_{i=k+1}^nc_i\dfrac{v_i'-n_i\eta'v_i}{v_i}$，可知$r=\prod\limits_{j=k+1}^nv_j$。记$u_i=\prod\limits_{j\ne i}v_j$，则$$r'=\sum_{j=k+1}^nu_jv_j',$$及$$q=\sum_{j=k+1}^nc_j(v_j'-n_j\eta'v_j)u_j.$$于是
+<latex>
+\begin{align*}
+  &\qquad\left(q-c_i\left(r'-r\sum_{j=k+1}^nn_j\eta'\right),r\right) \\
+  &=\left(\sum_{j=k+1}^n(c_j-c_i)(v_j'-n_jv_j\eta')u_j,r\right) \\
+  &=\prod_{l=k+1}^n\left(\sum_{j=k+1}^n(c_j-c_i)(v_j'-n_jv_j\eta')u_j,v_l\right) \\
+  &=v_i.
+\end{align*}
+</latex>
+因为$\sum\limits_{j=k+1}^nn_j=\deg r$，所以可以通过求结式$\res_\theta(q-y(r'-r\deg r\cdot\eta',r)$关于$y$的根来求得$c_j$。与超越对数情形类似，如果此结式有根$c_i$非常数，则$\dfrac{q}{r}$在$K(\theta)$上无初等积分；若所有根均为常数，则通过计算最大公因子$(q-c_i(r'-r\deg r\cdot\eta'),r)$即可求得$v_i$。
+
+; 例子

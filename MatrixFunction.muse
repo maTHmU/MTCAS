@@ -1,0 +1,184 @@
+#title 矩阵函数
+
+<contents>
+
+* 特征值方法
+
+给定一$n$阶方阵$A$和标量函数$f (z)$,有多种方法定义矩阵$f (A)$.例如,对于$r (z)= (1-z/2)^{-1} (1+z/2)$及$e^z$,可分别用$r (A)\equiv (1-A/2)^{-1} (1+A/2)$及Taylor级数$e^A\equiv \sum\limits_{k=0}^{\infty}\frac{A^k}{k!}$来定义.一种较精确而广泛的定义利用线积分:假设$f(z)$在闭曲线$\Gamma$的内部解析,且$\Gamma$包围了$\lambda(A)$,则定义$f(A)$为
+$$f(A)=\frac{1}{2\pi i}\oint_{\Gamma}f(z) (zI-A)^{-1}\mathrm{d}z.$$
+
+以上定义可以用来导出$f(A)$的一些实际特性.例如,若$f(A)$有定义,且$A=XBX^{-1}=X\mathrm{diag} (B_1,\cdots,B_p)X^{-1},B_i\in \mathbb{C}^{n_i\times n_i}$,则$$f(A)=Xf(B)X^{-1}=X\mathrm{diag} (f (B_1),\cdots,f (B_p))X^{-1}.$$特别地,当$B_i$为Jordan块时,可有如下结果:
+
+<theorem>
+设$X^{-1}AX=\mathrm{diag} (J_1,\cdots,J_p)$为$A\in \mathbb{C}^{n\times n}$的Jordan标准型 (JCF),其中
+<latex>
+\begin{equation*}
+J_i=
+\begin{bmatrix}
+  \lambda_i& 1\\
+  & \ddots& \ddots\\
+  & & \ddots& 1\\
+  & & & \lambda_i
+\end{bmatrix}
+\end{equation*}
+</latex>为$m_i$阶Jordan块.若$f(z)$在包含$\lambda (A)$的一个开集上解析,则$$f(A)=X\mathrm{diag} (f(J_1),\cdots,f(J_p))X^{-1},$$其中
+<latex>
+\begin{equation*}
+  f(J_i)=
+  \begin{bmatrix}
+    f(\lambda_i)& f^{(1)} (\lambda_i)& \cdots& \frac{f^{(m_i-1)} (\lambda_i)}{(m_i-1)!}\\
+    & \ddots& \ddots& \vdots\\
+    & & \ddots& f^{(1)} (\lambda_i)\\
+    & & & f (\lambda_i)
+  \end{bmatrix}.
+\end{equation*}
+</latex>
+</theorem>
+
+<proof>
+只要观察$f(G)$的形式即可,其中$$G=\lambda I+E,(E= (\delta_{(i,j-1)}))$$为$q $阶Jordan块.假设$(z I-G)$非奇异,因为$$(zI-G)^{-1}=\sum\limits_{k=0}^{q-1}\frac{E^k}{(z-\lambda)^{k+1}},$$由Cauchy积分定理可知
+<latex>
+\begin{equation*}
+  f (G)=\sum\limits_{k=0}^{q-1}\left[\frac{1}{2\pi i}\oint_\Gamma \frac{f(z)}{(z-\lambda)^{k+1}}\mathrm{d}z\right]E^k=\sum\limits_{k=0}^{q-1}\frac{f^{(k)} (\lambda)}{k!}E^k.
+\end{equation*}
+</latex>
+注意到$E^k= (\delta_{i,j-k}$即知定理成立.
+</proof>
+
+<corollary>
+若$A\in \mathbb{C}^{n\times n}$,$A=X\mathrm{diag} (\lambda_1,\cdots,\lambda_n)X^{-1}$且$f(A)$有定义,则$$f(A)=X\mathrm{diag} (f (\lambda_1,\cdots,f (\lambda_n)))X^{-1}.$$
+</corollary>
+
+以上结果给出了$f (A)$与$A$的特征系统之间的密切联系,但除非$A$能被良态矩阵$X$对角化,用Jordan标准型处理矩阵函数的数值特性不可靠.
+
+利用Schur分解可避免Jordan分解带来的困难.若$A=QTQ^H$是$A$的Schur分解,则$f (A)=Qf (T)Q^H$.因此,我们需要一个计算上三角阵函数的算法,但因为$f (T)$的显式表示极其复杂.我们代之以下的算法 (Parlett,1974),用以计算$F\equiv f(T)$的严格上三角部分,它仅需$2n^3/2$个flop.
+
+由$FT=TF$,比较方程两边的$i,j$元可知$$\sum\limits_{k=1}^j f_{ik}t_{kj}=\sum\limits_{k=i}^j t_{ik}f_{kj},j>i.$$若$t_{ii}\neq t_{jj}$,则
+<latex>
+\begin{equation*}
+  f_{ij}=t_{ij}\frac{f_{jj}-f_{ii}}{t_{jj}-t_{ii}}+\sum\limits_{k=i+1}^{j-1}\frac{t_{ik}f_{kj}-f_{ik}t_{kj}}{t_{jj}-t_{ii}}.
+\end{equation*}
+</latex>由此,在已知对角元$f (t_{ii} (i=1:n))$后,可逐对角线地递推出$F$的整个严格上三角部分.
+
+但是,以上算法在矩阵$A$有邻近的重特征值时失效.此时可采用其分块形式 (Parlett,1974).第一步在Schur分解中选取恰当的$Q$使得$A$的相同或相近特征值集中在$T$的对角块$T_{11},\cdots,T_{pp}$中,也即计算分划
+<latex>
+\begin{align*}
+  T&=
+  \begin{bmatrix}
+    T_{11}& \cdots& T_{1p}\\
+    & \ddots& \vdots\\
+    & & T_{pp}
+  \end{bmatrix},\\
+  F&=
+  \begin{bmatrix}
+    F_{11}& \cdots& F_{1p}\\
+    & \ddots& \vdots\\
+    & & F_{pp}
+  \end{bmatrix}.
+\end{align*}
+</latex>
+其中$$\lambda (T_{ii})\cap \lambda (T_{jj})=\O,$$用特征值排序的算法可以做到这一点.
+
+下一步计算子矩阵$F_{ii}=f (T_{ii}),(i=1:p)$,这将用以后阐述的方法.一旦$F$的对角块已知,$F$的严格上三角块也可如下递推算出.仍然比较$FT=TF$中$i<j$的块,则$$F_{ij}T_{jj}-T_{ii}F_{ij}=T_{ij}F_{jj}-F_{ii}T_{ij}+\sum\limits_{k=i+1}^{j-1} (T_{ik}F_{kj}-F_{ij}T_{kj}),$$每次要算出$F$的一条块对角线,它可以用之前介绍的Bartels-Stewart算法求解.
+
+** 逼近算法
+
+在数值计算中,可采用逼近法.其基本思想是若$g(z)$在$\lambda (A)$上逼近$f (z)$,则$g(A)$逼近$f(A)$.一个逼近矩阵函数的常用方法是Taylor级数,而针对具体函数形式则有更多更好的选择,如$e^A$可用Pad\'{e}函数逼近.
+
+逼近法中常需计算矩阵的多项式.设$$p (A)=b_0I+b_1A+\cdots +b_qA^q$$,最明显的办法是采用Horner的技巧,它需要$q-1$矩阵乘法:$$p (A)=b_0I+A(b_1I+A(\cdots(b_{q-1}+b_qA)\cdots))$$.但由于矩阵乘法与数乘性质不同,故更常用以下的算法:
+
+设$s$为满足$1\leqslant \sqrt{q}$的整数,则$$p (A)=\sum\limits_{k=0}^r B_k (A^s)^k,r=\lfloor q/s\rfloor,$$其中
+<latex>
+\begin{equation*}
+  B_k=
+  \begin{cases}
+    b_{sk+s-1}A^{s-1}+\cdots+b_{sk+1}A+b_{sk}I& k=0:r-1\\
+    b_qA_{q-sr}+\cdots+b_{sr+1}A+b_kI& k=r
+  \end{cases}
+\end{equation*}
+</latex>只要计算出$A^2,\cdots,A^s$,则Horner规则即可应用于上式.$p(A)$的结果可只用$s+r-1$次矩阵乘法得到.取$s=\lfloor \sqrt{q}\rfloor$时,乘法次数大致最少.
+
+以上计算中,矩阵求幂可采用所谓二进制求幂法.即先计算$$s=\sum\limits_{k=0}^t\beta_k2^k$$为$s$的二次幂的展开$(\beta_t\neq 0)$,分别计算$A^2,\cdots,A^{2^t}$将其累积出$A^s$.这一算法最多需要$2\lfloor \log_2 s\rfloor$次矩阵乘法,若$s$是$2$的幂,则只要$\log_2s$次矩阵乘法.
+
+** 矩阵指数
+
+经常要计算的矩阵函数之一是指数$$e^{At}=\sum\limits_{k=0}^{\infty}\frac{(At)^k}{k!}.$$计算它的算法有许多,但正如Moler和Van Loan (1978,2003)<cite>MolVan7803</cite>的综述文章所指出的,它们中的大多数是不可靠的.以下介绍两种算法,它们分别适用于数值计算和精确计算.
+
+*** Pad\'{e}逼近
+
+考虑如下一类逼近函数,Pad\'{e}函数:$$R_{pq} (z)=D_{pq} (z)^{-1}N_{pq} (z),$$其中,
+<latex>
+\begin{align*}
+  N_{pq} (z)&=\sum\limits_{k=0}^p\frac{(p+q-k)!p!}{(p+q)!k!(p-k)!}z^k,\\
+  D_{pq} (z)&=\sum\limits_{k=0}^q\frac{(p+q-k)!q!}{(p+q)!k!(q-k)!} (-z)^k.
+\end{align*}
+</latex>
+
+但Pad\'{e}逼近仅在原点才有效.但利用$e^A= (e^{A/m})^m$可克服这一困难.特别地,若取$m=2^j$,则可使求幂的计算十分有效地进行,而整个逼近的好坏取决于$$F_{pq}= \left(R_{pq} \left (\frac{A}{2^j}\right)\right)$$的精度.Moler和Van Loan(1978)证明了,若$$\frac{\|A\|_{\infty}}{2^j}\leqslant \frac{1}{2},$$则存在扰动矩阵$E$满足
+<latex>
+\begin{gather*}
+  F_{pq}=e^{A+E}\\
+  AE=EA\\
+  \|E\|_{infty}\leqslant \epsilon (p,q)\|A\|_{\infty}
+\end{gather*}
+</latex>其中,$$\epsilon (p,q)=2^{2- (p+q)}\frac{p!q!}{(p+q)!(p+q+1)!}.$$由此可以导出Pad\'{e}逼近的精度估计:
+<latex>
+\begin{equation*}
+  \frac{\|e^A-F_{pq}\|_{\infty}}{\|e^A\|_{\infty}}\leqslant \epsilon (p,q)\|A\|_{\infty}e^{\epsilon (p,q)\|A\|_{\infty}}.
+\end{equation*}
+</latex>
+参数$p,q$可根据要求的相对误差来确定.注意到$F_{p,q}$大约需要$j+\max (p,q)$次矩阵乘法,故通常令$p=q$,这样就得到以下算法:
+<algorithm  name="Pad\'{e}逼近">
+给定$A\in \mathbb{R}^{n\times n}$和正数$\delta>0$,计算$F=e^{A+E}$,其中$\|E\|_{\infty}\leqslant \delta\|A\|_{\infty}.$
+
+ 1. 取$j=\max (0,1+\lfloor\log_2 (\|A\|_{\infty})\rfloor)$,令$A\leftarrow A/2^j$.
+ 2. 令$q$为满足$\epsilon (q,q)\leqslant \delta$的最小非负整数.
+ 3. 逐项计算出$N,D$.
+ 4. 用Gauss消元法从$DF=N$中解出$F$.
+ 5. 计算$F^{2^j}$
+</algorithm>
+
+这一算法大约需要$2 (q+j+1/3)n^3/3$个flop,其中特殊的Horner技巧可用于加快$N$和$D$的计算.相比同样精度的Taylor逼近,Pad\'{e}逼近要减少约一半的计算量.
+
+*** Putzer方法
+
+若已知矩阵$A$的特征值 (在精确计算中借助其特征多项式得到),则关于矩阵指数$e^A$有如下定理<cite>Put66</cite>,它给出了一种精确计算矩阵指数的方法:
+
+<theorem  name="Putzer">
+设$\lambda (A)=\{\lambda_1,\cdots,\lambda_n\}$,则$$e^{Ax}=\sum\limits_{j=0}^{n-1}r_{j+1} (x)P _j,$$其中,
+<latex>
+\begin{align*}
+  P_0&=1,\\
+  P_1&=A-\lambda I,\\
+  &\cdots\\
+  P_{n-1}&= (A-\lambda_1I)\cdots (A-\lambda_{n-1}I)=P_{n-2} (A-\lambda_{n-1}I),
+\end{align*}
+</latex>
+$r_1 (x),\cdots,r_n (x)$如下确定:
+<latex>
+\begin{align*}
+  r_1' (x)&=\lambda_1r_1 (x), r_1 (0)=1 (\text{也即}r_1=e^{\lambda_1x}),\\
+  r_2' (x)&=\lambda_2r_2 (x)+r_1 (x),r_2 (0)=0,\\
+  & \cdots\\
+  r_n' (x)&=\lambda_n (x)+r_{n-1} (x),r_n (0)=0.
+\end{align*}
+</latex>
+</theorem>
+可以看出,$r_k$所满足的线性方程组都是容易求解的.
+
+<proof>
+记$\Psi (x)=\sum\limits_{j=0}^{n-1}r_{j+1} (x)P_j$.只要证$\Psi' (x)=A\Psi (x)$且$\Psi (0)=I$即可.由$P_j,r_{j+1}$的定义知$\Psi (0)=I$.以下证明$\Psi' (x)=A\Psi (x)$.
+<latex>
+\begin{align*}
+  \Psi' (x)&=\sum\limits_{j=0}^{n-1}r'_{j+1} (x)P_j=\sum\limits_{j=0}^{n-1}\lambda_{j+1}r_{j+1}P_j+\sum\limits_{j=1}^{n-1}r_jP_j,\\
+  A\Psi (x)&=\sum\limits_{j=0}^{n-1}r_{j+1}AP_j.
+\end{align*}
+</latex>由$P_j$的定义知,$AP_j=\lambda_{j+1}P_j+P_{j+1}$而$P_n=\prod\limits_{j=1}^{n-1}r_jP_j=0$.从而$AP_{n-1}=\lambda_nP_{n-1}$.故得到
+<latex>
+\begin{equation*}
+  A\Psi (x)=\sum\limits_{j=0}^{n-1}r_{j+1} (\lambda_{j+1}P_j+P_{j+1})=\Psi' (x)
+\end{equation*}
+</latex>
+</proof>
+
+** 矩阵有理函数的计算

@@ -1,0 +1,210 @@
+#title 符号求和
+
+<contents>
+
+我们接下来要讨论的符号求和问题是指符号表达式级数的求和,它包括<index>部分和</index>问题以及<index>无穷和</index>(即部分和序列的极限)问题两部分.如果求和上界$n$不出现在待求和的级数项中,则称为<index>不定求和</index>,这里我们只讨论不定求和的部分和问题.
+
+
+* 多项式级数求和
+
+为了解决<index>多项式级数</index>求和问题,我们先来看一看单项式级数求和,以下是我们熟知的几个求和公式,公式的证明请参阅<cite>shuxueshouce</cite>.
+<theorem>
+ 1.$\sum\limits_{0\le k<n}k=\frac{n(n-1)}{2}$
+ 2.$\sum\limits_{0\le k<n}k^2=\frac{n(n-1)(2n-1)}{6}$
+ 3.$\sum\limits_{0\le k<n}k^3=\frac{n^2(n-1)^2}{4}$
+ 4.$\sum\limits_{0\le k<n}k^4=\frac{n(n-1)(2n-1)(3n^2-3n-1)}{30}$
+</theorem>
+<remark>
+这些公式容易用归纳法证明,但很难直接从中找出显明的规律.
+</remark>
+
+为了进一步地讨论,我们引入<index>差分算子</index>和<index>差分原函数</index>的定义.
+<definition name="差分算子" label="de:difference">
+ 1.平移算子$E$定义为$$E(f)(x)=f(x+1),$$另外定义$E^n=E\circ E^{n-1}$,$E^1=E$,$E^0=e$.
+ 2.定义差分算子$\Delta=E^1-E^0$,如果$g=\Delta(f)$,那么称$f$为$g$的差分原函数.
+</definition>
+<theorem>
+$$\Delta(f\cdot g)=\Delta(f)\cdot g+f\cdot\Delta(g)-\Delta(f)\cdot\Delta(g).$$
+</theorem>
+<proof>
+<latex>
+\begin{align*}
+\Delta(f\cdot g)&=E(f\cdot g)-f\cdot g\\
+&=(E(f)-f)\cdot g+f\cdot (E(g)-g)-(E(f)-f)\cdot (E(g)-g)\\
+&=\Delta(f)\cdot g+f\cdot \Delta(g)-\Delta(f)\cdot \Delta(g).
+\end{align*}
+</latex>
+</proof>
+
+<theorem>
+如果$g$是$f$的差分原函数,即$g=\Delta(f)$,那么$$\sum_{i=a}^{b-1}g(i)=f(b)-f(a).$$
+</theorem>
+<proof>
+$$\sum_{i=a}^{b-1}g(i)=\sum_{i=a}^{b-1}(f(i+1)-f(i))=f(b)-f(a).$$
+</proof>
+<remark>
+$$g=\Delta(f)\Leftrightarrow f=\Sigma(g),$$这和微积分的互逆定理$$g=D(f)\Leftrightarrow f=\int g$$是类似的.
+</remark>
+
+<index name="函数降阶乘"></index>
+<definition name="函数降阶乘">
+函数$f$的$m$阶降阶乘$$f^{\underline{m}}=f(x)\cdot f(x-1)\cdots f(x-m+1).$$
+</definition>
+<theorem>
+$$\Delta(x^{\underline{m}})=mx^{\underline{m-1}}.$$
+</theorem>
+<proof>
+<latex>
+\begin{align*}
+  \Delta(x^{\underline{m}})&=(x+1)^{\underline{m}}-x^{\underline{m}}\\
+&=((x+1)-(x-m+1))x^{\underline{m-1}}\\
+&=mx^{\underline{m-1}}.
+\end{align*}
+</latex>
+</proof>
+<remark label="re:function-falling-factorial">
+$$\sum_{i=0}^{n-1}i^{\underline{m}}={1\over m+1}n^{\underline{m+1}}.$$
+</remark>
+
+设$$x^m=\sum_{i=0}^ma_{m,i}x^{\underline{i}},$$则
+<latex>
+\begin{align*}
+x^m&=x\cdot x^{m-1}\\
+&=\sum_{i=0}^{m-1}a_{m-1,i}(x-i+i)\cdot x^{\underline{i}}\\
+&=\sum_{i=0}^{m-1}a_{m-1,i}x^{\underline{i+1}}+\sum_{i=0}^{m-1}a_{m-1,i}i\cdot x^{\underline{i}}\\
+&=x^{\underline{m}}+\sum_{i=1}^{m-1}(a_{m-1,i-1}+i\cdot a_{m-1,i})x^{\underline{i}},  
+\end{align*}
+</latex>
+于是有递推公式$$a_{m,i}=a_{m-1,i-1}+i\cdot a_{m-1,i},$$其中$a_{m,0}=1$.
+
+$a_{m,i}$在组合数学中被称为<index>第二类Stirling数</index>(参见<cite>mca</cite>),它表示将一个$m$元有限集划分为$i$个非空子集的方法数.
+
+<problem>
+以$m=1,2$为例.
+ 1.$\sum\limits_{i=0}^{n-1}i=\sum\limits_{i=0}^{n-1}i^{\underline 1}={1\over 2}n^{\underline 2}={1\over 2}n(n-1),$
+ 2.$\sum\limits_{i=0}^{n-1}i^2=\sum\limits_{i=0}^{n-1}(i^{\underline 2}+i^{\underline 1})={1\over 3}n^{\underline 3}+{1\over 2}n^{\underline 2}={1\over 6}n(n+1)(2n+1).$
+</problem>
+
+<theorem name="多项式级数部分和">
+设$$g(x)=\sum\limits_{m=0}^dg_mx^m,$$则$$\sum_{k=0}^{n-1}g(k)=\sum_{0\le i\le m\le d}g_ma_{m,i}\frac{n^{\underline{i+1}}}{i+1}.$$
+</theorem>
+<proof>
+根据注##re:function-falling-factorial 有
+<latex>
+\begin{align*}
+  \sum_{k=0}^{n-1}g(k)&=\sum_{k=0}^{n-1}(\sum_{m=0}^dg_m(\sum_{i=0}^ma_{m,i}k^{\underline i}))\\
+&=\sum_{0\le i\le m\le d}g_ma_{m,i}(\sum_{k=0}^{n-1}k^{\underline{i}})\\
+&=\sum_{0\le i\le m\le d}g_ma_{m,i}\frac{n^{\underline{i+1}}}{i+1}.
+\end{align*}
+</latex>
+</proof>
+
+* 超几何级数
+
+和多项式级数的情形一样,首先研究超几何单项式级数求和.
+<definition name="超几何单项式">
+单项式级数通项$g_n$称为<index>超几何单项式</index>,如果相邻项之比$$r(n)=\frac{g_{n+1}}{g_n}$$是关于$n$的有理函数.
+</definition>
+<problem>
+二项式系数$\binom{m}{n}$是超几何单项式,因为
+<latex>
+\begin{align*}
+  \frac{\binom{m}{n+1}}{\binom{m}{n}}&=\frac{\Gamma(m+1)\Gamma(n+1)\Gamma(m-n+1)}{\Gamma(n+2)\Gamma(m+n)\Gamma(m)}\\
+&=\frac{-n+m}{n+1}.
+\end{align*}
+</latex>
+</problem>
+
+设$$r(n)=\frac{g_{n+1}}{g_n}=\frac{a(n)}{b(n)}\cdot \frac{c(n+1)}{c(n)},$$并且满足$\gcd(a(n),b(n+k))=1$,$\forall k\in \mathbb{N}$.设$\Delta(f)=g$,则$f_n=f_0+\sum\limits_{k=0}^{n-1}g_k$,$$\frac{f_n}{g_n}=\frac{f_n}{f_{n+1}-f_n}=\frac{1}{\frac{f_{n+1}}{f_n}-1}.$$令$y(n)=\frac{f_n}{g_n}$,则$$y(n+1)g(n+1)=f_{n+1}=(y(n)+1)g(n),$$即$r(n)y(n+1)=y(n)+1$.所以可取$y(n)=\frac{b(n-1)}{c(n)}x(n)$,其中$x(n)\neq0$且满足$$a(n)x(n+1)-b(n-1)x(n)=c(n).$$
+
+** 极大阶乘分解
+
+<index>极大阶乘分解</index>(Greatest Factorial Factorization)是多项式的一种特殊分解.
+<definition name="极大阶乘分解" label="de:gff">
+设$f$为首一多项式,记$f$的极大阶乘分解为$$\mathrm{gff}(f)=\langle f_1,\cdots,f_m\rangle,$$它满足:
+ 1.$f=f_1^{\underline 1}\cdots f_m^{\underline m}$.
+ 2.$f_1,\cdots,f_m$为首一多项式且$f_m\neq 1$.
+ 3.$\gcd(f_i^{\underline i},E(f_j))=1$.
+ 4.$\gcd(f_i^{\underline i},E^{-j}f_j)=1$,$1\le i,j\le m$.
+</definition>
+<remark>
+这样定义是为了保证$$f_j^{\underline j}=f_j\cdot E^{-1}f_j\cdots E^{-j+1}f_j$$没有更小的降阶乘因子,因为如果$g=\gcd(f_i^{\underline i},E^{-j}f_j)\neq 1$,则$g^{\underline{j+1}}|f$.
+</remark>
+
+关于极大阶乘分解有如下定理,定理的证明请参阅<cite>mca</cite>.
+<theorem>
+ 1.设$f$为首一多项式且$f\neq 0$,则$f$至多有一种极大阶乘分解.
+ 2.$\mathrm{gff}(\gcd(f,E(f)))=\langle f_2,\cdots,f_m\rangle$.
+</theorem>
+
+** Gosper算法
+<index name="Gosper算法"></index>
+<lemma>
+给定超几何单项式$g$,设$\sigma={E(g)\over g}$,$f=\tau\cdot g$,则$$\Delta(f)=g\Leftrightarrow E(\tau)\cdot \sigma-\tau=1.$$
+</lemma>
+<proof>
+<latex>
+\begin{align*}
+\Delta(f)&=E(f)-f\\
+&=E(\tau)\cdot E(g)-\tau\cdot g\\
+&=(E(\tau)\cdot\sigma-\tau)g.
+\end{align*}
+</latex>
+</proof>
+<remark label="re:gosper1">
+由超几何单项式的性质可以设$\sigma={a\over b}$,$\tau={u\over v}$,其中$(a,b)=(u,v)=1$,并且$b,v$均为首一多项式,上式化为$$a\cdot v\cdot E(u)-b\cdot u\cdot E(v)=b\cdot v\cdot E(v).$$这样我们就把求解差分原函数的问题归结为求解多项式方程.理论上可以直接通过待定系数法解出这个方程,但是计算量很大.
+</remark>
+
+Gosper算法利用极大阶乘分解来求解注##re:gosper1 中的多项式方程.
+
+记$\gcd(E(f))=\gcd(f,E(f))$,设$v_0={v\over\gcd(E(v))}$,$v_1={E(v)\over\gcd(E(v))}$,则$(v_0,v_1)=1$,方程两边同除以$\gcd(E(v))$得$$a\cdot v_0\cdot E(u)-b\cdot v_1\cdot u=b\cdot v_0\cdot v_1\cdot\gcd(E(v)),$$其中$$(u,v_0)=(E(u),v_1)=(u,v)=1,$$于是有$$v_0|b,v_1|a.$$设$\mathrm{gff}(v)=\langle h_1,\cdots,h_m\rangle$,则
+<latex>
+\begin{align*}
+v_0&=\frac{h_1^{\underline 1}h_2^{\underline 2}\cdots h_m^{\underline m}}{h_2^{\underline 1}\cdots h_m^{\underline{m-1}}}\\
+&=h_1\cdot E^{-1}(h_2)\cdots E^{-(m-1)}(h_m),
+\end{align*}
+</latex>
+<latex>
+\begin{align*}
+v_1&=\frac{E(h_1)^{\underline 1}E(h_2)^{\underline 2}\cdots E(h_m)^{\underline m}}{h_2^{\underline 1}\cdots h_m^{\underline{m-1}}}\\
+&=E(h_1)\cdot E(h_2)\cdots E(h_m),
+\end{align*}
+</latex>
+再由$v_0|b$,$v_1|a$可得$$h_i|E^{-1}(a),h_i|E^{i-1}(b).$$若$v\neq 1$,则
+<latex>
+\begin{align*}
+  1&\neq h_m|\gcd(E^{-1}(a),E^{m-1}(b))\\
+&=E^{-1}(\gcd(a(x),b(x+m))),
+\end{align*}
+</latex>
+而这等价于$$\mathrm{res}_x(a(x),b(x+y))|_{y=m}=0.$$
+
+现在我们可以写出求$v$的某一个倍数$V$的Gosper算法.
+<algorithm  name="Gosper算法">
+
+输入:$(a,b)$=1,其中$b$为首一多项式.
+
+输出:首一多项式$V$,满足$v|V$,其中$(u,v)=1$且$$a\cdot v\cdot E(u)-b\cdot u\cdot E(v)=b\cdot v\cdot E(v).$$
+
+ 1.设$R=\mathrm{res}_x(a(x),b(x+y))$,$d=\max\{k\in \mathbb{N}$;$k=0$或$R(k)=0\}$.若$d=1$,输出1.
+ 2.设$a_0=a$,$b_0=b$,对$i=1,2,\cdots,d$依次计算$$H_i=\gcd(E^{-1}(a_{i-1}),E^{i-1}(b_{i-1})),$$ $$a_i=\frac{a_{i-1}}{E(H_i)},b_i=\frac{b_{i-1}}{E^{-(i-1)}(H_i)}.$$ 
+ 3.输出$H_1^{\underline 1}\cdots H_d^{\underline d}$.
+</algorithm>
+<remark>
+不难看出$h_i|H_i$,因此$$v=h_1^{\underline 1}\cdots h_m^{\underline m}|H_1^{\underline 1}\cdots H_m^{\underline m}\cdots H_d^{\underline d}=V.$$在算法实际运行过程中,一旦$a_i=1$或$b_i=1$,可以预计$H_j=1$,其中$j=i+1,\cdots,d$,此时可以直接结束计算.
+</remark>
+
+现在我们将方程化成了$$a\cdot V\cdot E(U)-b\cdot E(V)\cdot U=b\cdot V\cdot E(V),$$其中$V$为已知的首一多项式.左右同除以$g=\gcd(a\cdot V,b\cdot E(V))$,得$$r\cdot E(U)-s\cdot U=t,$$其中$r=\frac{a\cdot V}{g}$,$s=\frac{b\cdot E(V)}{g}$,$t=s\cdot V$.
+
+设$$U=U_ex^e+\cdots+U_0,$$其中$e$可以通过如下定理确定,定理的证明请参阅<cite>mca</cite>.
+<theorem>
+设$m=\max\{\deg(r)-1,\deg(s-r)\}$,$\delta$为$(s-r)$中$x^m$的系数.
+ 1.若$\deg(r)-1<\deg(s-r)$或$\delta\notin \mathbb{N}$,则$e=\deg(t)-m$.
+ 2.若$\deg(t)-m=\delta$,则多项式方程不可解.
+ 3.若$\deg(t)-m\neq \delta$,则$e=\max\{\deg(t)-m,\delta\}$,如果$e<0$,则多项式方程不可解.
+</theorem>
+<remark>
+对多项式方程比较对应项系数将得到一个上三角阵的线性方程组,这时就可以解出$U$来.通过这一系列手续,最终求得$$u=\frac{U}{\gcd(U,V)},v=\frac{V}{\gcd(U,V)}.$$
+</remark>
+
+除了多项式级数与超几何级数的求和算法之外,还有许多其他的求和算法.例如Wilf-Zeilberger算法(参见<cite>aeqb</cite>),它可以解决求和上界$n$出现在待求和的级数项中的超几何级数求和问题,求出和函数所满足的递推方程,因此也常常用于组合恒等式的自动证明.再如针对有理函数级数的求和问题,现有的算法包括Moenck算法,Horowitz算法,Paule算法(参见<cite>paule95</cite>)和Karr算法(参见<cite>karr81</cite>)等,Karr算法的扩展版本还可以解决含根式的级数求和问题(参见<cite>kauers07</cite>)以及嵌套求和问题(参见<cite>schneider04</cite>),关于<index>有理函数求和</index>更详细的介绍请参阅<cite>aeqb</cite>和<cite>pirastu96</cite>.

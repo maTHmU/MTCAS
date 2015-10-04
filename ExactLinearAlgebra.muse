@@ -1,0 +1,1020 @@
+#title  线性代数
+
+<contents>
+; 精确线性代数主要包含两个互相关联的方面:一是一般PID和域 (特别地如有限域$F_p$)上的线性代数问题,二是作为特例,整数环$\mathbb{Z}$和有理数域$\mathbb{Q}$上的线性代数问题.精确线性代数的很多问题同数值线性代数是相对应的,如线性方程组求解,矩阵的特征值与特征向量以及矩阵的各种标准形等.但由于精确计算与数值计算的本质不同,二者在算法设计思想等方面则有根本的不同.简单举例来说,如果对$\mathbb{Z}$上的矩阵进行直接运算,为了保持计算的精确性,将不得不采用有理数的代数运算或引入Bezout等式进行消元.但两种方法随着计算规模的增长，都会出现矩阵元素的大小快速增加的现象，这将使得多数直接算法 (如通常的Gauss消元法)复杂度很高.尽管可以证明,在考虑了矩阵元素规模增长造成的计算复杂度增长之后,多数矩阵精确计算(包括求解线性方程组,计算行列式等)复杂度仍是多项式型的<cite>mca</cite>,但由于多项式指数相当大,对于实用计算造成很大的困难,难以直接应用.因此,在涉及整数与有理系数矩阵的计算中,一种典型的思路是借助整数的模运算,将主要的计算化归到有限域($\mathbb{Z}/p\mathbb{Z}$,往往也不限于$p$为素数)上进行,再将结果恢复为整数或有理数的形式;另一种典型的思路是通过某种近似,将主要的计算视为数值型计算,通过数值运算得到主要结果后再恢复为精确结果.对于后者,由于数值型算法先于精确算法得到了比较充分的发展,故在精确线性代数中常常要借用数值线性代数的思想与方法,我们在本章中将多次遇到.
+
+; 本章集中介绍精确线性代数中有普遍应用的几个问题的算法:
+
+;  1. 快速矩阵乘法,这是很多矩阵算法的基础,在数值线性代数中也有广泛的应用.
+;  2. 线性方程组求解,包括系数矩阵非奇异的情形与一般系数矩阵下 (多相应于不定方程组)的Diophantine解.
+;  3. 行列式的计算,这在计算矩阵的各种标准形时有广泛的应用.
+;  4. 矩阵特征多项式与极小多项式的计算.
+;  5. 矩阵的标准形式,包括Hermite标准形,Smith标准形与Jordan标准形等.
+
+; 由于精确线性代数的算法很多,且仍在迅速发展中,我们只能介绍一些基本的算法.更多的算法可以参考我们给出的文献以及它们的文献目录.
+
+在计算机代数系统中,涉及<index>线性代数</index>的内容主要包括两方面的问题:一是线性方程组的求解,二是矩阵各种标准形的约化.其中线性方程组不仅作为许多应用问题的数学模型,还是众多算法的基础,支撑着整个通用计算机代数系统.矩阵的标准形主要是指整环或域上矩阵的Hermite标准形,Smith标准形,Frobenius标准形以及Jordan标准形等[1].矩阵到这些标准形的约化过程与Diophantine方程求解以及更广泛的计算数论,计算群论等问题有着密切的联系.
+
+本章主要讨论快速矩阵乘法与线性方程组求解的算法.对矩阵标准形约化算法感兴趣的读者可以参考<cite>Gra03</cite>2.3.2节中所列出的参考文献.
+* 快速矩阵乘法
+
+在线性代数问题中,<index>矩阵乘法</index>具有基础性的意义.在代数复杂性理论中,大部分线性代数问题都可约化为矩阵乘法(<cite>BinPan94</cite>2.2节,<cite>Bur97</cite>第16章),因此矩阵乘法构成了复杂性理论中一个重要的研究模型(<cite>Bur97</cite>第15章).对于$n$阶一般矩阵的乘法,由定义得到的常规算法具有$O(n^3)$的复杂度[2].自1968年Strassen<cite>Str68</cite>发现一种基于分治策略的快速矩阵乘法算法以来,矩阵乘法算法复杂度的指数已由3降到2.376<cite>CopWin87</cite>.下面我们回顾两个经典算法,它们在实际中有着重要的应用.而更多算法虽然渐进复杂度更低,对于代数复杂性理论研究有着重要意义,但由于算法过于复杂,且对于有限规模的问题所需运算更多,因而并不实用,可参考<cite>Pan84</cite>及<cite>Bur97</cite>第15章.
+
+** 基于向量内积算法的Winograd算法
+
+以下讨论主要根据文献<cite>Win68</cite>.
+<index name="Winograd内积算法"></index>
+<algorithm label:"alg:WinogradInnerProduct" name="Winograd内积算法">
+设$x=(x_1,\cdots,x_n)^T$,$y=(y_1,\cdots,y_n)^T$,记$\xi=\sum\limits_{j=1}^{\lfloor n/2\rfloor}x_{2j-1}x_{2j}$,$\eta=\sum\limits^{\lfloor n/2\rfloor}_{j=1}y_{2j-1}y_{2j}$,则内积$(x,y)$可由下式给出:
+
+<latex>
+\begin{equation*}
+  (x,y)=
+  \begin{cases}
+    \sum\limits^{\lfloor n/2\rfloor}_{j=1}(x_{2j-1}+y_{2j})(x_{2j}+y_{2j-1})-\xi-\eta,& \text{$n$为偶数,} \\
+    \sum\limits^{\lfloor n/2\rfloor}_{j=1}(x_{2j-1}+y_{2j})(x_{2j}+y_{2j-1})-\xi-\eta+x_ny_n,& \text{$n$为奇数.}
+  \end{cases}
+\end{equation*}
+</latex>
+</algorithm>
+
+将这种算法用于$C=AB$的矩阵元素运算时,由于减少重复计算$\xi$,$\eta$,可使计算所需的乘法次数减半,但同时使所需的加法运算增加.Winograd算法也是$O(n^3)$的算法,仅适用于小规模的矩阵求积运算.
+
+** Strassen算法
+
+<index>Strassen算法</index>是一种分治策略的算法.它以分块矩阵运算为基础.
+
+下面介绍改进型Strassen算法,它较原始算法<cite>Str68</cite>需要更少的矩阵加法运算(<cite>mca</cite>12.1节).
+
+<algorithm label:"alg:Str" name="Strassen算法">
+设$A$,$B$为$n$阶矩阵,必要时通过补充零行零列加以扩充,将其分块:
+
+<latex>
+\begin{gather*}
+  A=
+  \begin{bmatrix}
+    A_{11}& A_{12}\\
+    A_{21}& A_{22}
+  \end{bmatrix}
+  ,B=
+  \begin{bmatrix}
+    B_{11}& B_{12}\\
+    B_{21}& B_{22}
+  \end{bmatrix}
+ ,C=AB=
+  \begin{bmatrix}
+    C_{11}& C_{12}\\
+    C_{21}& C_{22}
+  \end{bmatrix}.
+\end{gather*}
+</latex>
+进行如下递归运算:
+ 1. 若$n\leq l$($l$为递归下界),采用直接算法进行计算.
+ 2. 计算
+<latex>
+\begin{gather*}
+  S_1=A_{21}+A_{22},S_2=S_1-A_{11},S_3=A_{11}-A_{21},S_4=A_{12}-S_2,\\
+  T_1=B_{12}-B_{11},T_2=B_{22}-T_1,T_3=B_{22}-B_{12},T_4=T_2-B_{21}.
+\end{gather*}
+</latex>
+ 3. 计算
+<latex>
+\begin{gather*}
+  P_1=A_{11}B_{11},P_2=A_{12}B_{21},P_3=S_4B_{22},P_4=A_{22}T_4,\\
+  P_5=S_1T_1,P_6=S_2T_2,P_7=S_3T_3.
+\end{gather*}
+</latex>
+ 4. 计算
+<latex>
+\begin{gather*}
+  U_1=P_1+P_2,U_2=P_1+P_6,U_3=U_2+P_7,U_4=U_2+P_5,\\
+  U_5=U_4+P_3,U_6=U_3-P_4,U_7=U_3+P_5.
+\end{gather*}
+</latex>
+ 5. 返回
+<latex>
+\begin{equation*}
+\begin{bmatrix}
+   U_1& U_5\\
+   U_6& U_7
+\end{bmatrix}.
+\end{equation*}
+</latex>
+</algorithm>
+
+以上算法的正确性通过直接代入即可验证.可以看出,每次递归需要7次乘法与15次加法,从而其算法复杂度是$O(n^{\log_27})\simeq O(n^{2.808})$.
+
+下面考虑一个技术细节,即对于阶数$n$不是$2^k$的矩阵添加零行零列的问题.很容易想到两种方案,一是在必要时才考虑添加,即在递归过程中,遇到矩阵阶数为奇数的情形则给它添加一个零行(或零列);二是统一添加,即在计算的开始首先考察矩阵的阶数,若它不满足$2^k$的要求,即给它添加若干个零行零列,使之满足,而在递归过程中则不需再考虑矩阵阶数的问题.简单的分析可以知道,由于第一种方式将添加零行零列的工作分成许多次完成,造成其计算效率大大下降,因此实际中应采用第二种方法.
+
+J. Demmel等指出,以Strassen算法为代表的快速矩阵乘法在一定意义下(所谓"弱"意义下)是数值稳定的<cite>Dem07</cite>.我们对随机生成的浮点数矩阵进行了测试,并与经典算法给出的结果做对比,确实未见数值稳定性有明显下降.
+
+可以看到,Strassen算法与"高精度计算"中的Karatsuba算法的"神似".读者可能会提出这样的问题:能不能类似Toom-Cook算法一样推广Strassen算法到高阶从而降低算法的渐进复杂度呢?这个问题要从两方面来回答.直接的类比和推广由于矩阵乘法不可交换而受到限制,但将矩阵分块推广到$n\times n$块重新构造快速算法的确是可行的,然而这种从2到$n$的推广却不像整数运算那么直接.例如,对于$n=3$的情形,Laderman<cite>Lad76</cite>给出了需要23次乘法的算法,若采用递归计算,其渐进复杂度指数为$\log_323>\log_27$,反而不及Strassen算法.类似的这种尝试可参考<cite>Pan84</cite>,这方面的研究及相关理论分析最终导致了<index>双线性算法</index>概念及其复杂性理论的诞生.此后对于矩阵乘法复杂度的研究主要是沿着这个方向进行,迄今为止已经达到的最优渐进复杂度为$O(n^{2.376})$<cite>CopWin87</cite>.但在实际中,仅当$n$极大时才有价值,故通常并不采用.可参考<cite>Pan84</cite><cite>Bur97</cite>及其中所引用的参考文献.
+
+* 线性方程组与消元法
+
+; 线性方程组的重要性是显而易见的,它不但是许多实际问题的数学模型,而且构成许多算法的基础.在"数值线性代数"部分中我们已经介绍了工程计算中使用的数值算法,在这里我们将介绍线性方程组的精确求解,主要讨论整数系数与多项式系数线性方程组的有理解,一些方法可以推广到一般整区上.
+
+<index>线性方程组</index>求解是线性代数的中心问题之一.它是许多实际问题的数学模型,还构成许多数值与符号算法的基础,从而在工程计算与计算机代数系统中都占据着重要的位置.因此,人们对线性方程组求解算法进行了深入的研究,针对不同的问题提出了大量的高效算法.其中,数值算法主要包括一般系数矩阵的消元法以及应用于稀疏或有结构系数矩阵的算法,读者可以参考<cite>GolVan01</cite>和<cite>BinPan94</cite>.我们在随后几节中主要介绍精确求解线性方程组的算法.这些算法大多可直接应用于整系数,有理系数,多项式系数或有限域上的方程组,并可以推广到一般整环,商域及其扩域上.
+
+概括说来,精确算法可分为以下几类(其算法归纳可参考<cite>Gra03</cite>2.3节以及<cite>Vil07</cite>),我们将分别选取典型的算法进行介绍.
+ - <index>消元法</index>.这一类算法以Gauss消元算法为基础,但由于直接的消元步骤对于精确计算会遭遇"中间表达式膨胀"的困难,而往往通过特定的映射对问题进行约化.
+ - 黑箱算法.这相当于数值计算中大量运用的迭代法.
+ - 应用于稀疏或有结构的系数矩阵的特殊算法.
+
+关于有结构系数矩阵的线性方程组的求解,在<cite>GolVan01</cite>和<cite>BinPan94</cite>中,针对不同的系数矩阵(Vandermonde阵,Toeplitz阵和Hilbert阵等[3])给了详尽的讨论.另外,与求解线性方程组密切相关的一个问题是求解整系数不定线性方程的整数解(Diophantine解),它与矩阵的Hermite标准形约化有密切的关系,也请读者参考<cite>Gra03</cite>2.3节列出的有关文献.
+
+本节将要介绍的消元法也可称为直接法,这是相对于下节中要介绍的黑箱算法来说的.这些消元算法以Gauss消元法为基础,通过对系数矩阵元素的直接运算对矩阵进行约化,得到方程组的解.不同算法的区别体现在实施约化的过程.概括来说,本节介绍的三种算法都是通过某种映射将消元过程归结到更易计算的有限域或浮点数系统中进行.除这些算法之外,还有一种称为Exact Division算法,是通过细致分析整系数方程组的消元过程,从每一步消元的结果中除掉它们的公因子,从而控制矩阵元素规模的增长,可以参考<cite>Bareiss</cite>和<cite>Chee</cite>第10章.
+
+** 基于中国剩余定理的消元法
+<index sub="基于中国剩余定理的" name="消元法"></index>
+我们先简要回顾求解线性方程组的一般方法,即<index name="消元法">Gauss消元法</index>,并给出一些相关概念,这在任何一本线性代数教材中都可以找到(<cite>ZhaXu04</cite>第3章).为了讨论最一般的情形,我们设要求解的方程组为$AX=B$,其中$A$为$m\times n$阶矩阵,$B$为$m\times q$阶矩阵,未知元排列成$n\times q$的矩阵$X$,并设$A$与$B$为$s$元多项式系数的矩阵,对于整系数矩阵只要将$s$取为0.
+
+根据线性代数的知识,线性方程组的的一般解集合由一个特解与系数矩阵的零空间表征，即该方程组的任意解都可表达为该特解与零空间中向量的和.因此,我们要求线性方程组的一般解,就要同时求出其特解和零空间的一组基.Gauss消元的基本做法是对线性方程组的系数矩阵与增广矩阵进行行初等变换,将其化为相抵的<index>行既约阶梯形阵</index>(row-reduced echelon,RRE),即如下形式(最后的0可能是子方阵,也可能没有):
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    0&\cdots&0&*&\cdots&0&\cdots&0&\cdots\\
+     & & & & &*&\cdots&0&\cdots\\
+     & & & & & &\cdots&\cdots&\cdots\\
+     & & & & & & &*&\cdots\\
+     & & & & & & & &0
+  \end{bmatrix}
+\end{equation*}
+</latex>它具有如下特点:
+ - 非0行的最左非0元素所在列的其余元素均为0,且最左非0元素的位置随行号增加而右移;[4]
+ - 各非0行最左非0元素的位置,随行号增加而右移,若有0行均排在最后.
+
+详言之,若非零矩阵$B$满足:存在一列整数$1\le k_1<k_2<\cdots<k_r\le n$,其中$1\le r\le m$($r$即矩阵$B$的秩),使得$B(i,k_i)\neq 0$,$B(i,j)=0$,$1\le j<k_i$,且若$r<m$,则第$r+1,\ldots,m$行均为0.称$K=\{k_1,k_2,\cdots,k_r\}$为$B$的既约阶梯(reduced echelon,RE)序列,$B(i,k_i),1\le i\le r$称为RRE矩阵的对角元素[5].若$A$与$B$行相抵,则也称$B$为$A$的RRE,$K$为$A$的RRE序列.对于已经化为这种形式的系数矩阵与增广矩阵,我们很容易判断线性方程组是否有解并求出其一般解.在下面我们考察的情形中，非0行往往以一个公共元素$d$开始,从而对于整系数线性方程组的求解可以避免中间计算过程出现分数.
+
+<index sub="正则" name="行既约阶梯形阵"></index>
+
+在本小节中,我们将介绍一种适用于整系数与多元多项式系数线性方程组求解的算法<cite>Mcc73</cite>,这种算法通过同态映射将系数矩阵约化到有限域上进行消元运算.在如下算法中,我们需要判断给定同态映射是否可用,其判断标准由如下定义的序列$(J_A,I_A)$表征.
+
+为了叙述方便,我们首先引入子阵的记号:设$1\le i_1<i_2\cdots<i_p\le m$,$1\le j_1<j_2<\cdots<j_q\le n.$ $m\times n$阶矩阵$A=(a_{ij})$中位于第$i_1,\cdots,i_p$行和第$j_1,\cdots,j_p$列交叉处的元素按原序排成的方阵称为$A$的一个$p\times q$阶子阵,记为$$A\begin{pmatrix}i_1&\cdots&i_p\\j_1&\cdots&j_q\end{pmatrix}.$$记$M_j$为矩阵$A$的前$j$列构成的子矩阵.定义序列$J_A=\{j_1,\cdots,j_r\}$,其中$j_h$为最小的整数$j$使得$\mathrm{rank}(M_j)=h$.由于行变换不改变列向量之间的线性相关性,$J$即上文定义的行RE序列,而且是唯一的.对于非零矩阵$A$,可以找到一列互异整数$h_1,\cdots,h_r$,$1\le h_t\le m,1\le t\le r$满足$$A\begin{pmatrix}h_1&\cdots&h_s\\j_1&\cdots&j_s\end{pmatrix}\neq 0,1\le s\le r.$$若记$h_{r+1},\cdots,h_m$为其余的整数,则$H=(h_1,\cdots,h_m)$构成$1,\cdots,m$的一个排列.记所有这样的序列$H$构成集合$\mathcal{P}_A$,则$\mathcal{P}_A$中,存在一个按照字典序最小的序列$I_A=\{i_1,\cdots,i_m\}$.等价地说,对于$1\le t\le r$,$i_t$为依次选出来的最小的整数使得这些行向量线性无关,而对于$r+1\le t\le m$,$i_t$被按照原序排好.若$A$为零矩阵,我们很自然地定义$I_A=\{1,\cdots,m\}$.再定义$J_A\times I_A$的字典序,$(J_A,I_A)>(J_B,I_B)$,当且仅当$J_A>J_B$,或$J_A=J_B,I_A>I_B$.
+
+在定义了序列$(J_A,I_A)$之后,我们引入如下的正则RRE矩阵.对于$m\times n$阶矩阵$A$,定义
+<latex>
+\begin{equation*}
+\bar{A}_H(k,j)=
+\begin{cases}
+A
+\begin{pmatrix}
+h_1&\hdotsfor{5}&h_r\\
+j_1&\cdots&j_{k-1}&j&j_{k+1}&\cdots&j_r
+\end{pmatrix},&1\le k\le r,\\
+0,&\text{其他}.
+\end{cases}  
+\end{equation*}
+</latex>由$J_A,H_A$的定义可知,$\bar{A}_H$为RRE矩阵,且可以证明,$\bar{A}_H$与$A$行相抵.特别地,对于$H_A=I_A$,将其记为$\bar{A}$,并称为$A$的正则RRE(CRRE).很显然,这一标准形式是唯一确定的.对于$H=(h_1,\cdots,h_m)$,定义$$\delta_H(A)=A\begin{pmatrix}h_1&\cdots&h_r\\j_1&\cdots&j_r\end{pmatrix},$$若$A$为零矩阵,则定义$\delta_H(A)=0$.我们看到$\bar{A}_H$的对角线元素都等于$\delta_H(A)$.特别地,对于$H=I_A$,将$\delta_H(A)$简记为$\delta(A)$或$d$.
+
+该算法的整体思路,就是计算线性方程组增广矩阵的CRRE,并利用其得到线性方程组的一般解.其中,前者是算法最核心的部分.我们首先来看,若已知增广矩阵的CRRE,怎样求线性方程组的一般解,即一个特解和系数矩阵的零空间.
+
+首先考察一个RRE矩阵$E$的零空间.设$E$为$m\times n$阶非零RRE矩阵,其RE序列为$J_E=\{j_1,\cdots,j_r\},r<n$,公共的对角元素为$d$.记1到$n$中除RE序列之外的元素为$1\le k_1<\cdots<k_{n-r}$.如下构造$n\times (n-r)$矩阵$Z$,
+<latex>
+\begin{equation}@@eq:solution
+Z(j_i,j)=E(i,k_j),Z(k_j,u)=\begin{cases}-d,&u=j,\\0,&u\neq j.\end{cases}
+\end{equation}
+</latex>容易证明$EZ=0$且$Z$为列独立阵.当$E$作为矩阵$A$的RRE形,即存在$m\times m$阶可逆阵$U$使得$A=UE$时,则$AZ=(UE)Z=0$,从而$Z$给出了$A$的零空间的一组基.利用这一结论,可以对线性方程组的增广矩阵$C=(A,B)$做出如下结论:
+<theorem>
+设$C=(A,B)$为线性方程组$AX=B$的增广矩阵,其中$A$为$m\times n$阶矩阵,$B$为$m\times q$阶矩阵.并设$C$的秩为$r$,$E$为$C$的RRE形,公共的对角元为$d$.当线性方程组有解时,设$Z'$为根据$E$与$J_C$按如上方式构造出的矩阵,设$Z$为$Z'$的前$n$行与前$n-r$列的子阵,$Y$为$Z'$的前$n$行与后$q$列的子阵,则$(d,Y,Z)$是$AX=B$的一般解,即$AY=dB$且$Z$张成$A$的零空间.
+</theorem>
+<proof>
+依定理所述,将$Z'$划分为$\begin{bmatrix}Z&Y\\U&V\end{bmatrix},$则应用前述结论可得$$CZ'= (AZ+BU,AY+BV)=(AZ,AY-dB)=0.$$ $Z$的列无关性容易验证.
+</proof>
+
+然而,对于整系数线性方程组,如果直接对整系数矩阵进行行变换,并保持中间表达式为整系数,则很容易出现类似"高精度运算"部分中提到过的中间表达式膨胀(intermediate expression swell)的问题,即经过多次乘法后,中间表达式的位数急速增长,从而严重影响程序执行的效率.多项式系数的矩阵也有类似情形.为了避免此问题,自20世纪60年代起已经发展了系统的模算法,即通过如下两种同态映射:$\mathbb{Z}$到$F_p$的模同态与$F_p[x_1,\ldots,x_s]$到$F_p[x_1,\ldots,x_{s-1}]$的计值运算(这也等价于$F_p[x_1,\ldots,x_s]$模$x_s-a_s$的同态映射),将整数环与多项式环上的问题化到有限域$F_p$上,然后在$F_p$上执行Gauss消元步骤,这样就限制了主要计算的规模.由于矩阵的初等变换归根到底只涉及矩阵元素的乘法与加减法[6],因此模映射使得如下的图交换:
+<latex>
+\begin{equation}
+@@eq:cd
+\begin{CD}
+M_n(\mathbb{Z}[x_1,\ldots,x_s])
+@>\mod p>> M_n(F_p[x_1,\ldots,x_s])@>\text{计值}>>M_n(F_p) \\
+@VV{\text{行变换}}V @VV{\text{行变换}}V @VV{\text{行变换}}V\\
+M_n(\mathbb{Z}[x_1,\ldots,x_s])
+@>\mod p>> M_n(F_p[x_1,\ldots,x_s])@>\text{计值}>>M_n(F_p)
+\end{CD}
+\end{equation}
+</latex>为了从以上计算的结果得到有理数解或有理分式解,可采用模同态的中国剩余定理与多项式插值来"恢复"应有结果.这种思路可以判断线性方程组是否有解并求得其一般解.整体来讲,我们的算法包含如下的三个层次,相应于##eq:cd 中的三个映射:
+ 1. (算法的最外层)利用模映射,将$\mathbb{Z}$上的多元多项式系数的矩阵映射到$F_p$上的多元多项式系数的矩阵,引用中层算法得到其标准行阶梯形,再通过中国剩余定理得到整系数或有理系数多元多项式矩阵的RRE.据此得到线性方程组的通解;
+ 2. (算法的中层,应用于多元多项式系数的线性方程组)对于$F_p$上的多元多项式系数的矩阵,通过计值映射将其化为$F_p$上的矩阵,引用内层算法将其化为RRE,再通过多元多项式的插值算法得到$F_p$上的多元多项式系数的RRE矩阵;
+ 3. (算法的内层)通过$F_p$上的Gauss消去法,将$F_p$上的矩阵化为RRE.
+
+对这个思路可以打一个比方:为了减小"信息处理"的工作量,我们先对原问题中需要处理的$\mathbb{Z}$上的多元多项式矩阵先做一个"压缩"映射,对这个"压缩包"进行相应的处理之后,再通过"解压缩"将其恢复为我们需要的处理之后的结果.这时,我们将面临一个重要问题,即怎样保证这样的压缩处理是"无损压缩",从而可以从压缩包中重新恢复我们需要的结果呢?也就是说,我们使用怎样的模映射,才能保证可以通过中国剩余定理与插值算法得到原矩阵的RRE呢?详细说来,可以归纳为如下的三个问题:
+ 1. 我们所谓"无损压缩",究竟保持什么"信息"稳定,从而可以据此恢复应有结果?
+ 2. 什么样的模映射构成我们所需的"无损压缩"?
+ 3. 我们需要多少这样的模映射才能得到真正的"无损压缩"?实际存在的这种模映射够不够用?特别地,对于$F_p[X]$到$F_p$的约化,这个考虑是很重要的.
+
+下面我们回答这些问题,并给出线性方程组的求解详细算法.
+
+首先讨论脚注3中提到的模映射的交换性.引入如下记号:以$\theta:A\longmapsto A^*$表示模映射,以$\Gamma:A\longmapsto \bar{A}$表示计算REE形的行变换.若$\theta$与$\Gamma$可交换,则称模映射$\theta$具有交换性.在这种情况下,我们对$A^*$进行行变换得到$\bar{A^*}=(\bar{A})^*$,从而可以对$\bar{A^*}$应用中国剩余定理恢复原矩阵$A$的REE形.下述定理给出了模映射的交换性的充分条件:
+<theorem>
+设$A$为$m\times n$阶矩阵,在模映射$\theta$下的像为$A^*=\theta(A)$.若$(J_A,I_A)=(J_{A^*},I_{A^*})$,则$\bar{A^*}=(\bar{A})^*$,即$\theta$可交换.
+</theorem>
+<proof>
+注意到在模映射下,求子矩阵的行列式与模映射可交换.利用$J_A,I_A$的定义可知定理成立.
+</proof>我们称满足$(J_A,I_A)=(J_{A^*},I_{A^*})$的模映射称为"可行的(accepted)",否则称为不可行的(rejected).注意到可行性并非模映射交换的必要条件,例如下述矩阵$$A=\begin{bmatrix}p&1&0\\0&p&1\\1&0&p\end{bmatrix}$$在模$p$映射下不满足上述条件,但模$p$映射对于$A$交换.尽管如此,我们仍然得到了一个有效的判别条件.
+
+下面的论述表明,不可行的模映射是有限的.在模映射下,矩阵子阵的行列式只可能从非0映为0.根据矩阵秩以及$J_A,I_A$的定义可知,必有$r(A^*)<r(A)$或$(J_{A^*},I_{A^*})\ge (J_A,I_A)$.模映射$\theta$可行当且仅当对于$1\le k\le r(A)$,$$A^*\begin{pmatrix}i_1&\cdots&i_k\\j_1&\cdots&j_k\end{pmatrix}\neq0.$$换句话说,模映射$\theta$不可行当且仅当对某个$k$,$$A^*\begin{pmatrix}i_1&\cdots&i_k\\j_1&\cdots&j_k\end{pmatrix}=0,$$这样的模映射在整数环与多项式环上都是有限的,分别由整数的素因子个数与多项式的次数给出上限.因此,我们可以期望能够得到充分多的可行的模映射完成计算.当然,这里的"充分多"由中国剩余定理与多项式插值公式来决定.
+
+然而,以上给出的条件依赖于事先知道$A$的$(J_A,I_A)$,而这是不可能的.我们在计算中已知的只能是模映射后的矩阵的RE序列等.因此,我们还需要将以上条件换成其他等价条件,用模映射后的矩阵表达出来.确切地说,有以下两个定理,它们分别处理了对$J_A$和$I_A$的检测.
+<theorem>
+设$C$为$m\times n$阶非零矩阵,秩$r<n$.$E$为$m\times n$阶RRE矩阵,其秩$r'< r$或$r'=r,J_E\ge J_C$.设$Z$为由$E$根据##eq:solution 构造出来的矩阵.若$CZ=0$,则$J_C=J_E$.
+</theorem>
+<proof>
+若$r'<r$或$r'=r,J_E>J_C$,则很容易通过代入得到不可能有$CZ=0$的结果.
+</proof>根据这一定理,我们在计算中,只要将每步得到的$Z$代入$CZ=0$进行验证即可.通过如下的构造,可以减少该验证步骤的计算.设RRE形矩阵$E$的RE序列为$J_E=(j_1,\cdots,j_r)$,其余行记为$k_1,\cdots,k_{n-r}$,公共对角元为$d$,定义$E$的非对角部分$\tilde{E}$如下:
+<latex>
+\begin{equation}@@eq:ndiag
+  \tilde{E}=E
+\begin{pmatrix}
+1&\cdots&r\\
+k_1&\cdots&k_{n-r}
+\end{pmatrix},
+\end{equation}
+</latex>我们知道,$E$中其余部分除对角元$d$外均为0元素.又定义$C$的两个子阵如下:
+<latex>
+\begin{equation*}
+  C'=
+\begin{pmatrix}
+1&\cdots&m\\
+j_1&\cdots&j_r
+\end{pmatrix},\quad
+C''=
+\begin{pmatrix}
+1&\cdots&m\\
+k_1&\cdots&k_{n-r}
+\end{pmatrix}.
+\end{equation*}
+</latex>若$Z$定义如上,则$CZ=C'\tilde{E}-dC''$,从而与代入$CZ=0$验证等价的条件是
+<latex>
+\begin{equation}@@eq:sub
+C\tilde{E}=dC''.
+\end{equation}
+</latex>我们将采用此式进行代入验证.
+
+<theorem>
+设$C$为$F_p[x_1,\cdots,x_s],s>1$上的矩阵,$b+1$为根据插值公式的次数要求给出的所需计值点数的上界(将在下面给出).设$\Psi_{a_i}$为点$a_i$处的计值映射,$0\le i\le b$,且$C^{(i)}=\Psi_{a_i}(C)$的RE序列$J_{C^{(i)}}=J_C$,而$I_{C^{(i)}}=H$.则$H=I_C$.进一步,若$E$是根据$\bar{C^{(0)}},\cdots,\bar{C^{(b)}}$运用插值方法构造出的RRE矩阵,则$E=\bar{C}$.
+</theorem>
+<proof>
+反证法.记$H=(h_1,\cdots,h_m),I_C=(i_1,\cdots,i_m)$.若$H\neq I_C$,不妨设最先有$h_k\neq i_k$,也即$h_k>i_k$,显然应有$1\le k\le r$.则存在$b+1$个计值映射$\Psi_{a_i}$使得$$\Psi_{a_i}(\delta_k(C))=\Psi_{a_i}\left(\mathrm{det}C\begin{pmatrix}i_1&\cdots&i_k\\j_1&\cdots&j_k\end{pmatrix}\right)=0.$$但由于不可行映射数目的限制(也即上述方程解个数的限制),由$\deg(\delta_k(C))\le b$知道这是不可能的.从而$H=I_C$.根据映射的交换性即得由插值方法构造的$E=\bar{C}$.
+</proof>上述定理给出了算法过程中的另一个检验步骤.
+
+设$C=(A,B)$为$m\times n+q$阶增广矩阵,且$\tilde{E}$与$d$满足##eq:sub .则方程组$AX=B$的一般解$(d,Y,Z)$可以如下构造:
+<latex>
+\begin{gather}
+@@eq:con1
+  Z(j_i,j)=\tilde{E}(i,j),\quad Z(k_j,u)=\begin{cases}-d,&u=j,\\0,&u\neq j;\end{cases}\\
+@@eq:con2
+  Y(j_i,j)=\tilde{E}(i,n-r+j),\quad Y(k_j,u)=0.
+\end{gather}
+</latex>
+
+下面我们给出插值方法所需的模同态的个数,也即给出矩阵中某些子行列式或多项式次数的上界.以下命题的证明都不困难,只要注意到细节问题即可,故略去.读者可以参考<cite>Mcc73</cite>.
+
+<theorem>
+设$B$为$I[x]$上的$m\times m$阶矩阵,则对于任意整数$i:1\le i\le m,$
+<latex>
+\begin{equation*}
+\deg(\det(B))\le\max\limits_{1\le k\le m}\deg(B(i,k))+\sum\limits_{u=1}^me_u-\min\limits_{1\le u\le m}e_u,
+\end{equation*}
+</latex>其中,$e_u=\max\limits_{1\le t\le m,t\neq i}\deg (B(t,u)),1\le u\le m$.
+</theorem>
+<theorem label="th:degbound">
+设$C$为$m\times n$阶非零矩阵,$J_C=(j_1,\cdots,j_r)$.定义$f=\max\limits_{j\neq j_t}\max\limits_{1\le i\le m}\deg (C(i,j))$,$e_u=\max\limits_{1\le i\le m}\deg (C(i,j_u)),1\le u\le r$,以及$e\sum\limits^r_{u=1}e_u,e_0=\min e_u$,令$g=f-e_0$.定义$$b=\begin{cases}e,&g\le 0,\\e+g,&g>0.\end{cases}$$则对任意$H\in\mathcal{P}_C$,$b$构成$\bar{C}_H$中元素次数的上界.
+</theorem>以上两个定理提供了插值算法所需的对于多项式矩阵的元素次数的估计.一般来讲,中国剩余定理也要求相应的元素上界估计[7].然而,在本算法中由于有了##eq:sub 的代入检验,就不再需要上界估计了.
+
+这样,我们可将算法整理叙述如下.
+
+<algorithm label="PLES" name="最外层算法PLES">
+输入:$\mathbb{Z}[x_1,\cdots,x_s],s\le 0$上的$m\times n'$阶矩阵$C$,整数$n:1\le n<n'$.其中,$C=(A,B)$为线性方程组$AX=B$的增广矩阵,$A$为$m\times n$阶非零矩阵,$B$为$m\times q$阶矩阵,$q=n'-n$.我们还需要一个相当规模的素数库$\mathcal{L}$.
+
+输出:三元组$(d,Y,Z)$.若线性方程组有解,则$(d,Y)$构成$AX=B$的特解,$Z$为$A$的零空间的基.若线性方程组无解,则$d,Y,Z$全部设为0.
+
+ 1. (初始化)置$r=0$.
+ 2. (模$p$映射)若前述计算已经穷尽素数库$\mathcal{L}$,则算法失败.否则,取出下一个素数$p\in \mathcal{L}$,计算$C^*\equiv C\pmod{p}$.若$C^*$为零矩阵,转到第2步.
+ 3. (应用计值插值算法)运用CPRRE算法,计算$d^*=\delta(C^*),J^*=J_{C^*},I^*=I_{C^*}$以及$\bar{C^*}$的非对角部分$W^*$.
+ 4. (进行模算法的可行性检测)置$r^*=\mathrm{rank}(C^*)$.若$J^*(r^*)>n$,置$d=0,Y=0,Z=0$,返回$(d,Y,Z)$,此时方程组无解.若$r^*>r$,转至第5步.若$r^*<r$,转至第2步.若$(J^*,I^*)<(J,I)$,转至第5步;若$(J^*,I^*)>(J,I)$,转至第2步.其余情形,转至第6步.
+ 5. (中国剩余定理算法初始化)置$r=r^*,d=0,J=J^*,I=I^*,h=1$,置$W$为$r\times (n'-r)$阶零矩阵.
+ 6. 由中国剩余定理的算法迭代步骤,由$d,d^*,h,p$计算$d'$.采用类似的步骤,由$W,W^*,h,p$计算$r\times (n'-r)$阶矩阵$W'$的元素.置$h$为$p\cdot h$.
+ 7. (相等检验)若$d'=d$,$W'=W$,转至第8步.否则,置$d=d'$,$W=W'$,转至第2步.
+ 8. (代入检验)根据##eq:ndiag ,由$C$与$J$构造$C'$与$C''$.计算$C'W$与$d\cdot C''$.若$C'W\neq d\cdot C''$,转至第2步.
+ 9. (构造一般解)若$r<n$,根据##eq:con1 ,由$J,d,W$构造$r\times (n-r)$阶矩阵$Z$;若$r=n$,置$Z$为零矩阵.根据##eq:con2 构造$n\times q$阶矩阵$Y$.返回$(d,Y,Z)$.
+</algorithm>
+<remark>
+通常素数库$\mathcal{L}$中的素数$p$满足$p^2\lesssim \ell$,其中$\ell$为计算机硬件计算的字长,从而保证计算中能够充分利用机器精度运算的能力.这样的素数库可以预先存储在程序中,也可以动态生成.该库的生成并非本算法讨论的内容.
+</remark>
+<remark>
+前述"相等检验"通过是中国剩余定理算法结束的必要条件(而不是充分条件).此处引入该检验,是为了让随后的"代入检验"成功的可能性更大,从而减少代入检验的运算量.
+</remark>
+下面的算法给出$F_p[x_1,\cdots,x_s],s\ge 0$上矩阵RRE形的计算,其中大部分步骤与PLES算法是类似的.
+<algorithm label="CPRRE" name="中层算法CPRRE">
+输入:$F_p[x_1,\cdots,x_s],s\ge 0$上的$n\times n$阶非零矩阵$C$.
+
+输出:$d=\delta(C),J=J_C,I=I_C$,以及$\bar{C}$的非对角部分$W$.
+
+ 1. (应用Gauss消去法)若$C$为$F_p$上的矩阵,由下面介绍的CRRE算法计算$d=\delta(C),J=J_C,I=I_C$与$W$.
+ 2. (算法初始化)置$r=0,a=p,k=0.$
+ 3. (计值同态)置$a=a-1$.若$a<0$,则算法失败返回.否则,置$C^*=\Psi_{a}(C)$.若$C^*=0$,转至第3步.
+ 4. 递归调用CPRRE算法,计算关于$C^*$的相应结果:$d^*=\delta(C^*),J^*=J_{C^*},I^*=I_{C^*}$以及$\bar{C^*}$的非对角部分$W^*$.
+ 5. (计值同态的可行性检测)置$r^*=\mathrm{rank}(C^*)$.若$r^*>r$,转至第6步;若$r^*<r$,转至第3步.若$(J^*,I^*)<(J,I)$,转至第6步;若$(J^*,I^*)>(J,I)$,转至第3步.其余情况,转至第7步.
+ 6. (插值算法初始化)置$r=r^*,d=0,J=J^*,I=I^*$.若$r<n$,构造$r\times (n-r)$阶零矩阵$W$,若$r=n$,置$W=0$.置$E(x)=1.$
+ 7. 通过插值算法的迭代步骤,由$d,d^*,E(x),a$构造$d'$.若$r<n$,通过类似的计算用$W,W^*,E(x),a$构造$W'$.若$r=n$,置$W'=0$.更新$E(x)\leftarrow E(x)\cdot (x-a).$若$k=1$,转至第11步.
+ 8. (相等检验)若$d'=d$,$W'=W$,转至第9步.否则,置$d=d',W=W'$,转至第3步.
+ 9. (代入检验)若$r=n$,转至第10步.根据##eq:ndiag ,由$C$和$J$构造$C'$和$C"$.代入$C'W$与$d\cdot C"$中进行检验,若$C'W\neq d\cdot C''$,转至第3步，否则置$k=1$.
+ 10. (次数上界)根据##th:degbound 计算DRRE形矩阵元素次数的上界$b$.
+ 11. (次数检验)若$\deg(E(x))\le b$,转到第3步.否则,置$d=d',W=W'$,返回.
+</algorithm>
+<remark>
+注意到在算法的第3步中可能有算法失败返回的结果.这里包含一个与PLES算法很重要的不同:由于PLES算法中被模掉的素数可以在全体整数中选取,因此其算法主体总能成功(只要它调用的CPREE算法成功);然而,由于CPREE算法的计值点只能在$F_p$中选取,而这是有限的,因此可能不成功.鉴于此,通常我们选取模同态时,要求模掉的素数$p$充分大:同时满足$p^2\lesssim \ell$的条件.
+</remark>
+在算法的最内层,我们应用$F_p$上的Gauss消去法给出矩阵的REE形.由于这是一个标准的算法,我们只要给出几个关键步骤的详细描述即可.
+<algorithm label="MGE" name="内层算法,CRRE">
+输入:$F_p$上的$m\times n$阶矩阵$C$.
+
+输出:表征$C$的RRE形的$\delta(C),J_C,I_C$,以及非对角元素$W$.
+ 1. (初始化)置$J=\varnothing,I=(1,\cdots,m),d=1.$记$C^{(0)}=C$.
+ 2. (向前消去步骤)设在向前消去的前$k-1$步,我们已经得到了$C^{(k-1)}$,并各有$k-1$个元素添加到$J$与$I$中.在向前消去的第$k$步,执行如下步骤:
+    - (寻找主元)在第$k,k+1,\cdots,m$行中,按自左向右逐列扫描的顺序,找到第一个非零元素$C^{(k-1)}(t,s)$.将$s$添加到$J$中,即令$j_k=J_C(k)=s$;置$d\leftarrow d\cdot C^{(k-1)}(t,s)$;交换第$k$行至第$m$行的排列顺序得到$C^{(k)}$的一个"预备"形式:将第$t$行排到第$k$行,其余各行依原序排列,也即进行如下置换:$$\tau_k(h)=\begin{cases}h,&1\le h<k\text{或}t<h\le m,\\k,&h=t,\\h+1,&k\le h<t.\end{cases}$$随后将$I$中的元素进行类似的重排:将$I(\tau_k(h))$换成$I(h)$.
+    - 令$e=(C^{(k)}(t,s))^{-1}$,$C^{(k)}(k,j)\leftarrow C^{(k)}(k,j)\cdot e,s\le j\le n.$
+    - (向前消去)对于$h>k$行中第$s$列元素非零者,$C^{(k)}(h,j)\leftarrow C^{(k)}(h,j)-C^{(k)}(h,s)\cdot C^{(k)}(k,j),s\le j\le n$.
+ 3. (向后消去)经过向前消去后,我们已经得到了$C$的阶梯形式.设$\mathrm{rank}(C)=r$,则须执行$r-1$个向后消去步骤以得到$C$的RRE形式.在向后消去的第$k:1\le k\le r-1$步,利用第$r-k+1$行将前$r-k$行的第$j_{r-k+1}$列元素消去.可以证明,由此得到的RRE矩阵记为$\bar{C}$,据此可以得到其非对角元素$W$.
+</algorithm>
+
+至此,我们已完成了全部算法的叙述.McClellan在<cite>Mcc73</cite>中给出了详细的算法复杂性分析,我们不再给出具体结果.我们仅指出,这种算法的实际执行效率高度依赖于素数库的选择与插值映射的选择.对于$m\times n$阶系数矩阵的线性方程组,其平均时间效率与借助整数严格除法执行的Exact Division算法等相比,大致提高了$m$倍.
+
+** Pad\'e逼近与有理函数重建
+
+由于下面将要介绍的几个算法都要通过一定形式的"逼近"与"恢复"过程,它们都以Pad\'e逼近以及有理函数重建算法为基础.我们先来介绍这两个问题.
+
+*** 有理函数重建
+
+<index>有理函数重建</index>(Rational Function Reconstruction)要解决的问题是:对于域上$n$次多项式$m\in F[x]$以及次数小于$n$的多项式$f\in F[x]$,我们要找到多项式$r,t\in F[x]$使得有理函数$r/t\in F(x)$满足$\gcd(t,m)=1$且
+<latex>
+\begin{equation}
+rt^{-1}\equiv f\bmod m,\quad \deg r<k,\quad\deg t\le n-k,@@eq:rfr1
+\end{equation}
+</latex>其中$t^{-1}$是指$t$在模$m$下的逆.如果将$k$取为$n$,则$r=f$,$t=1$显然是该问题的一个解.如果我们不考虑$\gcd(t,m)=1$的约束,则问题可以等效需要满足下面一个较弱的条件
+<latex>
+\begin{equation}
+r\equiv tf\bmod m,\quad \deg r<k,\quad \deg t\le n-k.@@eq:rfr2
+\end{equation}
+</latex>
+
+下面给出一个引理.
+
+<lemma label="le:rfr1">
+设有多项式$f,g,r,s,t\in F[x]$满足$\deg f=n$,$r=sf+tg$，$t\neq 0$并且
+$$\deg r+\deg t<n=\deg f.$$
+再令$r_i,s_i,t_i(0\le i\le l+1)$是扩展Euclid算法中相应的多项式(各多项式定义见##sec:prsalg 节开头),设$j\le\{1,\ldots,l+1\}$满足$\deg r_j\le\deg r<\deg r_{j-1}$,则存在非零多项式$\alpha\in F[x]$满足
+$$r=\alpha r_j,\quad s=\alpha s_j,\quad t=\alpha t_j.$$
+</lemma>
+
+<proof>
+首先必然成立$st_j=ts_j$,若不然,则有关于$f$,$g$非奇异的线性方程
+$$
+\begin{pmatrix}s_j &t_j\\s & t\end{pmatrix}
+\begin{pmatrix}f\\g\end{pmatrix}
+=
+\begin{pmatrix}r_j\\r\end{pmatrix},
+$$
+于是$f=\displaystyle\frac{r_jt-rt_j}{s_jt-st_j}$,而
+<latex>
+\begin{align*}
+\deg\frac{r_jt-rt_j}{s_jt-st_j}&\le\deg(r_jt-rt_j)\le\max\{\deg r_j+\deg t,\deg r+\deg t_j\}\\
+&\le\max\{\deg r+\deg t,\deg r+n-\deg r_{j-1}\}\\
+&<\max\{n,\deg r_{j-1}+n-\deg r_{j-1}\}=n=\deg f,
+\end{align*}
+</latex>
+注意其中用到了$\deg t_j=n-\deg r_{j-1}$,此式可以用辗转相除的过程归纳证明.于是,我们得到了矛盾$\deg f<\deg f$,因而$s_jt=st_j$.
+
+由<cite>mca</cite>引理3.8知$\gcd(s_j,t_j)=1$,由此可知$t_j\mid s_jt\Rightarrow t_j\mid t$,于是非零多项式$\alpha\in F[x]$使得$t=\alpha t_j$,由$st_j=s_jt=\alpha s_jt_j$得到$s=\alpha s_j$,从而
+$$r=sf+tg=\alpha(s_jf+t_jg)=\alpha r_j.$$
+
+证毕.
+</proof>
+
+<definition name="有理函数正则形式">
+有理函数$r/t\in F(x)$称为正则的,如果$r,t\in F[x]$满足$t$首一且$\gcd(r,t)=1$.
+</definition>
+
+下面的定理给出了扩展Euclid算法和有理函数重建问题的关系,同时也给出了有理函数重建算法.
+
+<theorem label="th:rfr1">
+设有$n$次多项式$m\in F[x]$和次数小于$n$的多项式$f\in F[x]$,$r_j,s_j,t_j$的定义同引理##le:rfr1 ,这里取为关于$f$和$m$的扩展Euclid算法中的各个多项式(相当于令$g=m$),其中$j$取为最小的整数使得$\deg r_j<k$,那么:
+
+ 1. 存在多项式$r,t$满足##eq:rfr2 式,即$r=r_j$,$t=t_j$,若还有$\gcd(r_j,t_j)=1$,则$r,t$也满足##eq:rfr2 式,即求得了有理函数重建问题的解.
+
+ 2. 若$r_j/t_j\in F(x)$满足##eq:rfr2 ,设$\tau=\mathrm{lc}(t_j)\neq 0$,令$r=r_j/\tau$,$t=t_j/\tau$,那么$r/t$是一组正则解.特别地,有理函数重建问题可解当且仅当$\gcd(r_j,t_j)=1$.
+</theorem>
+
+证明过程较容易,用到了扩展Euclid算法内容以及引理##le:rfr1 .有兴趣的读者可以参考<cite>mca</cite>5.7节.
+
+*** <index>Pad\'e逼近</index>
+
+已知域上一形式幂级数$f\in F[ [x] ]$,那么Pad\'e逼近(Pad\'e Approximation)要解决的问题是求一有理函数$\rho=r/t\in F(x)$去逼近该级数,即$\rho$的Taylor展开中能有足够多的$x$的幂次与$f$符合.
+
+<definition  name="Pad\'e逼近">
+设$f\in F[ [x] ]$,如果有理函数$r/t$满足
+<latex>
+\begin{equation}
+x\nmid t,\quad r/t\equiv f\bmod x^n,\quad\deg r<k,\quad\deg t\le n-k,@@eq:pade1
+\end{equation}
+</latex>
+则称$r/t$是$f$的一个$(k,n-k)$-Pad\'e逼近.
+</definition>
+
+注意到如果令$m=x^n$,则Pad\'e逼近问题##eq:pade1 化为有理函数重建问题##eq:rfr1 .因此,我们完全采用上一节的算法就可以求出Pad\'e逼近了.关于Pad\'e逼近性质及其算法更详细的介绍可以参考<cite>Xu90</cite>.
+
+** <index>Hensel提升算法</index>
+
+求解非奇异整系数线性方程组$Ax=b$的模算法的另一种思路是对解进行$p$进制($p$-adic,$p$为素数)展开,然后"恢复"精确的有理数解.这一算法相当于多项式计算中介绍的Hensel提升算法,是Moenck,Carter<cite>MoeCar79</cite>与Dixon<cite>Dix82</cite>提出的.本小节介绍Dixon提出的应用于整系数方程组的算法,又称为<index>$p$-adic算法</index>.对于一元多项式系数的方程组,可完全类似地利用Hensel提升实施约化过程,再借助一元多项式的Pad\'e逼近得到有理函数解,这就是一般的<index>Moenck-Carter算法</index>.
+
+该算法包括三个主要步骤:
+ 1. 合理选定素数$p$,要求$p\nmid \mathrm{det}A$.在$F_p$上计算$A$的逆$C$,即$AC\equiv I\pmod{p}$,$C$的存在性由$C\equiv A^*/\mathrm{det}A\pmod{p}$保证,其中$A^*$是$A$的古典伴随方阵.这一步可以利用$F_p$上的Gauss消元法实现,也可采用其他有限域上求逆的算法得到.
+ 2. 对于选定的充分大的$m$,计算$\bar{x}$,使得$A\bar{x}\equiv b\pmod{p^m}$.$\bar{x}$称为$x$的$p$进展式.
+ 3. 利用连分式展开的方法(如下所述)由$x$的$p$进展式得到其有理解.
+
+首先考察如何得到$x$的$p$进展式.执行如下步骤:
+<latex>
+\begin{align*}
+  b_0&\leftarrow b,\\
+  x_i&\leftarrow Cb_i\pmod{p},\\
+  b_{i+1}&\leftarrow p^{-1}(b_i-Ax_i),i=0,1,2,\ldots.
+\end{align*}
+</latex>注意到由于$b_i-Ax_i=b_i-ACb_i\equiv 0\pmod{p}$，故上式最后一步中的除法是严格的,所得到的$b_{i+1}$为整数.这样的循环步骤将在计算得到$x_{m-1}$与$b_m$之后结束($m$要取多大在后面给出).这时,令
+<latex>
+\begin{equation*}
+  \bar{x}=\sum\limits^{m-1}_{i=0}x_ip^i,
+\end{equation*}
+</latex>我们有
+<latex>
+\begin{equation*}
+  A\bar{x}=\sum\limits^{m-1}_{i=0}p^iAx_i=\sum\limits^{m-1}_{i=0}p^i(b_i-pb_{i+1})=b_0-p^mb_m,
+\end{equation*}
+</latex>从而得到
+<latex>
+\begin{equation*}
+  A\bar{x}\equiv b\pmod{p^m}.
+\end{equation*}
+</latex>
+
+为了从$\bar{x}$得到$x$,注意到$x$一般为有理系数向量,可以表达为$x=f/g$,其中$f$为整系数向量,$g|\mathrm{det}A$.由此可得$g\bar{x}\equiv f\pmod{p^m}$.有如下定理:
+<theorem label="th:bestapprox"> 
+设$s,h>1$为整数,存在整数$f,g$满足$$gs\equiv f\pmod{h},\text{且}|f|,|g|\le\lambda h^{\frac{1}{2}},$$其中$\lambda=0.618\ldots$为方程$\lambda^2+\lambda-1=0$的一个根.设既约分数$w_i/v_i(i=1,2,\ldots)$为$s/h$的连分式展式序列,并记$u_i=v_is-w_ih$.若该序列中$k$第一个满足$|u_k|<h^{\frac{1}{2}}$,则$f/g=u_k/v_k$.
+</theorem>
+<proof>
+根据连分式展式的性质,我们知道序列$\{w_i\}$与$\{v_i\}$递增而$\{u_i\}$则正负交替而绝对值递降,$w_i/v_i$收敛于$s/h$.关于连分式展开的基本性质,可以参考<cite>RocSzu92</cite>.
+
+记$f=gs-th$,则$$\left|\frac{s}{h}-\frac{t}{g}=\frac{fg}{hg^2}<\frac{1}{2g^2},\right|$$从而对任意$t',g'<g$,由
+<latex>
+\begin{equation*}
+  \begin{split}
+    \left|\frac{s}{h}-\frac{t'}{g'}\right|&=\left|\frac{s}{h}-\frac{t}{g}+\frac{t}{g}-\frac{t'}{g'}\right|\\
+&\ge\left|\frac{t}{g}-{t'}{g'}\right|-\left|\frac{s}{h}-\frac{t}{g}\right|\\
+&\ge\frac{1}{gg'}-\frac{1}{2g^2}\\
+&\ge \frac{1}{2g^2}
+  \end{split}
+\end{equation*}
+</latex>得到,$t/g$为$s/h$的一个最佳逼近,这只能是$t/g$等于$s/h$的一个连分式展式(<cite>RocSzu92</cite>第二章定理1),记为$w_j/v_j$.由于$w_j$与$v_j$互素,$|u_j|\le|f|\le\lambda h^{\frac{1}{2}}$,由$k$的定义知$j\ge k$.另一方面,由$u_j=v_js-w_jh$及$u_k=v_ks-w_kh$得到$u_jv_k-u_kv_j\equiv 0\pmod{h}$.由于$j\ge k$,$|ujv_k-u_kv_j|\le(|u_j|+|u_k|)|v_j|<\lambda(\lambda+1)h=h$,从而$u_jv_k=u_kv_j$,即$j=k$.从而$f/g=u_k/v_k$.证毕.
+</proof>
+
+在上述定理中取$h=p^m$,即可给出求$f/g$的一种算法.其中$m$由定理中要求的不等式定义:$\delta\le \lambda p^{m/2}$,其中$\delta$为$g$与$f$的元素绝对值的上界,可由<index>Hadamard不等式</index>(定理##th:hadamardineq )给出:对任意实系数$n$阶可逆阵$B=(b_{ij})$有$$|\mathrm{det}B|\le \prod\limits^{n}_{i=1}\left(\sum\limits^{n}_{k=1}b_{ki}^2\right)^{1/2}=\prod\limits_{i=1}^nl_i,$$其中$l_i$为列向量的2-范数,即Eulid长度.由Cramer法则知道,$g$与$f$中的元素均为增广矩阵的$n$阶子式,从而可以选取$n+1$个列向量中最长的$n$个向量的长度求得<index>Hadamard界</index>$\delta$,并计算得到$m=\lceil 2\log(\delta\lambda^{-1})/\log p\rceil$.随后通过连分式展开的步骤,$s$取为$\bar{x}$的元素,执行如下过程:
+ - $u_{-1}\leftarrow h,u_0\leftarrow s,v_{-1}\leftarrow 0,v_0\leftarrow 1$;
+ - 对$i=0,1,\ldots$执行$$q_i=\lfloor u_i/u_{i-1}\rfloor,u_{i+1}=u_{i-1}-q_iu_i,v_{i+1}=v_{i-1}+q_iv_i,$$直到$u_k\le h^{1/2}$.则$$f/g=(-1)^ku_k/v_k.$$
+
+在实用中,对于连分式展式部分可以采用Lehmer加速算法,可以参考<cite>taocp2</cite>.经过详细的分析,Dixon指出这种算法的复杂度为$O(n^3(\log n)^2)$,接近数值算法的渐近复杂度$O(n^3)$,而优于采用基于中国剩余定理的模算法的算法复杂度.
+
+; 进入21世纪以来,利用Hensel提升求解整系数线性方程组的思想由Storjohnan等人进行了系统的发展<cite>CheSto04</cite><cite>CheSto04a</cite><cite>Sto03</cite><cite>Sto05</cite>.这种发展包括两方面:一是对原来的算法进行了改进,应用J.G.Dumas等人提出的有限域上运算的方法<cite>DumGio04</cite>以及改进的扩展Euclid算法<cite>WanPan03</cite>大大地提高了算法的效率;另一方面是将该算法与计算矩阵行列式结合起来<cite>Pan87</cite>,在一系列问题中得到应用,如求解不定方程组的Diophantine解<cite>Gie97</cite>等.这些算法大多已经被应用于精确线性代数库[[http://www.linalg.org][LinBox]]中(<cite>Vil07</cite>及其索引文献).(这些算法发展待整理)
+
+** <index>数值算法求精确解</index>
+
+; 如引言中所述,将精确线性代数计算过程压缩的另一种思路是将其化归为浮点数的运算.这是基于两方面的考虑:一是现代计算机往往具有超强的浮点数运算能力,通过将高精度的整数通过一定的计算手段化归为机器精度的浮点数运算,可以大大提高计算的效率;二是在精确线性代数快速发展之前,数值线性代数已经经历了长期而系统的发展,建立了基本线性代数子程序(Basic Linear Algebra Subroutines,[[http://www.netlib.org/blas][BLAS]])系统,著名的数值线性代数库[[http://www.netlib.org/lapack/index.html][LAPACK]]就是它的一个实现.相应的,数值线性代数对精确线性代数的启发有三个个层次:一是在进行$\mathbb{Z}$或$F_p$上的精确计算时,借助机器精度较长的浮点数来实现,而无需借助高精度整数环境;二是类似数值线性代数,也在精确线性代数领域引入BLAS技术,为更"高级"一些的算法提供基本的算法支持;三是在"高级"算法领域,如引言中所述,通过某种"压缩"步骤,将算法中大部分计算化归为浮点数的计算,在得到相应的数值结果之后,通过合理的手段恢复为整数或有理数.我们下面将要介绍的这一算法<cite>Wan05</cite>,就是这一方面的典型例子.相较Wan给出的原始证明,我们在下面给出的证明充分利用了连分式展开的性质,因而更简洁.
+
+与Hensel提升方法类似的另一种思路是将消元步骤化归为机器精度的浮点数运算.由于现代计算机往往具有很强的浮点数运算能力,通过将高精度的整数通过一定的近似手段化归为机器精度的浮点数运算可以大大提高计算的效率.我们在下面给出的这一算法<cite>Wan05</cite>,对于适当良态的非奇异矩阵,通过近似与迭代步骤得到足够精度的浮点数解后,通过连分式展开的方法恢复有理数解.而对于病态的矩阵,则很快判断并退出执行.相较于Wan给出的原始算法有效性证明,下面给出的证明充分利用了连分式展开的性质,因而更简洁.
+
+; 这一算法具有如下性质:它对于适当良态的(即数值稳定性好的,或者说条件数较小的)非奇异矩阵,能很快给出其精确解;而对于病态的矩阵,则很快判断并退出执行.它首先借助多次迭代,求得线性方程组的一个近似有理数解,当该有理数解构成方程组严格解的一个最佳逼近时[9],用上节提到的连分式展式将精确解求出[10].下面分别讨论这两个步骤.
+
+对于良态矩阵解的迭代逼近,在<cite>GolVan01</cite>中有一些介绍.然而,这种方法并没有将全部计算化归为单精度(或者说,机器精度)的计算,特别在将历次修正累加时,仍需要利用高精度的计算.因此,对我们目前的要求来说还不够.我们的迭代计算过程如下:对于输入非奇异整系数矩阵$A$与整数向量$b$,将解初始化为$x=n/d$,其中$n=0$,$d=1$,将余量$r$置为$b$.随后在每次迭代中,执行如下的步骤:在机器精度运算中找到近似解$\Delta x$满足$A\Delta x=r$,选择合适的量$\alpha$,对方程进行放大,即令$\Delta d=\alpha$,$\Delta n=(\approx\Delta \alpha\cdot x_1,\cdots,\approx\Delta\alpha\cdot x_n)$,将方程解修正为$n=\alpha n+\Delta n$,$d=\Delta d\cdot d$,余量修正为$r=\alpha r-A\cdot \Delta n$.这样,在每步迭代步骤之后,出现在结果中的数,包括近似解的分子与分母以及(扩大后的)余量,都是不超过$\|A\|_\infty+\|b\|_\infty$的整数.从而,迭代过程中我们不需要高精度运算.当近似解达到足够精度之后,我们进行如下算法中叙述的过程得到方程组的精确解.
+
+<algorithm label="alg:Wan" name="数值方法求稠密线性方程组有理解">
+输入:$A$为$m\times m$非奇异整系数矩阵,$b$为整系数向量.
+
+输出:当$A$为良态矩阵时,快速输出方程$Ax=b$的有理解$x$;否则,快速退出并输出"数值精度不足"的信息.
+
+ 1. 使用机器精度的浮点运算得到$A$的$LUP$分解(其他分解也可使用).
+ 2. 置解向量的公分母$d^{(0)}=1.$
+ 3. 置余向量$r^{(0)}=0$.
+ 4. 置计数器$i=0$.
+ 5. 计算$A$的Hadamard界.
+ 6. 重复执行以下步骤,直到$d^{(i)}>2mB^2\left(2^{-i}\|b\|_\infty+\|A\|_\infty\right)$:
+    -i:=i+1.
+    -利用第1步得到的$LUP$分解,用浮点运算计算$\bar{x}^{(i)}=A^{-1}r^{(i-1)}$.
+    -计利用浮点运算算$\alpha^{(i)}:=\min \left(2^{30},2^{\lfloor log_2(\frac{\|r^{(i-1)}\|_{\infty}}{\|r^{(i-1)}-A\bar{x}^{(i)}\|_{\infty}})-1\rfloor}\right)$.
+    -若$\alpha^{(i)}<2$,则退出并提示信息"数值精度不足".
+    -严格计算整系数向量$x^{(i)}:=(\approx \alpha^{(i)}\cdot \bar{x}_1^{(i)},\cdots,\approx\alpha^{(i)}\cdot\bar{x}_m^{(i)})$,也即使得$x^{(i)}$为满足$\|x^{(i)}-\alpha^{(i)}\cdot \bar{x}^{(i)}\|_{\infty}\le 0.5$的向量.
+    -严格计算整数$d^{(i)}:=d^{(i-1)}\cdot\Delta \alpha^{(i)}$.
+    -严格计算整系数向量$r^{(i)}:=\alpha^{(i)}\cdot r^{(i-1)}-Ax^{(i)}$,这时余量扩大了$d^{(i)}$倍.
+ 7. 置$k:=i$.
+ 8. 计算整系数向量$n^{(k)}:=\sum\limits_{1\le i\le k}\frac{d^{(k)}}{d^{(i)}}\cdot x^{(i)}$,注意到$\frac{d^{(k)}}{d^{(i)}}=\prod\limits_{i<j\le k}\alpha^{(j)}$.
+ 9. 此时,精确解$x$构成$\frac{1}{d^{(k)}}\cdot n^{(k)}$的一个最佳逼近,且其分母有上界$B$.可利用连分式展开的方法得到$x$.
+ 10. 返回$x$.
+</algorithm>
+<remark>
+第6步中$\alpha^{(i)}$的选择是基于如下考虑:选择2的幂次使得以下的计算变为简单的移位过程,从而更为高效;若$A$为良态矩阵,则余量可能已经非常小,必须加一个限制以保证以下的乘法不会溢出,这一限制被选择为$2^{30}$同样是为了保证计算结果在机器精度之内.
+</remark>
+首先我们来估计每次迭代过后余量的上界,并由此导出以上算法的正确性.
+<theorem name="算法的正确性" label="th:AlgRight">
+若以上算法中每步计算得到的$\alpha^{(i)}$都有
+<latex>
+\begin{equation}@@eq:alphaB
+\alpha^{(i)}\le \frac{\|r^{(i-1)}\|_{\infty}}{2\|r^{i-1}-A\bar{x}^{(i)}\|_{\infty}},
+\end{equation}
+</latex>则以上算法将正确执行,即正常地由于矩阵病态而退出,或者得到正确的结果.且在第$i$步迭代中$$\|r^{(i)}\|_{\infty}=\|d^{(i)}(b-A\frac{1}{d^{(i)}}\cdot n^{(i)})\|_{\infty}\le 2^{-i}\|b\|_{\infty}+\|A\|_{\infty}.$$
+</theorem>
+<proof>
+对于输入$A$与$b$,我们只需要证明若每次计算出的$\alpha^{(i)}\ge2$,则算法能够顺利执行完毕并得到正确结果.此时,由$$d^{(i）}=\prod\limits_{1\le j\le i}\alpha^{(j)}\ge 2^i$$可知循环步骤只能执行有限次而最终退出.
+
+记$n^{(i)}=\sum\limits_{1\le j\le i}\frac{d^{(i)}}{d^{(j)}}\cdot x^{(j)}$为$i$步迭代之后解的分子.我们要估计绝对误差$\|e^{(i)}\|_{\infty}=\|\frac{1}{d^{(i)}}\cdot n^{(i)}-A^{-1}b\|_{\infty}$,由归纳法容易得到
+<latex>
+\begin{gather*}
+r^{(i)}=d^{(i)}(b-A\frac{1}{d^{(i)}}\cdot n^{(i)}),\\
+e^{(i)}=\|\frac{1}{d^{(i)}}\cdot n^{(i)}\|_{\infty}=\frac{1}{d^{(i)}}\|A^{-1}r^{(i)}\|_{\infty}.
+\end{gather*}
+</latex>在每步迭代中,根据定理的假设,$\|A\bar{x}^{(i)}-r^{(i-1)}\|_{\infty}\le \frac{1}{2\alpha^{(i)}}\cdot \|r^{(i-1)}\|_{\infty}$.根据$x^{(i)}$的定义,我们有$\|x^{(i)}-\alpha^{(i)}\bar{x}^{(i)}\|_{\infty}\le 0.5$.从而,
+<latex>
+\begin{equation*}
+  \begin{split}
+    \|r^{(i)}\|_{\infty}&=\|Ax^{(i)}-\alpha^{(i)}\cdot r^{(i-1)}\|_{\infty}\\
+&\le \|\alpha^{(i)}\cdot A\bar{x}^{(i)}-\alpha^{(i)}\cdot r^{(i-1)}\|_{\infty}+\|Ax^{(i)}-\alpha^{(i)}\cdot A\bar{x}^{(i)}\|_{\infty}\\
+&\le \frac{1}{2}\|r^{(i-1)}\|_{\infty}+\frac{1}{2}\|A\|_{\infty},
+  \end{split}
+\end{equation*}
+</latex>据此,可以得到$$\|r^{(i)}\|_{\infty}\le \frac{1}{2^i}\|b\|_{\infty}+\|A\|_{\infty}.$$误差$$e^{(i)}=\frac{1}{d^{(i)}}\|A^{-1}r^{(i)}\|_{\infty}\le \frac{1}{d^{(i)}}\|A^{-1}\|_{\infty}\left(\frac{1}{2^i}\|b\|_{\infty}+\|A\|_{\infty}\right),\forall i\le 1.$$设$k$为循环停止时计数值,则$$2B\det (A)e^{k}<\frac{2}{d^{(k)}}\|B\det(A)\cdot A^{-1}\|_{\infty}(2^{-k}\|b\|_{\infty}+\|A\|_{\infty}).$$根据Cramer法则,$\det(A)A^{-1}$正是$A$的古典伴随矩阵,它的每个元素都是$A$的$m-1$阶子式,从而,$$2B\det(A)e^{(k)}\le \frac{2mB^2(2^{-k}\|b\|_{\infty}+\|A\|_{\infty})}{d^{(k)}}<1.$$这样就得到$e^{(k)}<\frac{1}{2B\det(A)}$,也即$\|\frac{n^{(k)}}{d^{(k)}}-A^{-1}b\|_{\infty}<\frac{1}{2B\det(A)}$.同样根据Cramer法则,我们知道$\det(A)A^{-1}b$为整系数向量.于是根据定理##th:bestapprox ,知道$A^{-1}b$构成$\frac{n^{(k)}}{d^{(k)}}$的一个最佳逼近,从而可以由$\frac{n^{(k)}}{d^{(k)}}$的连分式展开得到$A^{-1}b$.这就完成了证明.
+</proof>
+在利用近似解恢复精确有理解的阶段,可以采用<cite>WanPan02</cite>中建议的一种方法,可以概括为:首先利用概率性算法得到矩阵$A$的最大的不变因子(定义见下,也可见<cite>ZhaXu04</cite>)或它的一个因子,随后可以更快地计算上述恢复过程.
+
+<theorem  name="整系数矩阵的Smith标准形">
+设$A$为$\mathbb{Z}$上的矩阵,秩$\mathrm{rank}(A)=r$.存在$\mathbb{Z}$上的可逆方阵$P$和$Q$,使得
+<latex>
+\begin{equation*}
+B=PAQ=
+\begin{bmatrix}
+s_1&&&&&\\
+&\ddots  &&&&\\
+&&s_r&&&\\
+&&&0&&\\
+&&&&\ddots &\\
+&&&&&0
+\end{bmatrix},
+\end{equation*}
+</latex>其中$s_i|s_{i+1}$,$i=1,\cdots,r-1$.$(s_1,\cdots,s_r)$称为$A$的<index>不变因子</index>组,$B$称为$A$的<index>Smith标准形</index>.
+</theorem>
+<proof>
+证明可参见<cite>ZhaXu04</cite>定理7.13.
+</proof>
+; <remark>
+; 由于整数环$\mathbb{Z}$和域$F$上的多项式环$F[X]$是PID,故以上定理适用.特别地,为了使Smith标准形唯一,有时规定整系数矩阵的不变因子$s_i\ge 0,1\le i\le r$,而多项式系数矩阵的不变因子$s_i(X)$为首一多项式,$1\le i\le r$.以下我们将采用这一规定.
+; </remark>
+<remark>
+为了使如上定义的Smith标准形唯一,常常规定整系数矩阵的不变因子$s_i\ge 0,1\le i\le r$.以下我们将采用这一规定.
+</remark>
+<theorem>
+对于$m\times m$阶非奇异非奇异方阵$A$,设其最大不变因子为$s_n$,则$s_nA^{-1}$为整系数矩阵.
+</theorem>
+<proof>
+设$B=PAQ$为$A$的Smith标准形,则$s_nB^{-1}$为整系数矩阵,而$P$,$Q$为整系数可逆方阵,从而$s_nA^{-1}=Q(s_nB^{-1})P$为整系数方阵.
+</proof>
+根据该定理,若$s_n$已知,则算法##alg:Wan 中由近似解恢复精确解成为平凡的,因为这时$s_nA^{-1}b$为整系数向量,从而在计算足够精度之后将近似解截断即可.即使仅能得到$s_n$的一个非平凡因子$s_n^*$,将其乘到近似解$\frac{n^{(k)}}{d^{(k)}}$上,就只要计算$s_n^*\frac{n^{(k)}}{d^{(k)}}$的一个分母不超过$B/s^*_n$的最佳逼近即可.下面给出随机性地计算$A$最大不变因子的算法.
+<algorithm name="最大不变因子" label="alg:leadingSmith">
+输入:$n$阶非奇异整系数矩阵$A$.
+
+输出:正整数$s^*_n|s_n$.
+
+ 1. (初始化)$M:=\max\{\lceil\sqrt{n\log \|A\|_{\infty}}\rceil,4000\}$,$p$为约为$n\log A$的素数,$b^{(1)},b^{(2)},c^{(1)},c^{(2)}$为随机生成的$n$维整系数列向量.$h:=\lceil 2\log_p(\|A\|_{\infty}^{2n-1}M)\rceil$,从而$q:=p^h\ge \|A\|_{\infty}^{2n-1}M$.
+ 2. 对$k=1,2$,执行如下计算步骤:
+    -$x^{(k)}=(x^{(k)}_i)^n_{i=1}:=A^{-1}b^{(k)}\in F^n_q.$
+    -$y^{(k)}:=c^{(k)T}x^{(k)}=\sum\limits_{i=1}^nc^{(k)}_ix^{(k)}_i\in F_q.$
+    -取$t_n^{(k)}$为$y^{(k)}$的分母,$t_n^{(k)}:=\delta(y^{(k)})$,从而$0\le t^{(k)}_n\le \|A\|_{\infty}^n$.
+ 3. 输出$s_n^*:=\mathrm{lcm}(t^{(1)}_n,t^{(2)}_2)$.
+</algorithm>
+
+<theorem label="th:LSmith" name="算法的有效性">
+算法##alg:leadingSmith 中,$s_n^*|s_n$,且能以不小于$1/2$的概率给出$s_n^*=s_n$的结果.
+</theorem>
+
+为了证明##alg:leadingSmith 算法的有效性,首先证明如下引理,它给出了以上随机化过程带来的结果.为了叙述方便,我们引入如下记号:对整数$x$与素数$p$,定义$g=\mathrm{ord}_px$满足$p^g|x$,$p^{g+1}\nmid x$,称为$x$关于$p$的阶.用$P$表示概率.
+
+<lemma>
+记$\delta^{(k)}:=\mathrm{lcm}(\delta(x^{(k)}_1),\cdots,\delta(x^{(k)}_n))$,显然$t^{(k)}_n|\delta^{(k)}$.则对任意素数$\bar{p}$,有结论如下:
+ 1. $P(\mathrm{ord}_ps_n\neq \mathrm{ord}_p\delta^{(k)})\le \max\{1/M,1/p\}$;
+ 2. $P(\mathrm{ord}_pt^{(k)}_n\neq \mathrm{ord}_p\delta^{(k)})\le \max\{1/M,1/p\}$.
+</lemma>
+
+该引理证明参见<cite>WanPan02</cite>.
+
+
+<proof name="算法有效性的证明">
+$s_n^*|s_n$根据计算过程容易归纳得到.只需证明后一论断.
+<latex>
+\begin{equation*}
+\begin{split}
+P(s_n \neq s_n^*)&\le \sum\limits_{\bar{p}|s_n,\bar{p}~\text{prime}}P(\mathrm{ord}_{\bar{p}}s_n^*<\mathrm{ord}_{\bar{p}}s_n)\\
+&= \sum\limits_{\bar{p}|s_n,\bar{p}~\text{prime}}P(\mathrm{ord}_{\bar{p}}t_n^{(1)}<\mathrm{ord}_{\bar{p}}s_n\wedge \mathrm{ord}_{\bar{p}}t_n^{(2)}<\mathrm{ord}_{\bar{p}}s_n)\\
+&\le \sum\limits_{\bar{p}|s_n,\bar{p}~\text{prime}}(\max\{1/M,1/\bar{p}\})^2\\
+&<\frac12.
+\end{split}
+\end{equation*}
+</latex>
+</proof>
+
+在算法##alg:leadingSmith 中,我们仍然需要求解线性方程组,这是不是陷入了一种循环呢?注意到,在算法中,我们只需在$F_q$上求解两个线性方程组,而$y^{(k)},k=1,2$的恢复只需要少量运算,而不像之前算法中需要$n$次恢复运算.这样,当$n$很大时,我们可以利用这种方法进行加速.
+
+<remark>
+由定义可知,$\alpha^{(i)}$大致只与矩阵$A$的条件数有关.因此,我们可以只计算一次$\alpha$,而将之后的计算中取$\alpha$相同.这可能造成得到的$\alpha$不满足定理##th:AlgRight 中 ##eq:alphaB 式的要求.然而,我们可以通过检查余量的范数是否达到理论预测的值来发现这种情形.每当这种情形发生时,我们将$\alpha$减半,再次代入运算即可.
+</remark>
+<remark>
+算法##alg:Wan 的数值求解算法不限于$LUP$分解.任何具有一定数值稳定性的算法都可以用来求近似解,这种算法可以包括稠密线性方程组的多种分解方法以及稀疏线性方程组的迭代算法等,可参考<cite>GolVan01</cite>.在<cite>Wan05</cite>一文中就利用这种思想构造了一个稀疏线性方程组的求解算法.
+</remark>
+<remark>
+如果不要求精确解的话,算法##alg:Wan 不需要执行完毕,而仅作为一个可扩展精度的数值型求解算法,它具有较高的执行效率并能有效地估计解的精度.
+</remark>
+<remark>
+<cite>Wan05</cite>指出,这一算法的渐近复杂度与Dixon $p$-adic算法相同,均为$O^{\sim}(m^3)$阶的,其中$\sim$符号表示忽略了一个可能含有的$\log m$的幂次,也可记为$O(m^{3+\epsilon})$阶.但实际测试表明,本算法的执行效率比$p$-adic算法好很多.
+</remark>
+* Wiedemann算法与黑箱方法
+
+在数值线性代数中,黑箱(black box)算法已经广为人知.这一类算法的基本特点是,在算法执行过程中,不涉及对矩阵元素的直接操作(例如直接的消元步骤),矩阵的作用仅体现为能够对向量施行线性变换,体现为一个"黑箱".在数值运算中,黑箱方法往往与迭代法紧密相连,通过迭代操作使中间结果快速收敛.对于稀疏矩阵或有结构的矩阵(如Vandermonde阵或Toeplitz阵),由于存在黑箱作用的快速算法,在作用过程中不会破坏矩阵的稀疏性或结构性质,因而与消元法等直接算法相比,能够大大减少计算量.关于数值计算中的黑箱算法,读者可以参考<cite>GolVan01</cite><cite>TreBau06</cite>.
+
+自1986年Wiedemann<cite>Wie86</cite>将<index>黑箱算法</index>用于计算有限域上的稀疏线性方程组的精确解以来,精确线性代数中的黑箱型算法已经得到了很大的发展.针对不同的问题,出现了大量高效的黑箱算法;另一方面,随机化预处理步骤在精确计算中得到广泛运用.在本节中,我们将首先简述概率性算法与预处理步骤的概念,随后着重介绍<index>Wiedemann算法</index><cite>Wie86</cite>.
+
+** <index>概率性算法</index>与<index>预处理步骤</index>概述
+
+<index name="确定性算法"></index>
+<index sub="Monte Carlo型" name="概率性算法"></index>
+<index sub="Las Vegas型" name="概率性算法"></index>
+
+在传统的计算中,算法往往是"确定性"的,即只要能够正确地按照算法步骤执行,总能得到正确的结果.但当我们试图考虑一些复杂的问题时,要求"万无一失"的确定性算法往往复杂性很高,难于应用.而另一方面,我们总能够构造一些算法,它们能够高效地执行,并以一定的概率得到正确的结果,这就是我们所称的概率性算法.我们在设计这种算法的同时,必须给出得到正确结果的概率下界,从而了解这种算法的可靠性.在"素性判定"一节中,我们讲过很多这样的算法,如Solovay-Strassen算法等.上一节中的最大不变因子求解过程中也采用了随机化的步骤.这里,"一定的概率"可能体现为两种情形:一是算法总能快速地执行完毕,但可能得不到正确的结果,而是返回错误的结果或者只返回一条警告信息,这称为Monte Carlo型算法;二是当算法执行完毕时总能返回正确的结果,但是并非总能快速地执行,而只能在平均意义下或对一些好的情形快速给出结果,这称为Las Vegas型算法.
+
+注意到,以上两种类型算法的区别并不是绝对的.比如说,如果我们能够快速检验计算结果的正确性(如整数因子分解中的乘法检验),则我们只要反复执行该算法,直到我们得到一个正确结果,则该算法成为Las Vegas型的.而对于Las Vegas型算法,如果我们发现程序执行了过长的时间而没有返回结果,我们令算法中止同时返回一个警告信息(随后可以重开一个随机化步骤执行算法或者跳转到其他的算法),这时我们可以认为它成为了一个Monte Carlo型的算法.
+
+那么,为什么算法会带有随机的性质呢?这是因为算法中包含了随机化的步骤.在线性代数领域,这种随机化步骤往往是在中间步骤中通过随机产生向量或矩阵进行运算实现的.对于黑箱算法以及更广泛的算法而言,最重要的随机化过程称为预处理步骤,这是指对输入矩阵$A$施行一个带有随机性的变换$\mathcal{P}:A\longmapsto A'$,使得经过预处理后$A'$具有一定的代数性质,能够满足进一步运算的要求.由于这种变换存在的随机性,其结果可能并不满足要求,这往往体现为它具有一定的奇异性.为了控制这种奇异情形的概率,我们往往通过与有关多项式的零点数的Schwartz-Zippel定理来做估计.
+
+; 我们知道,在进行精确计算时,由于问题的复杂性,有时会引入与传统计算不同的做法,即随机性算法.随机性算法往往通过引入完全不同的算法思想,达到经典意义上的"决定性"算法不能达到的速度.在数论算法与多项式算法中有很多问题需要考虑随机性算法.我们通常所说的"随机性"往往包含两层意思,一是算法总能快速地给出结果但不能保证结果的正确性,如素性判定中的Solovay-Strassen算法等;或者程序快速返回,但可能带回一个警告信息而没有得到正确结果.我们在前面介绍的线性方程组精确求解的数值型算法正是这种情况.这种算法的执行过程中,往往包含随机化的步骤,如产生随机数,随机矩阵或对已知向量(矩阵)进行随机的线性变换等.在线性代数领域,这种随机化往往通过随机性的预处理器(pre-conditioner)<cite>CheEbe02</cite>来实现.提出这种算法必须同时给出出错的概率的上界,从而提供这种算法的可靠性,这往往通过有关多项式零点个数的Schwartz-Zippel定理<cite>Sch80</cite>进行估计.这种类型的算法往往称为Monte Carlo型算法.第二种情形是算法总能给出正确的结果,但不能保证每次都能快速执行,而只能在平均意义下,或在一些好的情形能快速给出正确结果,这称为Las Vegas型算法.实际上,我们遇到的很多算法都或多或少带有这种性质,即能够在一些好多情形特别快速地给出正确结果,例如以上给出的基于中国剩余定理的模算法.很容易看到,两种类型的随机性算法的区别不是绝对的,对于同一种算法甚至可以转换为Las Vegas型的或Monte Carlo型的.例如,如果很容易判断计算结果的正确性,(例如求解线性方程组的情形,求解过程一般需要$O(n^3)$的算法复杂度,而判断解的正确性却只要$O(n^2)$次计算.)这时,我们只要反复执行算法,直到我们得到一个正确结果.这时我们可以说算法被化归为Las Vegas型的.对于一个Las Vegas算法,如果我们发现程序执行了过长的时间,例如远远超过平均执行时间时,我们就令算法中止退出,同时返回一个警告.我们可以说,这时算法就是一个Monte Carlo型的算法.我们下面介绍的几个算法都带有随机性质.
+
+接下来我们介绍上面提到的<index>Schwartz-Zippel定理</index><cite>jts80</cite>.
+
+<theorem name="Schwartz-Zippel">
+设$Q\in F[x_1,\cdots,x_n]$,$Q\neq 0$是$n$元多项式.设$Q_1$是$Q$按照$x_1$的降幂排列得到的多项式,$d_1$为$x_1$在$Q_1$中的次数,$Q_2$为$x_1^{d_1}$在$Q_1$中的系数多项式.归纳地说,令$d_i$为$Q_i$中$x_i$的次数,$Q_{i+1}$为$Q_i$中$x_i^{d_i}$的系数,$1\le i\le n$.对$1\le i\le n$,令$x_i$在$I_i\subseteq F$中取值,则在$I_1\times \cdots \times I_n$中$Q$至多有$$|I_1\times \cdots \times I_n|\left(\frac{d_1}{|I_1|}+\cdots +\frac{d_n}{|I_n|}\right)$$个零点.
+</theorem>
+
+这一定理给出了多元多项式在其定义集合上零点个数的上界.在我们采取的随机化步骤中,往往需要在某个集合中随机取值构造向量或矩阵.在此过程中,可能导致算法失败的奇异情形往往表现为取到了某个多元多项式的零点.根据Schwartz-Zippel定理,我们就可以对此失败的概率做出上限估计.
+
+<proof>
+归纳法.$n=1$的情形由代数基本定理可得.
+
+设以上命题对$Q_2\in F[x_2,\cdots,x_n]$成立,即其零点集$\mathrm{Null}(Q_2)$有$\#\mathrm{Null}(Q_2)\le |I_2\times\cdots \times I_n|(\frac{d_2}{|I_2|}+\cdots+\frac{d_n}{|I_n|})$.若$(z_2,\cdots ,z_n)\in \mathrm{Null}(Q_2)$,则$\forall x_1\in I_1$,$(x_1,z_2,\cdots,z_n)\in I_1\times \cdots\times I_n$都可能是$Q_1\in F[x_1,\cdots,x_n]$的零点.若$(z_2,\cdots,z_n)\notin \mathrm{Null}(Q_2)$,则至多有$d_1$个$x_1\in I_1$使得$(x_1,z_2,\cdots,z_n)\in \mathrm{Null}(Q_1)$.从而$Q_1$在$I_1\times\cdots I_n$中至多有
+<latex>
+\begin{equation*}
+\begin{split}
+&|I_1||I_2\times\cdots\times I_n|\left(\frac{d_2}{|I_2|}+\cdots+\frac{d_n}{|I_n|}\right)+d_1|I_2\times \cdots\times I_n|\\
+=&|I_1\times I_n|\left(\frac{d_1}{|I_1|}+\cdots+\frac{d_n}{|I_n|}\right).
+\end{split}
+\end{equation*}
+</latex>个零点.
+</proof>
+
+Schwartz-Zippel定理有以下直接的推论,对于概率性算法的分析有重要意义.
+
+<corollary>
+设$Q\in F[x_1,\cdots,x_n]$,$Q\neq 0$,且$x_1,\cdots,x_n$均在$U\subseteq F$中随机选取.$Q$结果为零的概率不超过$\frac{D}{\# U}$,其中$D$为$Q$的次数.
+</corollary>
+<corollary>
+若$F=\mathbb{R}$或$F=\mathbb{C}$,$Q\in F[x_1,\cdots,x_n]$,$Q\neq 0$.若$(x_1,\cdots,x_n)$在非零测集$U\subseteq F$上随机选取,则$Q(x_1,\cdots,x_n)$在概率1的意义下非0.
+</corollary>
+; <corollary>
+; 若$F=F_q$,$Q\in F[x_1,\cdots,x_n]$,$Q\neq 0$.若$(x_1,\cdots,x_n)$在$F$中随机选取,则$Q(x_1,\cdots,x_n)$为零的概率不超过$\frac{D}{\# F}$,$D$为$Q$的次数.
+; </corollary>
+
+; 为了显示以上定理的作用,我们在随机预处理器中选取一个简单例子来看一看.
+
+; 所谓<index>预处理步骤</index>,就是我们希望通过一个确定的或随机性的变换$\mathcal{P}$,将给定矩阵$A$映射为$A'$,且$A'$满足某种好的性质.根据要求结果满足的性质不同,预处理器分为许多种<cite>CheEbe02</cite>,例如使主子式非奇异,或保证前$r,r=\mathrm{rank}A$列线性无关等.
+
+下面,我们通过几个例子说明预处理步骤的应用.关于线性代数中涉及到的更广泛的预处理问题以及相应的预处理方法,读者可以参考<cite>CheEbe02</cite>.
+
+*** <index>分块Gauss消元法</index>
+
+; 我们知道,在经典的Gauss消元法中,对于一般矩阵求解必须附加选取主元的过程.该过程的目的是为了保证主子式的可逆性,从而能够顺利进行消元步骤.我们也可不限于对矩阵每个元素的操作,考虑如下的块消元过程:
+
+我们已经熟悉带选主元的Gauss消元法.理论上,我们每个消元步骤也可不限于单个元素,考虑如下的块消元过程:
+<latex>
+\begin{equation*}
+\begin{bmatrix}
+A&B\\
+C&D
+\end{bmatrix}
+\begin{bmatrix}
+I&-A^{-1}B\\
+O&I
+\end{bmatrix}=
+\begin{bmatrix}
+A&O\\
+C&D-CA^{-1}B
+\end{bmatrix}.
+\end{equation*}
+</latex>这样的消元有如下好处:它借助分块矩阵计算可将消元化为递归的过程,这有利于算法复杂度的降低;同时,经过化归后,算法容易并行化.然而,这样的算法应用于一般矩阵时将遭遇重大的困难:算法步骤中要求$A $必须可逆,而这并非普遍得到满足的.事实上,按元素进行的Gauss消元法必要的选主元过程,正是为了保证主子式的可逆性,从而能够顺利执行消元步骤.
+
+如果对系数矩阵$M $进行预处理:$$\mathcal{P}:M\longmapsto M' x=UMV,$$其中$U $和$V $为在一定范围内随机选取的矩阵,使得$M' $满足主子式非奇异,则块消元过程可以执行下去.
+
+<problem name="随机四分变换">
+若$$M=\begin{bmatrix}A&B\\C&D\end{bmatrix}$$为$(2n)\times (2n)$阶非奇异实矩阵,$R=\mathrm{diag}(r_1,\ldots,r_n)$,$S=\mathrm{diag}(s_1,\ldots,s_n)$为$n\times n$阶对角阵,其元素在$U\subseteq \mathbb{R}$中随机选取.则
+<latex>
+\begin{equation*}
+M'=
+\begin{bmatrix}
+\tilde{A}&\tilde{B}\\
+\tilde{C}&\tilde{D}
+\end{bmatrix}=
+\begin{bmatrix}
+I&R\\
+I&-R
+\end{bmatrix}
+\begin{bmatrix}
+A&B\\
+C&D
+\end{bmatrix}
+\begin{bmatrix}
+I&I\\
+S&-S
+\end{bmatrix}
+\end{equation*}
+</latex>的任意阶主子阵均以概率1非奇异.
+</problem>
+<proof>
+可以证明,以上得到的$M' $每一主子阵的行列式均可表示为$(r_1,\cdots,r_n)$和$(s_1,\cdots,s_n)$的非零多项式,由推论得到对它进行计值时以概率1非0.
+</proof>
+
+以上的随机四分变换是一类更普遍的随机蝶形变换(random butterfly transformation)的特例.这类变换的思想来源于一类复杂网络问题.由于随机四分矩阵相当稀疏,其乘法计算量很小,因此它提供了一个很方便的分块矩阵预处理器,可以参考<cite>Par95</cite>.
+
+类似地,下面给出的Toeplitz预处理步骤也可达到同样的效果<cite>KalSau91</cite>.
+
+<problem>
+设$F$为域(通常为有限域).$M\in F^{n\times n}$,取$F$中的子集$S\subset F$.考虑如下的线性变换:$$M':=UMV^T,$$其中$$U:=\begin{pmatrix}1&u_2&u_3&\cdots&u_n\\&1&u_2&\cdots&u_{n-1}\\&&1&\ddots&\vdots\\&&&\ddots&u_2\\&&&&1\end{pmatrix},$$ $$V:=\begin{pmatrix}1&v_2&v_3&\cdots&v_n\\&1&v_2&\cdots&v_{n-1}\\&&1&\ddots&\vdots\\&&&\ddots&v_2\\&&&&1\end{pmatrix},$$未定元$u_2,\ldots,u_n,v_2,\ldots,v_n$从$S$中随机选取.记$r=\mathrm{rank}(A)$,记$A'_i$为$A'$的$i$阶前主子阵(leading principal minors),则$$\mathrm{Prob}(\mathrm{det}(A'_i)\neq 0, \forall 1\leq i\leq r)\geq1-\frac{r(r+1)}{\# S}.$$
+</problem>证明参考<cite>KalSau91</cite>.由于Toeplitz阵与向量的乘法等价于两个多项式的乘法,可用$O^{\sim}(n)$步计算得到,从而在对$M$施行如上预处理步骤后,得到的$M' $仍是一个好的黑箱矩阵.
+
+*** 一个概率性的求秩算法
+
+秩是矩阵的一个重要的不变量,许多线性代数的算法都假定矩阵的秩已知.通常的求秩算法是以Gauss消元法为基础的.为了适应黑箱算法的应用,下面给出一个基于极小多项式计算的概率性的矩阵求秩算法<cite>KalSau91</cite>.
+
+我们知道,对于一般矩阵$M$而言,由于特征值的简并性质,秩$r$与极小多项式的次数$m_A$没有直接的关系.但如果矩阵的特征多项式除0以外没有重根,且矩阵的Jordan标准形中没有超过1阶的幂零Jordan块(即0的代数重数等于其几何重数<cite>ZhaXu04</cite>),则总有$r=m_M-1$.下面给出的对角阵预处理步骤事实上将矩阵转化为这种情形.证明同样参见<cite>KalSau91</cite>.
+
+<problem>
+设$M\in F^{n\times n}$具有直到$r$阶的非奇异前主子阵,其中$r=\mathrm{rank}(M)$(未知),并设$r<n$.令$X=\mathrm{diag}(x_1,\cdots,x_n)$,其中$x_1,\cdots,x_n$在子集$S\subset F$中随机选取,记$M^{\prime} = MX$,则$$\mathrm{Prob}(r=\deg(m_{M'})-1)\geq 1-\frac{n(n-1)}{\# S}.$$
+</problem>
+
+对一个一般的方阵,在进行如上两个预处理步骤之后,利用后面两节中介绍的矩阵极小多项式算法即可得到矩阵的秩.对于稀疏或有结构的矩阵,这一概率性算法的效率要高于直接的消去法.
+
+从以上例子中我们可以归纳出预处理器的构造思路:
+ 1. 预处理过程即对矩阵$M\in F^{m\times n}$进行如下的线性变换$\mathcal{P}:M\longmapsto PMQ$,$P\in F[x_1,\cdots,x_s]^{m\times m}$,$Q\in F[y_1,\cdots,y_t]^{n\times n}$.
+ 2. 其中$x_1,\cdots,x_s,y_1,\cdots,y_t$在$F$(或$U\subseteq F$)上随机选取.
+ 3. 由于要证明的性质对应于$F[x_1,\cdots,y_t]$上非零多项式,因此变换后的矩阵在一定概率下满足我们要求的性质.
+
+在构造$P$,$Q$的过程中,有一些原则是要遵守的:
+ - $P$,$Q$的选取要尽量简单.
+ - $P$,$Q$要具有好的性质,如易于求逆,能够快速施行矩阵-向量乘法等.
+
+关于预处理步骤的全面的论述,请读者参阅<cite>CheEbe02</cite>.
+
+** 线性递推列
+
+在本节中,我们首先介绍<index>线性递推序列</index>(linear recurrent sequences)及其极小多项式的概念以及相关算法.
+
+<definition name="线性递推列">
+设$F$为域,$V$为$F$上的线性空间,记$V$上的无穷序列$(a_i)_{i\in \mathbb{N}},a_i\in V,i\in\mathbb{N}$全体构成的线性空间为$V^{\mathbb{N}}$.称$a=(a_i)\in V^{\mathbb{N}}$为线性递推列,若存在$n\in\mathbb{N}$及$f_0,\cdots,f_n\in F,f_n\neq 0$,使得$$\sum\limits_{0\le j\le n}f_ja_{i+j}=f_na_{i+n}+\cdots+f_1a_{i+1}+f_0a_i=0$$对于任意的$i\in \mathbb{N}$都成立.$n$阶多项式$f\equiv \sum_{0\le j\le n}f_jx^j\in F[X]$称为$a$的特征多项式,也称为零化多项式或生成多项式.
+</definition>
+
+根据以上定义,将$F$和$V$均取为$\mathbb{Q}$,则我们熟悉的Fibonacci序列是线性递推列,$x^2-x-1$构成它的一个特征多项式.我们知道,对于一个线性递推列,在已知其特征多项式及最初的几个取值时,可以通过递推的方法快速计算其后继序列.下面我们举一些线性代数中涉及的线性递推列的例子,它们在下面的算法中将扮演重要角色.
+<problem label="pr:rec">
+本例给出线性代数中一些重要的线性递推列.这里最关键的是利用了线性代数中的Caley-Hamilton定理<cite>ZhaXu04</cite>.以下$F$均表示一般域.
+ 1. 取$V=F^{n\times n}$,$A\in V$为任意方阵.则$a=(A^i),i\in \mathbb{N}$为线性递推列,$A$的极小多项式与特征多项式都是$a$的特征多项式.
+ 2. 设$V=F^n$,$A\in F^{n\times n}$,$b\in F^n$为任意向量.注意到$(A^i)$的任意特征多项式也将$(A^ib)$化为零,故$(A^jb)$也为线性递推列.由$a$的元素生成的$V$中的线性子空间称为$A$与$b$的Krylov子空间.
+ 3. 设$V=F^n$,$A\in F^{n\times n}$,$b,u\in F^n$为$V$中的任意向量.则$(A^ib)$的任意特征多项式同样将$(u^TA^ib)$化为零,故$(u^TA^i)b$也为线性递推列.
+</problem>
+
+我们可以通过引入多项式对序列的作用,将无穷序列与多项式更紧密地联系起来.
+
+<definition name="多项式对序列的作用">
+设$f=\sum_{0\le j\le n}f_jx^j\in F[X]$以及序列$a=(a_i)_{i\in \mathbb{N}}\in V^{\mathbb{N}}$,定义$f$对$a$的作用如下$$f\bullet a=\left(\sum\limits_{0\le j\le n}f_ja_{i+j}\right)_{i\in \mathbb{N}}\in V^{\mathbb{N}}.$$注意到,在此定义下,常系数对序列的作用即数乘作用,而未定元$x$对$a$的作用相当于平移算子.在此作用下,$V^{\mathbb{N}}$成为$F[X]$上的模.
+</definition>
+
+固定$a\in V^{\mathbb{N}}$,容易验证$a$的特征多项式的集合与0一起,构成了$F[X]$中的理想,我们称之为$a$的零化子理想,记为$\mathrm{Ann}(a)$.由于$F[X]$为主理想整环,记$\mathrm{Ann}(a)$首项系数为一的生成元为$m_a$,则$m_a$的倍数全体构成了$a$的特征多项式集合,$m_a$是其中次数最低的首一多项式,我们称之为$a$的<index>极小多项式</index>.$m_a$的次数称为$a$的递推阶数.结合例##pr:rec 中的几个例子,我们可以对线性代数中的特征多项式,极小多项式等概念有更深刻的理解.
+
+本节的主要目的是给出线性递推序列的极小多项式的构造性算法.以下定理给出了$V=F$时线性递推列的极小多项式的一个判别法则.
+
+<definition name="多项式的倒逆">
+设$f(x)=f_dx^d+\cdots+f_0\in F[X]$为$d$阶多项式,记$\mathrm{rev}(f)\equiv x^df(x^{-1})=f_0x^d+\cdots+f_d\in F[X]$,称为$f$的倒逆.
+</definition>
+<theorem>
+设$a=(a_i)_{i\in \mathbb{N}}\in F^{\mathbb{N}}$为线性递推序列,$h=\sum_{i\in \mathbb{N}}a_ix^i\in F[~[X]~]$,$f\in F[X]\backslash 0$,$\deg f=d$,$r=\mathrm{rev}(f)$.
+ 1. 以下命题等价:
+    - $f$为$a$的特征多项式;
+    - $r$,$h$为低于$d$阶的多项式;
+    - $h=g/r$,其中$g\in F[X]$,且$\deg g<d$.
+ 2. 若$f$为$a$的极小多项式,则$d=\max\{1+\deg g,\deg r\},$且$\mathrm{gcd}(g,r)=1$.
+</theorem>
+<proof>
+ 1. 直接代入按照形式幂级数的乘法规则验证即可.
+ 2. $d\ge \deg r$,故$d\ge \max\{1+\deg g,\deg r\}$.若$d>\deg r$,则$x|f$,且$f/x$为$a$的特征多项式,与$f$极小矛盾.设$u=\mathrm{gcd}(g,r)$,则$f^*\equiv f/\mathrm{rev}(u)$为$d-\deg r$次多项式,$r/u=\mathrm{rev}(f^*)$,且$(r/u)\cdot h=g/u$为$\deg g-\deg u$次多项式.于是$r/u$为$a$的特征多项式,$u\in F$.
+</proof>
+
+; <remark>
+; 从$h$的定义可以看出,$h=g/r$为序列$a$的生成函数(generating function).
+; </remark>
+
+在域$F$上,若给定一个线性递推列$a\in F^{\mathbb{N}}$,且我们能够预先知道其极小多项式$m_a$的次数上界.例如在前面的例##pr:rec 的3中,$m_a$的最高次数不会超过矩阵$A$的阶数.在这种情况下,$m_a$可以通过求解如下的Pad\'e逼近问题得到解答:
+<latex>
+\begin{equation}@@eq:pade
+h\equiv \frac{s}{t}\pmod {x^{2n}},x\nmid t,\deg s<n, \deg t\le n,\mathrm{gcd}(s,t)=1.
+\end{equation}
+</latex>我们看到,$(s,t)=(g,r)$正是如上问题的一组解.由Pad\'e逼近问题解的唯一性,即得如下算法.
+
+<index name="Berlekamp-Massey算法"></index>
+
+<algorithm name="Berlekamp-Massey" label="alg:rec">
+输入:域$F$上线性递推列$a\in F^{\mathbb{N}}$,给定$a$的递推阶数的一个上界$n$以及$a$的前$2n$个元素$a_0,\cdots,a_{2n-1}\in F$.
+
+输出:$a$的极小多项式$m_a\in F[X]$.
+
+ 1. $h:=a_{2n-1}x^{2n-1}+\cdots+a_1x+a_0$,使用扩展Euclid算法计算$s,t\in F[X]$且$t(0)=1$,使得##eq:pade 成立.
+ 2. $d:=\max\{1+\deg s,\deg t\}$.
+ 3. 返回$\mathrm{rev}_d(t)=x^d t(1/x)$.
+</algorithm>
+
+经过分析,这一算法能在$O(n^2)$的域$F$运算步骤内给出$a$的极小多项式.
+
+** 线性方程组的Wiedemann算法
+
+下面我们考虑线性方程组$Ax=b$,其中系数矩阵$A\in F^{n\times n}$非奇异,则该线性方程组有唯一解.设$m=m_{b}=\sum_{0\le j\le d}m_jx^j\in F[X]$为线性递推序列$a_b=(A^ib)_{i\in \mathbb{N}}$的极小多项式,则$m\bullet a=m(A)b=\sum_{0\le j\le d}m_jA^jb=0$,从而我们得到$$A\cdot (-m_0^{-1})\sum\limits_{1\le j\le d}m_jA^{j-1}b=b,$$即$x=-m_0^{-1}\sum_{1\le j\le d}m_jA^{j-1}b$为方程组的解.据此分析,我们得到如下算法:
+
+<algorithm label="Wie">
+给定域$F$上的非奇异$n$阶方阵$A$与任意$n$维向量$b$,本算法计算线性方程组$Ax=b$的解$x=A^{-1}b$.
+
+ 1. 计算线性递推列$(A^ib)_{i\in \mathbb{N}}$的极小多项式$m\in F[X]$.
+ 2. 返回$x:=-m_0^{-1}\sum_{1\le j\le d}m_jA^{j-1}b.$
+</algorithm>
+
+以上给出了Wiedemann算法的整体过程,但还有一个重要问题没有解决,即算法第一步中要求的$n$维向量组成的线性递推列的极小多项式的计算.由例##pr:rec 中3,我们知道$a_b\equiv(A^jb)_{j\in \mathbb{N}}$与$a_{ub}\equiv(u^TA^jb)_{\mathbb{N}},u\in F^{\mathbb{N}}$的特征多项式有很重要的联系.详言之,我们知道$a_b$的每个特征多项式都将$a_{ub}$零化,即$\mathrm{Ann}(a_b)\subseteq \mathrm{Ann}(a_{ub})$,从而$m_{ub}|m_b$;另一方面,若$f\in \mathrm{Ann}(a_{ub}),\forall u\in F^{\mathbb{N}}$,则$f\in \mathrm{Ann}(a_b)$,否则总可取$u=f\bullet a_b$使得$f\bullet a_{ub}\neq 0$.这样,我们有如下的随机性算法,若该算法顺利执行完毕,则能给出正确的结果.
+<algorithm>
+给定域$F$上$n$阶方阵$A$与$n$维向量$b$,该算法计算线性递推序列$a_b\equiv (A^jb)_{j\in \mathbb{N}}$的极小多项式$m_{b}$.
+
+ 1. 随机选取$u\in F^{n}$,计算$(u^TA^ib)_{i\in\mathbb{N}}\rightarrow a$.
+ 2. 运用算法##alg:rec 计算$m:=m_{ub}\in F[X]$.
+ 3. 校验步骤:若$m(A)b\neq 0$,进行步骤1.
+ 4. 返回$m$.
+</algorithm>
+
+<remark label="multiple">
+如果计算结果在校验步骤中失败,意味着$m_{ub}|m_b$但$m_{ub}\neq m_b$.在以上算法中我们采取的是丢弃策略.事实上,注意到$m_{ub}$提供了$m_b$的一个非平凡因子.因此我们也可以尝试如下两种改进方案,将第3步的校验步骤扩展为以下两种方式中的任意一种:
+ - $m:=m\cdot m_{ub}$,若$m(A)b\neq 0$,则令$b:=m(A)b$,返回步骤1.
+ - $m:=\mathrm{lcm}(m,m_{ub})$,若$m(A)b\neq 0$,则返回步骤1.<cite>Wie86</cite>
+
+以上两种做法的正确性都很容易证明.
+</remark>
+
+; 在给出一个随机性算法后,我们急需解决的一个问题是算法的有效性.与确定性算法不同的是,仅仅知道一个随机性算法的正确性是远远不够的,我们还需要知道,这一算法到底以多大概率得到正确结果,从而能够很快返回.为此,我们还需要对$F^{\mathbb{N}}$作为$F[X]$上模的结构有更清楚的认识.
+
+我们还需要知道以上算法到底以多大概率得到正确结果.为此,我们需要对$F^{\mathbb{N}}$作为$F[X]$上模的结构有更清楚的认识.
+
+设$f\in F[X]$为$d$次多项式,记$\langle f\rangle=F[X]\cdot f$为由$f$生成的多项式理想.定义$M_f:=\{a\in F^{\mathbb{N}}|f\bullet a=0\}$,则$M_f$为$F[X]$上的循环模,且$M_f=F[X]\bullet c$,其中$c=(0,\cdots,0,1,c_d,c_{d+1},\cdots)$,$c_d,c_{d+1},\cdots$为根据前$d$个元素递推得到的序列元素.这时$c,x\bullet c,\cdots,x^{d-1}\bullet c$构成了$M_f$的一组基.我们看到,$F[X]$在$M_f$上的作用给出了$F[X]$到$M_f$的满同态,从而决定了如下的模同构:$$M_f\cong F[X]/\mathrm{Ann}(M_f)=F[X]/\langle f\rangle.$$这样的结构给出了如下的引理,它是我们分析算法有效性的基础.
+<lemma>
+设$A\in F^{n\times n}$,$b\in F^n\backslash 0$.$f\in F[X]$为$(A^ib)_{i\in \mathbb{N}}$的极小多项式.存在$F-$线性的满射$\psi:F^n\rightarrow F[X]/\langle f\rangle$,使得$\forall u\in F^n$,以下两个命题等价:
+ - $f$为$(u^TA^ib)_{i\in \mathbb{N}}\in F^{\mathbb{N}}$的极小多项式.
+ - $\psi(u)$为单位,即$(\psi(u),f)=1$.
+</lemma>
+<proof>
+由前面的讨论,存在$F[X]/\langle f\rangle$到$M_f$的同构$\phi:F[X]/\langle f\rangle\rightarrow M_f$.我们还可定义$F-$线性映射$$\psi^*:F^n\ni u\longmapsto \psi^*(u)=(u^TA^ib)_{i\in \mathbb{N}}\in M_f$$,并由$f$为$M_f$的极小多项式得到$\psi^*$为满射.因此可以构造$F-$线性满映射$$\psi=\phi^{-1}\circ \psi^*:F^n\rightarrow M_f,$$用交换图表示如下:
+<latex>
+\begin{equation*}
+\xymatrix{
+F[X]/\langle f\rangle\ar[dr]_{\phi}&&F^n\ar[dl]^{\psi^*}\ar[ll]_{\psi=\phi^{-1}\circ \psi^*}\\
+&M_f }.
+\end{equation*}
+</latex>
+
+这时,我们有
+<latex>
+\begin{equation*}
+\begin{split}
+f=m_{\psi^*(u)}&\Longleftrightarrow \forall g\in F[X](g\bullet \psi^*(u)=0\Leftrightarrow f|g)\\
+&\Longleftrightarrow \forall g\in F[X]((g \bmod f)\bullet \psi(u)=0\Leftrightarrow g\bmod f=0)\\
+&\Longleftrightarrow \forall h\in F[X]/\langle f\rangle (h\bullet\psi(u)=0\leftrightarrow h=0)\\
+&\Longleftrightarrow \psi(u)\text{为单位}.
+\end{split}
+\end{equation*}
+</latex>
+</proof>
+
+<theorem>
+设$U\subseteq F$,$A\in F^{n\times n}$,$b\in F^n\backslash 0$,$f$为$(A^ib)_{i\in\mathbb{N}}$的极小多项式,$d=\deg f$,则$u$从$U^n$中随机选取时,$f$为$(u^TA^ib)_{i\in\mathbb{N}}$的极小多项式的概率$p\ge 1-d/\# U$.
+</theorem>
+这一定理给出了算法有效性的估计,并可据此给出Wiedemann算法的平均复杂度估计.
+<proof>
+记$$u=(u_1,\cdots,u_n)^T=u_1e_1+\cdots+u_ne_n\in F^n$$为$F^n$中的任意向量,由$\psi$线性得到
+<latex>
+\begin{equation*}
+\begin{split}
+\psi(u)&=u_1\psi(e_1)+\cdots+u_n\psi(e_n)\\&=(u_1h_1+\cdots+u_nh_n)\bmod f,
+\end{split}
+\end{equation*}
+</latex>其中$h_1,\cdots,h_n\in F[X]$,且次数低于$d$.$\psi(e_j)=h_j\bmod h_j$.令$y_1,\cdots,y_n$为不定元,$r=\mathrm{res}_x(y_1h_1+\cdots+y_nh_n,f)\in F[y_1,\cdots,y_n]$,则$r$的总次数不超过$d$.由于$\psi(u)\text{单位}\Leftrightarrow r(u_1,\cdots,u_n)\neq 0$,但$\psi$满,故$r\neq 0$.从而$u_i\in U$随机选择时,$p\ge 1-d/\# U$.
+</proof>
+
+根据该定理,可以给出Wiedemann算法##Wie 的平均复杂度估计,证明可参考<cite>mca</cite>.
+<theorem>
+若$F$中含有不少于$2n$个元素,则算法##Wie 的复杂度为$4nc(A)+O(n^2)$,其中$c(A)$为矩阵$A$左乘向量所需的计算量,与矩阵$A$的结构有关.
+</theorem>
+
+以上我们给出了有限域上适用于稀疏非奇异矩阵的Wiedemann算法及其有效性分析.在此之后,黑箱算法成为精确线性代数研究领域发展的主流.首先是将这类算法应用于更广泛的情形,如奇异系数矩阵的方程组,元素很少的系数域上的方程组等,并被用于解决线性代数中相关联的其他问题,如矩阵的秩,行列式等.可参考<cite>Gra03</cite>2.3节和<cite>Vil07</cite>中包含的有关参考文献.
+
+对于系数矩阵奇异情形,Wiedemann本人在<cite>Wie86</cite>中给出了一种基于随机蝶形变换(Benes变换)的预处理步骤,在此之后其他形式的预处理步骤以及相当于数值算法中的Lanczos迭代,共轭梯度法等迭代方法的黑箱算法得到广泛的应用,并在此基础上发展了块形式的相应算法,如<cite>EbeKal97</cite><cite>KalSau91</cite><cite>Cop94</cite><cite>Kal95</cite>等.以上算法大多已经在[[http://www.linalg.org][LinBox]]系统中得到实现<cite>Dum02</cite>.
+
+对于系数域元素很少的情形,在同样预处理步骤下以上的有效性分析将失效.这时,一种做法是将系数域进行适当的扩张(这在<cite>Wie86</cite>中有了初步的描述),保证以上分析成立.但这样做的代价是域扩张带来的复杂计算步骤.在LinBox系统中,并未采用域扩张的方法,而是在前述方法上增加适当的校验步骤,保证计算结果以较高的概率正确<cite>Dum02</cite>.
+
+; 对于元素很少的域$F_q$,上面的随机性算法不适合于直接应用.这时,我们可以采取两种方式:一是对$F_q$进行适当的域扩张,从中进行元素的随机选择;此时算法复杂度大致要乘上一个$O(M(\log_qn))$的因子,其中$M(\log_qn)$是进行$F_q$上的$n$次多项式乘法的运算量.第二种方式是利用注记##multiple 中类似的方法,即使某次计算失败了,仍然从中提取出我们想要的信息.
+; ** 分块Lanczos算法与Wiedemann算法
+
+; 在Wiedemann的文章<cite>Wie86</cite>将黑箱型算法引入精确线性代数之后,这一思路为这一领域打开了一扇崭新的窗口.随后,各种类似算法快速发展起来,很大一部分被称为Wiedemann算法的变体,或Lanczos算法的变体[19].这其中一个重要的问题是改进Wiedemann最先提出的奇异线性方程组的求解算法,最典型的是有限域$F_q$或二元域$F_2$上的求解向量线性相关系数的问题.我们在本节叙述的两个算法都是基于精确线性代数领域的BLAS技术与分块运算技术的,因此我们应首先叙述这些基础的技术.
+
+; *** 精确线性代数领域的BLAS技术及相关问题
+
+; *** $F_2$上向量相关性的分块Lanczos算法
+
+; *** $F_q$上向量相关性的分块Wiedemann算法
+; (待整理)
+; ** PID上不定方程组的Diophantine解与最小分母有理解 (Storjohann)
+; (待整理)
+; * 行列式
+
+; 对于一般环上的矩阵,计算行列式的传统方法主要有两种:一是利用行列式的代数余子式展开<cite>ZhaXu04</cite>,其代数复杂度为指数级的.二是利用幺模矩阵进行行变换,将矩阵化为行阶梯形,随后可以直接对对角元素求积得到行列式;若矩阵为奇异的,这种方法还能快速判别并返回0的结果.这两种算法的比较可以参见<cite>GenJoh76</cite>,其中指出两种算法都各有其适用范围,即前者适用于小规模的或稀疏的矩阵计算,而后者则适合对大型稠密矩阵进行运算.实际中,应当通过实验确定何时采取哪种算法更有效.
+
+; 当我们考察的对象从一般环转移到整数环上的行列式时,以上算法当然还能够使用.这时,我们也可根据整数环的性质,设计出更多算法,这些算法有效地降低了算法的复杂度.
+
+; ** CRT算法 (MCA)
+
+; ** 线性方程组解的LCD与行列式的Las Vegas算法 (Abbott)
+
+; * 特征多项式
+
+; ** $F_p$上的$LU$-Krylov算法 (Dumas)
+
+; ** $F_p$上的Keller-Gehrig分支算法 (Keller-Gehrig,Dumas)
+
+; ** $\mathbb{Z}$上的CRT算法 (Dumas)
+
+Footnotes: 
+[1]  这些矩阵标准形的定义可参考<cite>New72</cite>.
+
+[2]  本章提到的"算法复杂度"均指乘法复杂度,即在计算复杂度时仅计入乘法运算.采用这种计算方法是因为对于多数代数结构,乘法运算的消耗要远远大于加减法的消耗
+
+[3]  这些特殊矩阵的定义可参考<cite>BinPan94</cite>.
+
+[4]  相比<cite>ZhaXu04</cite>中的定义,我们放宽了每行最左非0元素为1的要求.
+
+[5]  这里对角元素与通常定义不同,注意区别.
+
+[6]  以下的算法步骤中并不显式包含整数的除法,这是我们构造该交换图的基础.然而,必须注意,这里出现的三个"行变换"是执行完全相同的操作,在这个意义下,该交换图总是成立的.而后面将会讨论的模同态的交换性是在如下意义下:对于一个已知的矩阵,要通过行变换求得其REE形,所需的变换对于模映射前后的两个矩阵可能是不同的,例如矩阵$$\begin{bmatrix}0&p\\p&0\end{bmatrix}$$在模$p$映射下得到零矩阵,二者的RE序列显然不同,从而化为REE形所需行变换也是不同的.如果模映射前后的两个矩阵需要执行的行变换完全相同,则模映射自然是交换的,这构成"交换"的充分条件.对此,后面会给出更为详细的分析.
+
+[7]  这种估计往往由Hadamard不等式提供,见"Hensel提升方法"一节.
+
+; [5]  在该算法中,我们还需要一个相当规模的素数库$\mathcal{L}$.通常取该库中的素数$p$满足$p^2\lessapprox \ell$,其中$\ell$为计算机硬件计算的字长.这样的素数库可以预先存储在程序库中,也可以动态生成.该库的生成并非本算法讨论的内容.
+
+; [6]  若素数库采取动态生成的方式,则不应有此问题.
+
+; [7]  注意到此时,线性方程组右端向量组$B$包含列独立与系数矩阵列空间的向量,从而方程组无解.
+
+; [8]  这一检验成立是中国剩余定理算法结束的必要条件(不是充分条件).此处引入该检验,是为了让随后的"代入检验"成功的可能性更大,从而减少代入检验的运算量.
+
+; [9]  此处要运用矩阵乘法.对于一般矩阵的乘法快速算法可以参考"快速矩阵乘法"一节.对于多元多项式系数的矩阵乘法(在CPRRE算法中要用到),也可采用计值插值的方法进行.
+
+; [10]  注意!这里包含一个与PLES算法很重要的不同之处.由于PLES算法中被模掉的素数可以在全体整数中选取,因此其算法主体总能成功(只要它调用的CPRRE算法成功);然而,由于CPRRE算法的计值点只能在$F_p$中选取,而这是有限的,因此可能不成功.鉴于此,通常我们选取模同态时,要求模掉的素数$p$充分地大:只要满足$p^2\lessapprox \ell$的条件,从而$F_p$上的运算可以高效地执行.
+
+; [11]  这种说法看上去很自然,但并不准确.严格来讲,应该是精确解构成近似解的一个最佳逼近.见下所述.
+
+; [12]  据<cite>Wan05</cite>的说法,这种思想来源于分母有限大的有理数是离散的.
+
+; [13]  上述选择是基于如下考虑:选择2的幂次使得以下的计算变为简单的移位的过程,从而更为高效;若$A$为充分良态的,则余量可能已经非常之小,需要加一个限制以保证以下的乘法不会溢出,这一限制被选择为$2^{30}$同样是为了使计算结果在机器精度之内.
+
+; [14]  注意到,这样的情形仅发生在$A$为病态的时候.
+
+; [15]  事实上,即使按照原算法中建议的去做,也可能由于浮点数运算的舍入误差出现这种情况(尽管已经尽量做了避免).
+
+; [16]  可参考数值线性代数部分"迭代法"一章,也可参考其中所列出的参考文献.
+
+; [17]  这里的"稀疏"条件只是为了保证矩阵对向量的线性作用能以较少的计算量得到估计.对于某些有结构的矩阵,如Vandermonde阵,由于也满足这一要求,因而同样适合应用黑箱型算法.
+
+; [18]  它至少还返回了一个警告.从这种意义上说,它还优于通常意义下的Monte Carlo型算法.
+
+; [19]  直观地讲,模就是"环上的线性空间".关于其严格定义以及一些一般性质,可参考<cite>ZhaXu04</cite>.
+
+; [20]  如果我们这里的正确性仅仅指,"如果按照正常步骤计算并正常退出,则算法返回正确结果"的话.
+
+; [21]  Lanczos算法最先是由Lanczos提出用于数值求解稀疏线性方程组的,参见"数值线性代数"部分.准确地说,Wiedemann算法正是类似Lanczos算法的黑箱技术在精确线性代数领域的对应.

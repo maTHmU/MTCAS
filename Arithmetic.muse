@@ -1,0 +1,440 @@
+#title 高精度运算
+
+<contents>
+
+我们所熟知的科学计算一般就是指数值计算.数值计算是计算数学的一个主要部分,它研究用计算机求解各种数学问题的数值计算方法及其理论与软件实现.关于数值计算的研究在计算机被发明之前就已经有了相当的基础,它涉及到的内容包括函数的数值逼近,数值微分与数值积分,非线性方程数值解,数值线性代数,常微分方程与偏微分方程数值解等(参见<cite>shuzhifenxi</cite>).数值计算中处理的对象并不仅仅是数值,还包括由数值构成的简单数据结构,例如一般的多项式,无穷级数,矩阵等,数值计算处理问题的一般方法是通过数学推导将问题化归到这些数学对象的运算上.
+
+作为应用数学,数值计算的主要目标是解决来自于生产实践的工程学问题.与此同时,数学工作者做数学研究本身也是一种生产实践,数学研究过程中同样会产生许多问题,与工程学问题不同,这些问题往往只能用抽象的符号来表达,仅用数值计算的方法是不易解决的,对于这类问题解决方案的研究逐渐形成了应用数学的一个新的分支,为了与数值计算相区别,常常称之为符号计算.类似地,我们可以给符号计算下一个简单的定义:符号计算是一门研究用计算机求解各种数学问题的符号计算方法及其理论与软件实现的科学,它是数学(家)的计算数学.符号计算中处理的数据和结果都是符号,这种符号可以是字母,公式,也可以是数.与数值计算不同的是,数是作为一种符号出现在符号计算中的,这就要求关于数的运算应该是绝对精确的,我们接下来就要讨论数的<index>高精度运算</index>.
+
+* 整数
+
+在基于硬件的整数指令中,计算机能够处理的整数是有界的,在目前典型的计算机中整数的溢出界都不超过$2^{64}$,而符号计算中常常需要处理更大的整数,例如阶乘,Fibonacci数列这样简单的数论函数计算.另一个不平凡的例子是所谓的<index>中间表示膨胀</index>(intermediate expression swell)(参见<cite>wangdongming</cite>第2章),例如采用Euclid算法计算两个整系数多项式的最大公因子时,即使输入的两个多项式和输出的最大公因子都具有绝对值较小的系数,计算过程中的中间结果仍然很可能出现绝对值非常大的系数.设
+<latex>
+\begin{align*}
+  F&=7x^7+2x^6-3x^5-3x^3+x+5,\\
+G&=9x^5-3x^4-4x^2+7x+7,
+\end{align*}
+</latex>
+在计算过程中将有理数化为整数,我们将得到如下的多项式序列
+<latex>
+\begin{align*}
+&1890x^4-4572x^3-6930x^2-846x+4527,\\
+&294168996x^3+257191200x^2-20614662x-142937946,\\
+&-103685278369841305200x^2-32576054233115610000x\\
+&+122463167842311670000,\\
+&2956790833503849546789342057565207098291763520000x\\
+&+555325261806247996966034784074025291687620160000,\\
+&1092074685733031219201041602791259862659169966184593803518\\
+&602418777140682884334769647063543607737698426880000000000,
+\end{align*}
+</latex>
+最后的那个整数达到了118位.除此之外,高精度浮点数的表示和运算也是直接依赖于<index>高精度整数</index>的.
+
+** 进制转换
+
+为了提高运算效率,高精度整数的内部表示常常采用2的正整数次幂进制,如$2^{32}$进制或$2^{64}$进制,而人们书写或阅读时更习惯于采用十进制,因此高精度整数输入输出时常常需要做<index>进制转换</index>.即给定正整数$n$的$B$进制表示$$n=(a_s\ldots a_1a_0)_B,$$需要得到$n$在$B'$进制下的表示.
+
+进制转换的计算方法一般有如下两种.
+<algorithm  name="在$B$进制下除以$B'$" label="al:conversion1">
+
+输入:正整数$n$的$B$进制表示$n=(a_s\ldots a_1a_0)_B$.
+
+输出:$n$的$B'$进制表示.
+
+ 1.设$n$的$B'$进制表示为$(b_t \ldots b_1b_0)_{B'}$.
+ 2.在$B$进制下依次计算出$$b_0=n\bmod B',b_1=\left[{n\over B'}\right]\mod B',\ldots.$$
+ 2.返回$(b_t\ldots b_1b_0)_{B'}$.
+</algorithm>
+<algorithm name="在$B'$进制下乘以$B$" label="al:conversion2">
+
+输入:正整数$n$的$B$进制表示$n=(a_s\ldots a_1a_0)_B$.
+
+输出:$n$的$B'$进制表示.
+
+ 1.设$B'$进制整数$x=0$.
+ 2.利用Horner法则(参见<cite>Weisstein-horner</cite>),在$B'$进制下依次计算$x=Bx+a_k$,$k$从$s$到0.
+ 3.返回$x$.
+</algorithm>
+<remark>
+当待转换的数$n$较长时,进制转换应该分段进行.以"在$B$进制下除以$B'$"的转换算法(算法##al:conversion1
+)为例,设待转换的数为$n$,先反复地用$B'^m$除$n$从而得到$n$的$B'^m$进制表示,然后将$n$的$B'^m$进制表示的每一位再反复地用$B'$除从而转换成$m$位$B'$进制数字.这样做的好处是第二步除以$B'$的除法一般只是单精度运算,因此大大节省了运算时间,关于这一点更详细的介绍请参阅<cite>taocp2</cite>.
+</remark>
+
+** 四则运算
+
+本章的开头曾经强调过,数是作为一种符号出现在符号计算中的,这就要求关于数的运算应该是绝对精确的.在机器精度的范围内,现有的计算机可以轻松地完成整数的四则运算,这主要得益于计算机设计师们的工作.而接下来要讨论的高精度整数四则运算,其基本原理其实和基于硬件的整数指令是一致的,事实上,这就是阿拉伯计数法的发明者们很早就发展出的一整套借助纸笔进行的四则运算理论,我们从小就开始学习熟练地利用它们来操作整数.加法,减法和普通乘法是平凡的,这里不再赘述,而重点讨论一下除法.
+
+*** 商为一位数的除法
+<index name="高精度除法"></index>
+在四则运算的笔算方法中,除法可能是最复杂的.因为除法需要<index>试商</index>,试商包含着猜测的成分,于是不容易形成有效的算法.机器精度整数除法也要试商,但由于计算机内部采用了二进制表示,实际上每一次试商的结果都只有0,1两种可能,因此只需要比较相除的两个数的大小就可以确定.为了得到高精度整数除法的有效算法,我们必须要将一般的试商过程算法化.
+
+首先来看商为一位数的除法,即假定商$\left[\frac{a}{b}\right]$满足$$0\le\left[\frac{a}{b}\right]\le B-1.$$笔算除法的经验告诉我们,被除数和除数的最高几位数对试商是很重要的,我们常常凭借目测(口算)最高几位数就能基本上把商给确定下来.
+
+<theorem label="th:division1">
+设整数$a=(a_{s+1}a_s\ldots a_1a_0)_B,b=(b_s\ldots b_1b_0)_B$,则商$[{a\over b}]$满足不等式
+$$\left[\frac{a_{s+1}B+a_s}{b_s+1}\right]\le\left[\frac{a}{b}\right]\le\min\left\{\left[\frac{a_{s+1}B+a_s}{b_s}\right],B-1\right\}.$$
+</theorem>
+<proof>
+首先$$\frac{a}{b}>\frac{a_{s+1}B^{s+1}+a_sB^s}{(b_s+1)B^s}=\frac{a_{s+1}B+a_s}{b_s+1},$$故$\left[\frac{a_{s+1}B+a_s}{b_s+1}\right] \le \left[\frac{a}{b}\right]$,不等式的前半部分得证.
+
+而由$$\left[\frac{a_{s+1}B+a_s}{b_s}\right] > \frac{a_{s+1}B+a_s}{b_s}-1$$可以得到
+<latex>
+\begin{align*}
+  \left[\frac{a_{s+1}B+a_s}{b_s}\right]+1&\ge\frac{a_{s+1}B+a_s+1}{b_s}\\
+&=\frac{a_{s+1}B^{s+1}+(a_s+1)B^s}{b_sB^s}\\
+&>\frac{a}{b},
+\end{align*}
+</latex>
+故$\left[\frac{a}{b}\right]\le\left[\frac{a_{s+1}B+a_s}{b_s}\right]$,证毕.
+</proof>
+<remark>
+记$$q = \min\left\{\left[\frac{a_{s+1}B+a_s}{b_s}\right],B-1\right\},$$则$q$是商$\left[{a\over b}\right]$一个很好的上界,事实上下面的定理将告诉我们$q$比商的真值至多大2.
+</remark>
+
+<theorem label="th:division2">
+若$b$的最高位不小于$\left[\frac{B}{2}\right]$,即$b_s\ge\left[\frac{B}{2}\right]$,则$$q-2\le\left[\frac{a}{b}\right]\le q.$$
+</theorem>
+<proof>
+用反证法.假设$\left[\frac{a}{b}\right]<q-2$,则$$\left[\frac{a}{b}\right]\le\left[\frac{a_{s+1}B+a_s}{b_s}\right]-3,\quad\left[\frac{a}{b}\right] \le B-4.$$
+因为$$\left[\frac{a}{b}\right]>\frac{a}{b}-1,\quad\frac{a_{s+1}B+a_s}{b_s}<\frac{a}{b-B^s},$$所以$\frac{a}{b}+2<\frac{a}{b-B^s}$,推出$$\frac{a}{b}>2(\frac{b}{B^s}-1)\ge 2(b_s-1).$$因此$b_s \le \frac{B}{2}-1<\left[\frac{B}{2}\right]$,与题设条件矛盾,证毕.
+</proof>
+
+上面只考虑了被除数的头两位与除数的首位,如果允许做更精细的考察,譬如说考虑被除数的头三位与除数的头两位,我们还可以得到对商更好的估计.
+<theorem label="th:division3">
+设$t=(a_{s+1}B+a_s)-qb_s$,若$B\cdot t\ge qb_{s-1}-a_{s-1}$,则$$q-1\le\left[\frac{a}{b}\right]\le q.$$
+</theorem>
+<proof>
+将$t$代入不等式中得$$B\cdot((a_{s+1}B+a_s)-qb_s)\ge qb_{s-1}-a_{s-1},$$化简得到
+<latex>
+\begin{align*}
+a&\ge a_{s+1}B^2+a_sB+a_{s-1}\\
+&\ge q(b_sB+b_{s-1})\\
+&>q(b-B^{s-1}).
+\end{align*}
+</latex>
+因为$q(b-B^{s-1})>qb-B^s\ge(q-1)b$,所以${a\over b}>q-1$,证毕.
+</proof>
+<remark>
+如果定理中的条件不满足,将$q$减1,这时我们总可以说$q$比商的真值至多大1.
+</remark>
+
+综合以上这些想法,现在可以写出商为一位数的除法的详细过程了.
+<algorithm  name="商为一位数的除法" label="al:div1">
+
+输入:整数$a=(a_{s+1}\ldots a_1a_0)_B$,$b=(b_s\ldots b_1b_0)_B$.
+
+输出:$a,b$的商$[{a\over b}]$.
+
+ 1.若$b_s<\left[{B\over 2}\right]$,$a,b$同乘以$\left[\frac{B}{b_s+1}\right]$.
+ 2.计算$$q = \min\left\{\left[\frac{a_{s+1}B+a_s}{b_s}\right],B-1\right\}.$$
+ 3.计算$t=(a_{s+1}B+a_s)-qb_s$,如果$B\cdot t<qb_{s-1}-a_{s-1}$,$q$减一.
+ 4.计算余数$r=a-qb$,如果$r\ge 0$,返回$q$,否则返回$q-1$.
+</algorithm>
+
+*** 整数除法
+
+注意到$$r=a-qb=a\bmod b$$在"商为一位数的除法"算法(算法##al:div1
+)的最后一步也同时被算出,以此为基础可以直接写出一般的商为多位数的除法算法.
+<algorithm  name="整数除法" label="al:division2">
+
+输入:整数$a=(a_m\ldots a_1a_0)_B$,$b=(b_n\ldots b_1b_0)_B$.
+
+输出:$a,b$的商$\left[{a\over b}\right]=(q_{m-n}\ldots q_1q_0)_B$.
+
+定义辅助序列$$r_k=\left[{a\over B^k}\right]\bmod b,\quad m-n+1\ge k\ge 0.$$
+按递推公式依次求出$q_k,r_k(m-n+1\ge k\ge 0)$:
+ 1.$q_k=\left[{B\cdot r_{k+1}+a_k\over b}\right]$,
+ 2.$r_k=(B\cdot r_{k+1}+a_k)\bmod b$.
+</algorithm>
+<remark label="re:division1">
+为了利用快速乘法,还可以利用<index>Picarte迭代</index>来计算整数除法,具体来说就是先利用数值计算中浮点数的Picarte迭代求出除数倒数具有一定精度的近似值,然后利用整数乘法将被除数乘上去,当除数的位数较多时,这种方法是很有效的,关于这一点更详细的介绍请参阅<cite>Gutierrez-fastinverse</cite>.
+</remark>
+
+* 快速乘法
+
+高精度整数是计算机代数系统的内置基本类型,其四则运算的快慢对系统的性能好坏有着决定性的影响.目前最著名的高精度整数运算库是GNU的GMP<cite>gmplib</cite>,许多著名的计算机代数系统如Axiom,Maple,Mathematica,Maxima等的底层高精度整数运算都是基于GMP实现的(参见<cite>gmpman</cite>).加法和减法的复杂度关于整数位数是线性的,考虑到输入输出的复杂度关于整数位数也是线性的,因此从算法上来看加减法已经达到了复杂度的下界.而高精度除法总可以通过Picarte迭代归结为<index>高精度乘法</index>(注##re:division1
+),所以高精度四则运算的主要问题集中到了乘法上.
+
+设$n$为乘数的位数,就目前已知的情况而言,不同乘法算法的时间复杂度可以从平凡的$O(n^2)$(普通乘法),$O(n^{\log_2{3}})$(Karatsuba乘法),$O(n^{\log_3{5}})$(Toom-3乘法),$O(n\log^*{n})$(复数域上的FFT),其中$$\log^*{n}=\log{n}(\log{\log{n}})(\log{\log{\log{n}}})\cdots,$$和$O(n(\log{n})(\log{\log{n}}))$(有限域上的FFT),其中"有限域上的FFT"的时间复杂度已经相当接近线性了,<cite>taocp2</cite>和<cite>mca</cite>中给出了具体的复杂度分析与证明.但是这些乘法算法中复杂度较低的算法往往有较大的常数因子,因此如果乘数的位数较少,普通乘法反而是最快的,所以实用中常常将这些不同的乘法算法结合起来使用,每次做乘法时都根据相乘两数的大小动态地选择具体采用哪一种算法,而每种算法的最佳适用范围往往依赖于具体实现和硬件环境,因此一般直接通过实验来确定.
+
+** 一元多项式乘法
+
+单从整数乘法的角度来看,笔算乘法的算法是如此直截了当,以至于很难想象出更好的算法.因此我们换一个角度,先来考虑与整数乘法具有很大相似性的一元多项式乘法,这里需要用到一元多项式的<index>系数表示</index>和<index>点值表示</index>的概念.
+
+<definition  name="一元多项式系数表示">
+一元多项式$$A(x)=\sum_{k=0}^{n-1}a_kx^k,$$的系数表示就是一个由系数组成的向量$\mathbf{a}=(a_0,a_1,\ldots,a_{n-1})$.
+</definition>
+<remark>
+我们习惯的表示多项式的方式其实就是系数表示,每个多项式的系数表示向量都是唯一确定的.
+</remark>
+
+<definition  name="一元多项式点值表示">
+一元多项式$$A(x)=\sum_{k=0}^{n-1}a_kx^k,$$的点值表示是$A(x)$在$n$个不同点处的点值对构成的集合$$\{(x_0,y_0),(x_1,y_1),\ldots,(x_{n-1},y_{n-1})\},$$其中$y_k=A(x_k),k=0,1,\ldots,n-1$.
+</definition>
+<remark>
+一个多项式可以有很多种不同的点值表示,这是因为每一组$x_k$都决定着一种点值表示.
+</remark>
+
+一元多项式的系数表示与点值表示之间是可以相互转换的,系数表示到点值表示的转换就是一元多项式多点求值,而点值表示到系数表示的转换就是一元多项式插值.关于这两种转换的高级讨论,如一元多项式快速多点求值,一元多项式快速插值等,请参阅"多项式快速求值与插值"一章.
+
+两个一元多项式的乘积有如下的系数表示,这可以从一元多项式乘积的定义直接得到.
+<theorem label="th:multiply1">
+已知两个次数小于$n$的多项式的系数表示分别为$$A(x)=\sum_{k=0}^{n-1}a_kx^k,\quad B(x)=\sum_{k=0}^{n-1}b_kx^k,$$设乘积的系数表示为$C(x)=\sum\limits_{k=0}^{2n-2}c_kx^k$,那么$$c_k=\sum_{i+j=k}a_ib_j.$$
+</theorem>
+<remark label="re:multiply1">
+根据定理##th:multiply1
+来直接计算一元多项式的乘积时总共需要$n^2$次系数乘法.现在我们首先取定$2n-1$个不同点$x_k$,然后利用多项式多点求值计算出$A(x)$与$B(x)$在这组点上的点值表示,如果$C(x)=A(x)\cdot B(x)$,那么显然有$C(x_k)=A(x_k)\cdot B(x_k)$,只需要$2n-1$次系数乘法就可以计算出乘积$C(x)$的点值表示,再通过多项式插值就可以得到$C(x)$的系数表示.
+</remark>
+注##re:multiply1
+表明利用多项式的点值表示也可以做多项式乘法,而且过程显得更简洁.如果多项式的默认表示形式就是点值表示,那么连多项式多点求值和多项式插值这两个转换步骤也可以省去了,多项式乘法就和向量逐点相乘一样简单.
+
+整数与多项式之间的相似性是由整数的进制表示$$(a_n\ldots a_1a_0)_B=\sum_{k=0}^na_k\cdot B^k$$产生的,与整数的进制表示相对应的是多项式的系数表示.我们要从注##re:multiply1
+中的多项式乘法算法中产生整数<index>快速乘法</index>算法,就必须解决多项式系数表示与点值表示之间的转换问题,因此接下来的要介绍整数快速乘法算法也就自然包含多项式多点求值,向量逐点相乘,多项式插值这三个步骤.
+
+** Karatsuba乘法
+
+第一个不平凡的快速乘法算法是由俄罗斯数学家A. Karatsuba于1962年发现的(参见<cite>Karatsuba-multiply</cite>),它采用了一个简单但十分有效的分治策略来使乘法加速.<index>Karatsuba乘法</index>实现起来并不困难,因此在算法理论中也常常被拿来当作分治算法(参见<cite>ita</cite>)的很好例子.
+
+*** 一次多项式的乘法
+
+为了更多地了解隐藏在算法背后的思想,在介绍Karatsuba算法之前,我们先看一看如何利用多项式的点值表示来计算一次多项式的乘法,这是一个很具有启发性意义的例子.
+<definition>
+多项式$f(x)$在$\infty$处的值定义为$$f(\infty)=\lim_{x\rightarrow\infty}f(x)/x^{\deg{f}}.$$
+</definition>
+<remark>
+$f(\infty)$其实就等于$f(x)$的首项系数,可以证明这样的定义与多项式插值是相容的.
+</remark>
+<problem label="pr:karatsuba">
+设$$A(x)=a_1x+a_0,\quad B(x)=b_1x+b_0,$$选取插值点组为$x_0=-1,x_1=0,x_2=\infty$,则$A(x),B(x)$的点值表示分别为$\{(-1,a_0-a_1),(0,a_0),(\infty,a_1)\}$,$\{(-1,b_0-b_1),(0,b_0),(\infty,b_1)\}$,如果$C(x)=A(x)\cdot B(x)$,那么$C(-1)=(a_0-a_1)\cdot(b_0-b_1)$,$C(0)=a_0\cdot b_0$,$C(\infty)=a_1\cdot b_1$,利用简单的多项式插值算法,可以计算出$C(x)$的系数表示$$(c_0,c_1,c_2)=(C(0),C(0)+C(\infty)-C(-1),C(\infty)),$$即$$C(x)=a_1b_1x^2+(a_0b_0+a_1b_1-(a_0-a_1)(b_0-b_1))x+a_0b_0.$$
+</problem>
+<remark>
+在这个例子中,多项式多点求值与多项式插值都只用到系数加减法,这表明可以只用三次系数乘法完成一次多项式的乘法.
+</remark>
+<remark label="re:karatsuba">
+如果$a,b$都是$2n$位$B$进制整数,那么在$B^n$进制下$a,b$都是两位数$$a=a_1B^n+a_0,\quad b=b_1B^n+b_0,$$其中$a_i,b_i(i=0,1)$都是$B^n$进制下的个位数,也就是$B$进制下不超过$n$位的数.那么根据例##pr:karatsuba 我们有$$a\cdot b=a_1 b_1B^{2n}+(a_0b_0+a_1b_1-(a_0-a_1)(b_0-b_1))B^n+a_0b_0.$$
+</remark>
+
+*** Karatsuba乘法
+
+根据注##re:karatsuba ,我们现在写出Karatsuba乘法算法的详细过程.
+<algorithm  name="Karatsuba乘法" label="al:karatsuba">
+
+输入:$n_a$位整数$a$和$n_b$位整数$b$.
+
+输出:$a,b$的积$c=a\cdot b$.
+
+ 1.令$n=\max\{n_a,n_b\}$,若$n=1$,利用普通乘法计算并返回$a\cdot b$;若$n$为奇数,令$n=\frac{n+1}{2}$,否则令$n=\frac{n}{2}$.
+ 2.若$n_a\le n$,令$a_1=0,a_0=a$;否则令$a_1=a$的高$n_a-n$位,$a_0=a$的低$n$位.
+ 3.若$n_b\le n$,令$b_1=0,b_0=b$;否则令$b_1=b$的高$n_b-n$位,$b_0=b$的低$n$位. 
+ 4.使用Karatsuba乘法计算$c_0=a_0b_0,c_1=a_1b_1,c_2=(a_0-a_1)(b_0-b_1)$,返回$$(c_1\cdot B^{\frac{n}{2}}+c_0+c_1-c_2)\cdot B^{\frac{n}{2}}+c_0.$$
+</algorithm>
+<remark>
+与普通乘法类似,在第4步中乘上$B^k$时只需要在右边添上$k$个0,或者说左移$k$位.
+</remark>
+记$T(n)$是递归地利用Karatsuba乘法将两个$n$位$B$进制数相乘所需要的$B$进制个位数乘法次数,那么有$T(2n)\le 3T(n)$,由此推出$T(n)=O(n^{\log_2{3}})\approx O(n^{1.59})$.
+
+关于Karatsuba算法更详细的介绍请参阅<cite>wangdongming</cite>第2章,<cite>mca</cite>,<cite>taocp2</cite>和A. Karatsuba的原始论文<cite>Karatsuba-multiply</cite>.
+
+值得一提的是,采用和Karatsuba乘法完全类似的想法,还可以得到一种整数除法的快速算法(参见<cite>Burnikel-fastrecursive</cite>).
+
+** Toom-Cook乘法
+
+*** Toom-3乘法
+
+沿着Karatsuba的思路,考虑二次多项式的乘法.
+<problem label="pr:toom">
+设$$A(x)=a_2x^2+a_1x+a_0,\quad B(x)=b_2x^2+b_1x+b_0,$$选取插值点组为$$x_0=-1,x_1=0,x_2=1,x_3=2,x_4=\infty,$$如果$C(x)=A(x)\cdot B(x)$,类似地,利用简单的多项式插值算法,可以计算出$C(x) $的系数表示$(c_0,c_1,c_2,c_3,c_4)$,其中
+<latex>
+\begin{align*}
+c_0&=C(0),\\
+c_1&=C(-1)+C(0)+C(1)+C(2)+C(\infty),\\
+c_2&=C(-1)+C(0)-C(1)-C(2)+C(\infty),\\
+c_3&=4C(-1)+C(0)+2C(1)+8C(2)+16C(\infty),\\
+c_4&=C(\infty).
+\end{align*}
+</latex>
+</problem>
+<remark>
+如果不计乘以较小常数的乘法和加减法,我们可以只用5次系数乘法完成二次多项式的乘法.
+</remark>
+根据例##pr:toom 并仿照Karatsuba乘法而得到的算法称为<index>Toom-3乘法</index>.记$T(n)$是递归地利用Toom-3乘法将两个$n$位$B$进制数相乘所需要的$B$进制个位数乘法次数,那么有$T(3n)\le 5T(n)$,由此推出$T(n)=O(n^{\log_3{5}})\approx O(n^{1.46})$.
+
+*** Toom-$r$乘法
+
+更一般地,考虑$r$次多项式的乘法.
+<problem label="pr:toomr">
+设$$A(x)=a_rx^r+\cdots+a_0,\quad B(x)=b_rx^r+\cdots+b_0,$$选取插值点组为$$x_0=-r,x_1=-(r-1),\ldots,x_r=0,x_{r+1}=1,\ldots,x_{2r}=r,$$设$$C(x)=A(x)\cdot B(x)=\sum_{k=0}^{2r}c_kx^k,$$则
+<latex>
+\begin{equation*}
+  \begin{bmatrix}
+    c_0\\
+    c_1\\
+    \vdots\\
+    c_{2r}
+  \end{bmatrix}
+=
+  \begin{bmatrix}
+    1 & x_0 & \cdots & x_0^{n-1}\\
+    1 & x_1 & \cdots & x_1^{n-1}\\
+    \vdots & \vdots & \ldots & \vdots\\
+    1 & x_{2r} & \cdots & x_{2r}^{2r}
+  \end{bmatrix}
+^{-1}
+  \begin{bmatrix}
+    A(x_0)\cdot B(x_0)\\
+    A(x_1)\cdot B(x_1)\\
+    \vdots\\
+    A(x_{2r})\cdot B(x_{2r})
+  \end{bmatrix}.
+\end{equation*}
+</latex>
+</problem>
+与Toom-3乘法的情形类似,根据例##pr:toomr 对Karatsuba乘法做推广就可以得到<index>Toom-$r$乘法</index>.记$T(n)$是递归地利用Toom-r乘法将两个n位$B$进制数相乘所需要的$B$进制个位数乘法次数,那么有$T(rn)\le (2r+1)T(n)$,由此推出$T(n)=O(n^{\log_{r+1}{2r+1}})$.
+
+这样得到的一系列快速乘法算法统称为<index>Toom-Cook乘法</index>,关于Toom-Cook乘法更详细的介绍请参阅<cite>taocp2</cite>.Toom-Cook乘法中的Toom-2乘法与Karatsuba乘法基本相同,只是选取的3个插值点不一样.
+
+由于$$\lim_{r\rightarrow\infty}\log_{r+1}{2r+1}=1,$$所以使用Toom-Cook乘法进行$n$位整数乘法所需要的$B$进制个位数乘法次数的下界趋近于$O(n)$,这是一个很好的结果.但是由于多项式多点求值和多项式插值所需要的线性级操作会随着$r$的增加而迅速增加,以至于一般说来仅仅当$r=2,3$时,Toom-Cook乘法才是实用的.
+
+** FFT乘法
+
+<index>FFT</index>(Fast Fourier Transform)常常被认为是20世纪数值计算和算法领域最重要的成果之一,它可以快速计算向量卷积,这一点对于信号处理等工程领域尤其重要.对于符号计算来讲,FFT实际上可以看成是多项式快速多点求值和快速插值算法一个高度优化的特例.在这里我们只需要利用多项式乘法和向量卷积之间的相似性,就可以很好地利用FFT来加速多项式乘法和整数乘法.
+
+在上一节中,Toom-Cook乘法通过充分地利用分治与递归有效地减少了多项式多点求值和多项式插值操作的消耗;下面将要讨论的FFT乘法则是通过精心地挑选求值点,把系数表示与点值表示之间的转换所需的操作压缩为次线性级别,即$O(n\log{n})$,其中的$n$是乘数的位数.
+
+*** DFT
+
+顾名思义,FFT是快速计算<index>DFT</index>(Discrete Fourer Transform)的算法,我们可以将DFT简单的理解成以单位复根作为求值点时多项式系数表示到点值表示之间的转换.在正式给出DFT的定义之前,需要先引入<index>原根</index>和<index>循环卷积</index>的概念.
+
+<definition  name="原根">
+设$n\in\mathbb{N}_+$,$R$是一个环,$\omega\in R$.
+ 1.若$\omega^n=1$,则称$\omega$为$R$的$n$次单位根.
+ 2.若$\omega$是$n$次单位根,并且对于$n$的每个素因子$p$,$\omega^{n/p}-1$不是$R$的零因子,则称$\omega$为$R$的$n$次单位原根.
+</definition>
+<remark>
+按照这个定义,任意素数的整数次幂单位复根都是复数域$\mathbb{C}$的单位原根,例如$\omega=e^{{2\pi i\over 8}}\in R=\mathbb{C}$就是一个8次单位原根.除此之外,对于模整数环$\mathbb{Z}_{17}$,$\overline{3}\in R=\mathbb{Z}_{17}$是16次单位原根,与此同时,虽然$\overline{2}^{16}=\overline{1}\in R=\mathbb{Z}_{17}$,但$\overline{2}$并不是$\mathbb{Z}_{17}$的16次单位原根,因为$2^8-1\equiv 0\mod 17$.如果$q$是素数的整数次幂,那么当且仅当$n|q-1$时有限域$\mathbb{F}_q$存在$n$次单位原根.
+</remark>
+关于原根有如下定理.
+<theorem label="th:primitiveroot">
+如果$\omega$是环$R$的$n$次单位原根,那么$\forall 1<k<n$,$\omega^k-1$不是$R$的零因子,并且$$\sum_{j=0}^{n-1}\omega^{jk}=0.$$
+</theorem>
+<proof>
+设$d=\gcd(k,n)$且$u\cdot k+v\cdot n=d$,由$d<n$知存在$n$的一个素因子$p$使得$d|n/p$.从而$\omega^d-1|\omega^{n/p}-1$,但$\omega^{n/p}-1$不是$R$的零因子,因此$\omega^d-1$也不是$R$的零因子.
+
+与此同时,$$\omega^k-1|\omega^{u\cdot k}-1=\omega^{u\cdot k+v\cdot n}-1=\omega^d-1,$$这就证明了$\omega^k-1$不是$R$的零因子.
+
+由$\omega^n=1$知$$0=\omega^{kn}-1=(\omega^k-1)\cdot(\sum_{j=0}^{n-1}\omega^{jk}),$$而$\omega^k-1$不是$R$的零因子,因此$$\sum_{j=0}^{n-1}\omega^{jk}=0.$$
+</proof>
+
+<definition  name="循环卷积">
+设$f(x)=\sum\limits_{k=0}^{n-1}f_kx^k,g(x)=\sum\limits_{k=0}^{n-1}g_kx^k$,则称$f(x)*g(x)=\sum\limits_{k=0}^{n-1}h_kx^k$为$f(x),g(x)$的循环卷积,其中$h_k=\sum\limits_{i+j\equiv k\bmod n}f_ig_j$.
+</definition>
+<remark>
+不难发现,循环卷积的定义跟多项式乘积的定义很相似,我们可以简单地把它理解成先扩充多项式次数再做多项式乘法的过程.设$f,g$的多项式乘积$fg$是$n-1$次多项式,则$f$和$g$的次数可能小于$n-1$,如果在它们的最高次项之前添上系数为0的高次项并把它们看成$n-1$次多项式,这时候会发现$f,g$的循环卷积$f*g$恰好等于$fg$,这就是循环卷积和普通多项式乘积之间的关系.
+</remark>
+
+现在可以正式地给出DFT的定义了.
+<definition  name="DFT">
+设$f(x)=\sum\limits_{k=0}^{n-1}f_kx^k$,$\omega$是环$R$的$n$次单位原根,则称$$\mathrm{DFT}_{\omega}(f)=(f(1),f(\omega),\ldots,f(\omega^{n-1}))$$为$f$的离散傅立叶变换.
+</definition>
+
+DFT存在逆变换,并且原根的良好性质(定理##th:primitiveroot )保证了DFT的逆变换和DFT具有相同的结构.
+<theorem>
+设$\omega$是环$R$的$n$次单位原根,用$(\mathrm{DFT}_\omega)^{-1}$表示$\mathrm{DFT}_\omega$的逆变换,那么$$(\mathrm{DFT}_\omega)^{-1}=\frac{1}{n}\mathrm{DFT}_{\omega^{-1}}.$$
+</theorem>
+<proof>
+$\mathrm{DFT}_\omega$是$R^n$上的线性变换，它在自然基下的矩阵表示为$\vec{y}=V_n(\omega)\vec{a}$，即
+<latex>
+\begin{align*}
+\begin{bmatrix}
+y_0\\
+y_1\\
+y_2\\
+\vdots\\
+y_{n-1}
+\end{bmatrix}
+=
+\begin{bmatrix}
+1 & 1 & \cdots & 1\\
+1 & \omega & \cdots & \omega^{n-1}\\
+1 & \omega^2 & \cdots & \omega^{2n-2}\\
+\vdots & \vdots & & \vdots\\
+1 & \omega^{n-1} & \cdots & \omega^{(n-1)^2}
+\end{bmatrix}
+\begin{bmatrix}
+a_0\\
+a_1\\
+a_2\\
+\vdots\\
+a_{n-1}
+\end{bmatrix},
+\end{align*}
+</latex>
+其中$V_n(\omega)$为$n$阶Vandermonde方阵.$V_n(\omega)$的$(i, j)$位元素是$\omega^{ij}$，$V_n(\omega)\cdot V_n(\omega^{-1})$的$(i, j)$位元素为
+<latex>
+\begin{align*}
+u_{ij}&=\sum_{0\le k<n}\omega^{ik}(\omega^{-1})^{kj}\\
+&=\sum_{0\le k<n}(\omega^{i-j})^k\\
+&=n\delta_{ij}.
+\end{align*}
+</latex>
+因此$V_n(\omega)\cdot V_n(\omega^{-1})=n(\delta_{ij})=nI_n$,即$(V_n(\omega))^{-1}=\frac{1}{n}V_n(\omega^{-1})$,亦即$(\mathrm{DFT}_\omega)^{-1}=\frac{1}{n}\mathrm{DFT}_{\omega^{-1}}$.
+</proof>
+<remark>
+这样一来,系数表示和点值表示之间的正逆转换可以用相同的办法去处理,也就是说可以采用统一的方法来计算单位原根处的多点求值和插值,这是适当地选取插值点带来的好处之一,现在$f$和$g$的循环卷积可以表示成$$f*g={1\over n}\mathrm{DFT}_{\omega^{-1}}(\mathrm{DFT}_\omega(f)\cdot \mathrm{DFT}_\omega(g)),$$其中$\cdot$表示一维向量之间逐点相乘.
+</remark>
+
+*** FFT
+
+如果采用普通的多项式多点求值方法,譬如说Horner法则,计算$n$阶DFT大约需要$n^2$次系数乘法.为了寻找更快的方法,需要对DFT的结构进行仔细分析.
+
+先来看向量$\mathrm{DFT}_\omega(f)$的第$j$个分量$f(\omega^j)=\sum\limits_{k=0}^{n-1}f_k\omega^{jk}$.因为$\omega$是$n$次单位原根,所以$\omega^{jk}$至多只有$n$个不同的值$\omega^0,\omega^1,\ldots,\omega^{n-1}$,特别地,如果$j$是$n$的因子,那么$\omega^j$是${n\over j}$次单位根,因此$(\omega^j)^k$至多只有${n\over j}$个不同的值.如果我们已经知道了哪些$\omega^{jk}$具有相同的值,就可以像合并同类项一样将对应于相同的$\omega^{jk}$的系数$f_k$先加在一起,然后再和$\omega^{jk}$相乘,这样就可以有效地减少乘法的次数,跟计算$ab+ac$时转而计算$a(b+c)$是一个道理.
+
+设$0\le k_1<k_2<n$,那么$$\omega^{jk_1}=\omega^{jk_2}\Leftrightarrow jk_1\equiv jk_2\mod n,$$即$n|j(k_1-k_2)$,一般地,$n$是素数的整数次幂,不妨设$n=p^m$,其中$p$为素数,设$j$的素因子分解中$p$的幂次为$m'<m$,那么应该有$p^{m-m'}|k_1-k_2$,这可以当作合并$\omega^{jk}$的系数时的依据.广义的FFT可以处理$p$为任意素数的情形,我们这里接下来要讨论的的FFT则特指基$p=2$的FFT.
+
+为了高效地多点求值,FFT方法运用了分治策略.设$n=2^m$次多项式$f$的系数表示向量为$f=(f_0,f_1,\ldots,f_{n-1})$,将它依下标的奇偶性分成两组得到
+<latex>
+\begin{align*}
+f^{[0]}&=(f_0,f_2,\ldots,f_{n-2}),\\
+f^{[1]}&=(f_1,f_3,\ldots,f_{n-1}),
+\end{align*}
+</latex>
+那么向量$\mathrm{DFT}_\omega(f)$的第$j$个分量$$f(\omega^j)=\sum_{k=0}^{n-1}f_k\omega^{jk}=\sum_{k=0}^{n/2-1}f_{2k}(\omega^{2j})^k+\omega^j\sum_{k=0}^{n/2-1}f_{2k+1}(\omega^{2j})^k,$$注意到$\omega^{j+n/2}=-\omega^j,\omega^{j+n}=\omega^j$,因此可以改写成
+<latex>
+\begin{align*}
+\mathrm{DFT}_\omega(f)[j]=\mathrm{DFT}_{\omega^2}(f^{[0]})[j]+\omega^j\mathrm{DFT}_{\omega^2}(f^{[1]})[j],\\
+\mathrm{DFT}_\omega(f)[j+n/2]=\mathrm{DFT}_{\omega^2}(f^{[0]})[j]-\omega^j\mathrm{DFT}_{\omega^2}(f^{[1]})[j],
+\end{align*}
+</latex>
+其中$0\le j<n/2$.如果从多项式的角度来看,这其实就是$f(x)=f^{[0]}(x^2)+xf^{[ 1]}(x^2)$.
+
+经过以上的分析,现在可以写出FFT的详细过程了.
+<algorithm  name="FFT">
+
+输入:$n-1$次多项式的系数表示向量$f=(f_0,f_1,\ldots,f_{n-1})$,$n$次单位原根$\omega_n$,其中$n=2^m$.
+
+输出:$\mathrm{DFT}_{\omega_n}(f)$.
+
+ 1.若$n$等于1,返回$f$.
+ 2.令$f^{[0]}=(f_0,f_2,\ldots,f_{n-2})$,$f^{[ 1]}=(f_1,f_3,\ldots,f_{n-1})$,$\omega=1$.
+ 3.计算$y^{[0]}=\mathrm{DFT}_{\omega_n^2}(f^{[0]})$,$y^{[ 1]}=\mathrm{DFT}_{\omega_n^2}(f^{[ 1]})$.
+ 4.$k$从0到$n/2-1$,顺次计算$t=\omega y_k^{[ 1]}$,$y_k=y_k^{[0]}+t$,$y_{k+n/2}=y_k^{[0]}-t$,$\omega=\omega\omega_n$.
+ 5.返回$y$.
+</algorithm>
+设$T(n)$是利用FFT进行多点求值时所需要的系数乘法的次数,那么$T(n)=O(n\log{n})$,如果环R为复数域,那么利用FFT进行整数乘法时需要考虑浮点运算的截断误差和截断位数,这种乘法算法的复杂度为$O(n\log^*{n})$,其中$\log^*{n}=(\log{n})(\log{\log{n}})\cdots$.
+
+采用FFT计算DFT比直接按照定义计算要快得多,它成功的主要原因是利用了单位原根$\omega$的特殊性质和分治策略.FFT在信号处理,多媒体数据压缩等领域被广泛使用,人们对基本算法进行了许多改进以获得更高的速度和适应于特定的硬件.关于FFT更详细的介绍请参阅<cite>ita</cite>,<cite>mca</cite>和<cite>taocp2</cite>.
+
+*** 有限域上的FFT
+
+如果$R=\mathbb{C}$,即使$m$很大,也很容易求出$n=2^m$次单位原根.但是对于有限域,前面已经提到过,如果$q$是素数的整数次幂,那么当且仅当$n|q-1$时有限域$\mathbb{F}_q$才存在$n$次单位原根,当$m$很大时,并非总能轻易地找到这样的素数$q$.
+
+尽管如此,相比于复数域而言,使用有限域上的原根做FFT不会涉及到浮点操作,因此也不用考虑中间精度的问题,正因为这样,在利用FFT计算整系数多项式的乘积或者计算高精度整数乘法时,我们还是希望使用有限域.注意到有限域$F_q=\mathbb{Z}/q\mathbb{Z}$上的算术都是以$q$为模的,因此利用$F_q$上的FFT求出的点值向量的各项系数都不应该超过$q$,否则最后无法将结果还原到$\mathbb{Z}$中.
+
+设$a=(a_s\ldots a_0)_B$,$b=(b_s\ldots b_0)_B$,那么$a,b$分别对应于多项式$$a(B)=\sum_{k=0}^sa_kB^k,\quad b(B)=\sum_{k=0}^sb_kB^k,$$
+$a,b$的乘积$c$对应于多项式$C(B)=\sum\limits_{k=0}^{2s}c_kB^k$,其中$$c_k=\sum_{i+j=k}a_ib_j<\sum_{i+j=k}B^2\le(s+1)\cdot B^2,\quad 0\le k\le 2s.$$在典型的计算机代数系统中,机器精度整数的溢出界$B=2^{64}$,整数位数$s$的界也取为$2^{64}$,那么根据$F_q$的限制应该有$q>(s+1)B^2\approx 2^{192}$,这样大的素数$q$以及有限域$F_q$是不容易使用的.
+
+为了解决这个问题,可以借用模方法中的技术,选取三个机器精度的素数$2^{63}\le q_0,q_1,q_2<2^{64}$,分别在$F_{q_i}$中计算出模乘积$a\cdot b\bmod q_i$,然后利用中国剩余定理(参见<cite>nlzdss00</cite>)计算出$\mathbb{Z}$中的乘积$a\cdot b$.
+
+考虑到中国剩余定理的计算,利用有限域上的<index sub="有限域上的">FFT</index>进行整数乘法的计算复杂度为$$O(n(\log{n})(\log{\log{n}})).$$关于有限域上的FFT更详细的介绍请参阅<cite>mca</cite>和<cite>Schoenhage-multiply</cite>.
+
+除了以上两种最常用的算法之外,还有许多类似于FFT的算法也可以用于快速计算DFT,如<index>NTT</index>(Number theoretic transform),<index>WFT</index>(Winograd Fourier Transform)和<index>PFT</index>(Polynomial Fourier Transform)等,关于FFT,NTT,WFT和PFT更详细的介绍请参阅Nussbaumer<cite>Nussbaumer82</cite>或中译本<cite>fftca</cite>.

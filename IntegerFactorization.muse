@@ -1,0 +1,344 @@
+#title 整数因子分解
+
+相对于素数判定来说，因子分解的实现就没办法达到那么快速了。因子分解至今仍没有类似于素数判定的多项式算法，这也成为了RSA公钥系统安全得以保障的基础。鉴于这两个问题的难度相差较大，在我们施行分解之前，最好是预先知道目标整数的确不是一个素数，否则很可能花费了很大力气只干了素数判定的活——杀鸡用牛刀了。
+
+<index sub="整数">因子分解</index>的方法分为一般方法和特殊方法两大类，通常倾向于先针对数的特殊性（例如$N=2^n-1$）使用特殊方法，如果目标数的形式不那么特殊，再尝试使用一般方法。当然，前者往往要比后者快上许多。
+
+我们在本章中着重介绍因子分解的一般方法，且总是用$N$表示待分解的目标数。阅读本章需要读者具有初等数论和抽象代数的基础知识（例如<cite>fkq03</cite>,<cite>nlzdss00</cite>）。本章的主要参考书是<cite>cohen</cite>,<cite>mca</cite>. 读者也可以参考写的十分通俗易懂的<cite>yan08</cite>及其他算法/计算数论方面的相关文献。
+
+<contents>
+
+* 试除法
+
+无论素数判定还是因子分解，<index>试除法</index>(Trial Division)都是首先要进行的步骤。在试除的策略上有两种不同的选择：
+ - 用足够大的空间来储存试除用的素数因子。储存方法可以相当紧凑，比如使用一个大整数，此大整数二进制表达的第$2k-1,2k$位来代表$6k\pm1$是否为素数。
+ - 不耗费大量空间来储存所有需要的素因子，这时需要一个快速生成素数的子程序，或者干脆只用2,3以及$6k\pm1$型的整数来作为试除因子。
+
+很少能发生一个数没有小因子的情况，例如根据<index>Mertens定理</index>（参见<cite>yao07</cite>），奇数中没有$x$以下因子的比例$$P=\prod_{p\ge3}^x(1-\frac{1}{p})\sim \frac{2e^{-\gamma}}{\ln x},\quad x\rightarrow+\infty.$$可以知道76%的奇数都有小于100的素因子，而没有小于$10^8$因子的奇数比例仅为6.1%（可参看<cite>riesel</cite>）。因此在大多数情况，试除法的第二种选择已经足够，实现也是最为简单的。
+
+* Euclid算法
+
+<index sub="用于整数因子分解">Euclid算法</index>用于因子分解也非常简单。我们预先计算好小于100的素数之积$$p_0=\prod_{2\le p\le97\atop p\text{为素数}}p=2305567963945518424753102147331756070.$$然后将$p_0$与目标数$N$进行Euclid算法，最终得到$p_0$与$N$的最大公因子，继续分解公因子就可以得到在100以下的因子分解了。同样可以预先计算出100到200，200到300的素数乘积$p_1$,$p_2$等等。这本质上是试除法的一个实现，当$N$非常大时，必须借助高精度算术来进行$N$除以$p$的操作，因此频繁的试除会十分耗时，而Euclid方法可以施行很少次数，再在机器精度上完成最终的分解，提高效率。
+
+* Pollard $p-1$ 方法
+
+<index>Pollard $p-1$方法</index>由Pollard<cite>pol74</cite>于1974年提出，其基本想法是这样的：设素数$p\mid N$，由Fermat小定理，又有$p\mid a^{p-1}-1$，因此$(a^{p-1}-1,N)$就可能是$N$的一个非平凡因子。当然，问题在于我们并不知道$p$是多少。一个合理的假设是$p-1$的因子都很小，比如说，$p-1$所有素因子都包含在因子基$FB=\{p_1,p_2,\ldots p_m\}$中，我们来尝试着找到一个$\displaystyle c=\prod_{i=1}^mp_i^{\alpha_i}$能够“覆盖”$p-1$，即是说$p-1\mid c$，从而$a^{p-1}-1\mid a^c-1$，因此我们可以转而求$(a^c-1,N)$来获得所要的非平凡因子。例如设素因子上限为$B$，便可以简单的取$c=B!$或是最小公倍数$\text{LCM}\{1,2,\ldots,B\}$.
+
+下面给出Pollard $p-1$方法的一个版本：
+<algorithm  name="Pollard $p-1$ 方法">
+ 1. 设素因子搜索的上限为$B$，生成$B$以下的形如$p_i^{\alpha_i}$数对应的素数因子之表$\{p_i\}$，其中$p_i$的幂次用$p_i$代表，即：2,3,2,5,7,2,3,11,13,2...
+ 2. 随机选择正整数$a$，顺次计算
+<latex>
+\begin{align*}
+  b_1&=a\\
+  b_{i+1}&\equiv b_i^{p_i}\pmod{N}\quad i=1,2,\ldots
+\end{align*}
+</latex>
+ 3. 定期检查（例如每当$n$为20的倍数时）$(b_n-1,N)$，若$(b_n-1,N)>1$，则得到一个$N$的因子；否则继续第2步中的递推计算。
+</algorithm>
+
+<remark>
+由于越小素数在$p-1$分解中出现的幂次可能越高，$FB$中小素数（例如2,3）应当较多重复出现，第1步中的生成方法便考虑到了这一点.（实际上最终计算了$\text{LCM}\{1,2,\ldots,B\}$.）
+</remark>
+
+<remark>
+在极少的情形，也可能出现$(b_n-1,N)=N$，即所有$N$的素因子都同时出现在了$b_n-1$之中，这时可以重新选取定期检查的时机或者换一个$a$进行计算。
+</remark>
+
+<remark>
+另一种类似的<index>Williams $p+1$方法</index>依赖于$p+1$只有小的因子，著名的<index>Lucas序列</index>替代了这里的$a$的幂次，乘法群$\mathbb{Z}/p\mathbb{Z}(\sqrt{t})^*$($t$为$p$的二次非剩余)代替了乘法群$\mathbb{Z}/p\mathbb{Z}^*$。因此Pollard $p-1$方法与Williams $p+1$方法的关系就好像素数检测中的<index>Lehmer $N-1$型检测</index>与<index>Lucas $N+1$型检测</index>的关系一样。具体可参看<cite>williams</cite>.
+</remark>
+
+<remark>
+实践中$B$一般取$10^6$左右。
+</remark>
+
+<remark>
+Pollard $p-1$方法的时间复杂度为$O(N^{1/4+\varepsilon})$，其中$\varepsilon$为一个正数（参见<cite>mca</cite>）。
+
+</remark>
+
+* Pollard $\rho$ 方法
+
+目前几乎所有实用的分解方法都是概率性的算法，目标是找到能计算$x$的算法，使得$(x,N)>1$的概率较大(而最大公因子可以很快地计算)。上面的Pollard $p-1$就是一例，下面即将看到的Pollard $\rho$方法也不例外。
+
+<index>Pollard $\rho$方法</index>由Pollard<cite>pol75</cite>在1975年提出，它来自一个有趣的事实：随机选取大约$c\sqrt{p}$个整数（$c$为一个常数），就有很大概率在这些整数中找到两个是模$p$同余的。实践中可以采用同余递推序列$$x_{i+1}\equiv f(x_i)\pmod{N}$$来产生伪随机数，其中$f$为映射：$\mathbb{Z}/N\mathbb{Z}\rightarrow\mathbb{Z}/N\mathbb{Z}$。设$p$是$N$的一个因子，且找到$x_j\equiv x_i\pmod{p}$，则计算$(x_j-x_i, N)$便可能得到$N$的一个非平凡因子。
+
+[[images/rho.png][Pollard $\rho$ 方法]]
+
+由$\mathbb{Z}/p\mathbb{Z}$的有限性，如上定义的一阶的递推序列$\{x_i\}$在模$p$意义下必定是最终循环的(如图，看上去就像希腊字母$\rho$）。设其开头的非循环部分长度为$m$，循环节长度为$l$。著名的<index>Floyd算法</index>可以在$m+l$步内高效地找出序列中的两个重复元素，并且只用常数的储存空间。
+
+<algorithm  name="Floyd" label="alg:floyd">
+ 1. 依次判断是否$x_{2i}=x_i$，$i=1, 2, 3,\cdots$
+ 2. 若相等，则终止；否则继续第1步。
+</algorithm>
+
+<proof name="算法的有效性" >
+只需证明必定存在$i$满足$m<i\le m+l$且$x_{2i}=x_i$。由于$x_{2i}=x_i$等价于$l\mid i$，因此取$i$为$(m, m+l]$中$l$的倍数即可。算法过程中不必保存所有$\{x_i\}$，可以存下当前的$x_i, x_{2i}$并递推计算$x_{i+1}=f(x_i)$，$x_{2(i+1)}=f(f(x_{2i}))$。
+</proof>
+
+实践中常采用的$f$为$$x_{i+1}\equiv x_i^2+a\pmod{N}, $$选择二次的递推序列一方面能提供足够的随机性，另一方面计算起来也非常简便。
+<index name="Pollard $\rho$方法"></index>
+<algorithm  name="Pollard $\rho$">
+ 1. 随机选取$a$与$x_1$。
+ 2. 顺次计算$x_{i+1}=x_i^2+a \mod N$。
+ 3. 计算$$Q_n=\prod_{i=1}^n(x_{2i}-x_i) \mod N.$$
+ 4. 每隔一段时间（例如$k=20$），检测$(Q_{nk},N)$，若非平凡则算法终止，否则继续第2步。
+</algorithm>
+
+<remark>
+当$N$较大时，对每个$i$都去检测$(x_{2i}-x_i,N)$可能会耗费大量时间，因为我们的目标只是得到$N$的非平凡因子，可以通过计算$Q_n$，再定时检测$(Q_{nk},N)$来减少计算次数。
+</remark>
+
+<remark>
+如同Pollard $p-1$方法，也可能出现计算出来的最大公因子$(Q_n,N)=N$，这时可改变检测间隔$k$或干脆改变$a$重新进行计算。
+</remark>
+
+<remark>
+Pollard $\rho$方法的时间复杂度为$O(N^{1/4+\varepsilon})$（参见<cite>mca</cite>）。
+实际上复杂度依赖于$N$的最小素因子$P^-(N)$，在分离$N$的小因子时尤其有效。
+</remark>
+<index name="Floyd算法" sub="Brent的改进"></index>
+<remark>
+1980年，Brent<cite>brent1980</cite>给出了Pollard $\rho$方法的一个改进，在分解整数时，该方法平均能够加速24%。这个改进是针对Floyd的算法##alg:floyd 的，因为在Floyd算法中，往往要重复计算$x_2, x_4, x_6,\cdots$等，Brent有如下改进，无需重复计算，但仍能同样有效地找出重复元素，并且只要常数的储存空间。
+</remark>
+; || $x_2$ || $x_1$ ||
+; || $x_3$ || $x_2$ ||
+; || $x_4$ || $x_3$ ||
+; || $x_5$ || $x_4$ ||
+; || $x_6$ || $x_4$ ||
+; || $x_7$ || $x_4$ ||
+; || $x_8$ || $x_4$ ||
+; || $x_{13}$ || $x_8$ ||
+
+
+<algorithm name="Brent的改进">
+ 1. 令$j=2$, $i=1$，若$x_j=x_i$，则算法终止。
+ 2. 若$j $为2的幂，即$j=2^k$，令$i=j$, 依次令$j=3\cdot 2^{k-1}+1, 3\cdot 2^{k-1}+2,\cdots, 2^{k+1}$，判断是否有$x_j=x_i$，若相等则算法终止。
+</algorithm>
+
+<proof  name="算法的有效性">
+注意算法过程中$j-i$能够依次遍历所有正整数，重复算法##alg:floyd 的论证可知。
+</proof>
+
+* 平方型分解(SQUFOF)
+
+<index>平方型分解</index>(SQUare FOrm Factorization)是由Shanks在大约三十前发展的算法，但他从来没有正式发表过（参见<cite>gower08</cite>）。尽管SQUFOF复杂度为$O(N^{1/4+\varepsilon})$也是一个指数级的算法（而下面介绍的<index>CFRAC</index>, <index>ECM</index>, <index>QS</index>等都是次指数级的），但其仍有自身的优势：一方面算法十分简洁优美、便于实现（甚至可以在袖珍计算器上实现），并且在$10^{10}$到$10^{18}$范围的整数分解仍然是最快的。
+;  待补充，这里的算法来源不可靠
+<index>SQUFOF</index>依赖于对二次域结构的分析，我们在这里仅给出算法的描述，略去证明，具体可参见<cite>gower08</cite>：
+
+<algorithm  name="SQUFOF" label="al:SQUFOF">
+设$N$非平方数，非素数，以下算法输出$N$的一个非平凡因子。
+
+ 1. 设$P_0=\lfloor\sqrt{N}\rfloor$，$Q_0=1$，$Q_1=N-P_0^2$。
+ 2. 顺次计算$b_i=\left\lfloor\frac{\lfloor\sqrt{N}\rfloor+P_{i-1}}{Q_i}\right\rfloor$，$P_i=b_iQ_i-P_{i-1}$，$Q_{i+1}=Q_{i-1}+b_i(P_{i-1}-P_i)$，直到$Q_k$为完全平方数。($i=1, 2, \ldots$)
+ 3. 计算$b_0=\left\lfloor\frac{\lfloor\sqrt{N}\rfloor-P_{i-1}}{\sqrt{Q_k}}\right\rfloor$，$P_0=b_o\sqrt{Q_k}+P_{i-1}$，$Q_0=\sqrt{Q_k}$，$Q_1=\frac{N-P_0^2}{Q_0}$。
+ 4. 重复第二步中的计算，直到$P_{i+1}=P_i$，输出$(N,P_i)$。
+</algorithm>
+
+
+
+* 连分式方法(CFRAC)
+
+<index name="CFRAC"></index>
+<index>连分式方法</index>(Continued FRACtion)是由Morrison, Brillhart<cite>mor75</cite>于1975年提出的，他们运用此方法成功地分解了Fermat数$F_7$。它以及之后要介绍的二次筛(QS)以及数域筛(NFS)都基于如下一个简单的事实：如果$$x^2\equiv y^2 \pmod{N},\quad\text{且}~x\not\equiv y\pmod{N}.$$则$(N,x\pm y)$就是$N$的一个非平凡因子。
+
+当然，寻找这样的$x, y$不能只靠运气，CFRAC方法要构造一组同余式
+<latex>
+\begin{equation}
+  x_k^2\equiv (-1)^{e_{0k}}p_1^{e_{1k}} \cdots p_m^{e_{mk}}\pmod{N},@@eq:congruences
+\end{equation}
+</latex>
+其中$p_i$都是因子基$FB$中较小的素数。如果找到足够多这样的同余式(例如个数$n>m+1$)，那么利用二元域$\mathbb{F}_2$上的Gauss消元法，可以找到组合系数$\varepsilon_k\in \mathbb{F}_2$使得$$\sum_{k=1}^n\varepsilon_k(e_{0k},e_{1k},\ldots,e_{mk})\equiv(0,0,\ldots,0)\pmod{2}.$$我们记$$(v_0,\ldots,v_m)=\frac{1}{2}\sum_{k=1}^n\varepsilon_k(e_{0k},e_{1k},\ldots,e_{mk}),$$此时若令
+<latex>
+\begin{equation}
+x=\prod_{k=1}^nx_k^{\varepsilon_k},\quad y=(-1)^{v_0}\prod_{i=1}^m{p_i^{v_i}},@@eq:xandy  
+\end{equation}
+</latex>
+便有我们所需要的$$x^2\equiv y^2 \pmod{N}.$$
+
+如何构造这么多同余式呢？我们知道用连分式部分展式可以得到二次无理数$\sqrt{KN}$($K\in\mathbb{N}$)的好的有理数逼近。设$\displaystyle\frac{P}{Q}$为其近似分数，那么$t=P^2-KNQ^2$的绝对值就很小，从而$t$很可能在因子基$FB$下分解，同时$P^2\equiv t\pmod{N}$，便能得到我们所期望的同余式##eq:congruences 。
+
+<index name="CFRAC"></index>
+<algorithm label="alg:CFRAC" name="CFRAC方法">
+ 1. 选择适当的$K\in\mathbb{N}$（通常取为1，当连分式展式周期太小而无法产生足够的同余式时选择另一个$K$），令$FB=\{p_1,p_2,\ldots p_m\}$，使得$\displaystyle\legendre{KN}{p_i}\not=-1, i=1,\ldots, m$。
+ 2. 计算$\sqrt{KN}$的连分式展式，得到一系列近似分式$\displaystyle\frac{P_k}{Q_k}$。
+ 3. 计算$t_k=P_k^2-KNQ_k^2$，尝试在$FB$下得到$t_k$的分解，若分解成功则有$$P_k^2\equiv (-1)^{e_{0k}}\prod_{i=1}^mp_i^{e_{ik}}.$$
+ 4. 当得到足够多的同余式时（$n>m+1$即可），用$\mathbb{F}_2$上的Gauss消元法得到##eq:xandy 中的$x, y$。
+ 5. 若$x\not\equiv\pm y\pmod{N}$，输出$N$的非平凡因子$(N,x\pm y)$。
+</algorithm>
+
+<remark>
+由于$(P_k,Q_k)=1$，因此若$p_i\mid t_k=P_k^2-KNQ_k^2$，必有$p_i\nmid Q_k$，因此$KN$必定为模$p$的平方数，从而第一步中可以只选择限定条件的素数$p_i$。
+</remark>
+
+<remark>
+连分式的计算可以只用简单的四则运算，Gauss消元法可以用一些稀疏矩阵的专用算法来加速，因此CFRAC最花时间的部分在$t_k$的分解上，当分解$t_k$花去太久时间时可以直接放弃，转而求下一个同余式。
+</remark>
+
+
+<remark>
+CFRAC方法的时间复杂度为$L_N[\frac{1}{2},\sqrt{2}]$(见<cite>mca</cite>)，其中$L $记号如下定义：
+$$L_N[\alpha,c]=O\left(\exp\left({(c+o(1))(\ln N)^\alpha(\ln\ln N)^{1-\alpha}}\right)\right).$$
+</remark>
+
+<remark>
+寻找同余式##eq:congruences 来进行分解的想法首先来自Dixon<cite>dixon</cite>，他当时的做法是直接随机地选取$x$，然后在$FB$下分解$x^2$，算法复杂度为$L_N[\frac{1}{2},2\sqrt{2}]$，这也是第一个次指数阶的一般整数分解方法。
+</remark>
+
+
+* Lenstra椭圆曲线方法(ECM)
+
+因子分解说到底就是寻找$x$，使得$(x,N)$非平凡，关键在于提高寻找的$x$的成功率。Pollard $p-1$方法通过计算$a^{p-1}-1$来提高成功率，实质上是在群$\mathbb{Z}/p\mathbb{Z}^*$中考虑问题。Lenstra<cite>len87</cite>提出的<index>椭圆曲线方法</index>(Elliptic Curve Method)转而在有限域上随机的椭圆曲线群中考虑问题。由于椭圆曲线可以有许多不同的选择，<index>ECM</index>方法要比Pollard $p-1$高效许多，到目前为止是第三快的因子分解方法，仅次于数域筛和二次筛。
+
+首先我们给出域上<index>椭圆曲线</index>的定义：
+<definition  name="域$F $上的椭圆曲线">
+设$F $是特征不为2，3的域，$x^3+ax+b\in F[x]$无平方因子，$O$表示无穷远点，则$$E=\{(x,y)\in F^2\mid y^2=x^3+ax+b\}\cup\{O\}$$称为$F $上的一条椭圆曲线。
+</definition>
+
+<remark>
+$x^3+ax+b$无平方因子等价于判别式$-16(4a^3+27b^2)\ne0$，即椭圆曲线是非奇异的，在几何上看没有“尖点”。
+</remark>
+
+
+椭圆曲线既是代数曲线又是一个加法群：
+<definition  name="椭圆曲线上的加法运算">
+设$E $为一椭圆曲线，$P, Q\in E$，过$P, Q$的直线交$E $于三点$\{P, Q, S\}$。$-S$表示$S$关于$x$轴的对称点。定义加法$$P+Q=-S.$$另有三种特殊约定：
+ 1. 若$P=Q$，则直线视为$P$处的切线；
+ 2. 若$P=-Q$，则定义$P+Q$为无穷远点$O$；
+ 3. 若$Q=O$，则定义$P+O=-(-P)=P$。
+</definition>
+[[images/ecm.png][椭圆曲线]]
+
+由定义通过简单的计算我们可以得到：
+<proposition label="pr:arith" name="加法的显式表达">
+设$P=(x_1,y_1)$，$Q=(x_2,y_2)$，$P+Q=(x_3,y_3)$，则
+<latex>
+\begin{equation}
+  \begin{cases}
+  x_3=\lambda^2-x_1-x_2,\\
+  y_3=\lambda(x_1-x_3)-y_1.
+  \end{cases}@@eq:ecmarith
+\end{equation}
+</latex>
+其中
+<latex>
+\begin{equation*}
+  \lambda=
+  \begin{cases}
+    \displaystyle\frac{y_1-y_2}{x_1-x_2}&\text{若}P\ne Q,\smallskip\\
+    \displaystyle\frac{3x_1^2+a}{2y_1}&\text{若}P= Q.\\
+  \end{cases}
+\end{equation*}
+</latex>
+</proposition>
+
+<remark>
+可以知道以上加法定义确实使$E $成为了一个加法交换群（尽管结合性的验证需要一些繁琐的计算）。
+</remark>
+
+上面我们考虑了域上的椭圆曲线，然而对于因子分解的任务来说，我们需要考虑$\mathbb{Z}/N\mathbb{Z}$上的椭圆曲线。由于$x_1-x_2$等在$\mathbb{Z}/N\mathbb{Z}$中未必可逆，此时上面的加法运算未必能定义好，不过这无关紧要，例如当$x_1-x_2$不可逆时，我们已经可以通过计算$(x_1-x_2,N)$来得到$N$的非平凡因子，从而直接完成分解的目标；而当$x_1-x_2$可逆时，一切可以正常按照上面的显式表达进行运算。因此在这里我们不再花功夫用严格的语言来定义$\mathbb{Z}/N\mathbb{Z}$上的椭圆曲线了。
+
+下面我们将Pollard $p-1$中类似的想法用在椭圆曲线中。
+<definition name="整数的光滑性">
+整数$n$称为是$B$-光滑，若其最大素因子$P^+(n)\le B$。
+</definition>
+
+Pollard $p-1$方法的实质就是期望整数$p-1$足够光滑而能在因子基$FB$下分解。和Pollard $p-1$方法中的想法类似，ECM中首先从椭圆曲线$E $中随机取一点$P $，我们期望$P $的阶$n$是足够光滑的，从而可以在$FB$下分解，然后通过加法规则计算$nP$（当然我们预先并不知道$n$），利用计算过程中出现的不可逆元，求得$N$的一个因子。
+
+<algorithm  label="alg:ecm" name="Lenstra ECM">
+设$(N,6)=1$，$B$为给定的搜索极限，$p_1,\ldots,p_m$为$B$以下的所有素数。
+ 1. 随机选取整数$a$，$E $为曲线$y^2=x^3+ax+1$。
+ 2. 设$P=(0,1)$，$e_k=\lfloor\ln_{p_k}B\rfloor$，根据式##eq:ecmarith 递推地计算$\displaystyle\left(\prod_{k=1}^m p_k^{e_k}\right)P$。若计算过程中出现不可逆元$t$，则到第三步，否则到第一步。
+ 3. 计算$d=(t,N)$。如果$d\ne N$则输出$d$，算法终止；如果$d=N$则到第一步。
+</algorithm>
+
+下面我们谈一下搜索极限$B$的取法，和Pollard $p-1$方法中一样，我们需要知道有限域$\mathbb{Z}/p\mathbb{Z}$上群$E $的阶，下面有限域上椭圆曲线最主要的定理归功于Hasse，告诉我们群$E $的阶在$p$左右（参见<cite>cohen</cite>）：
+<index name="Hasse定理"></index>
+<theorem  label="th:Hasse" name="Hasse">
+设$E $为一有限域$\mathbb{Z}/p\mathbb{Z}$上的椭圆曲线，则$|E|=p+1-a_p$，其中$|a_p|<2\sqrt{p}$。
+</theorem>
+
+下面的定理则给出了关于光滑性的一个估计（参见<cite>cohen</cite>）：
+<index name="Canfield-Erd\H{o}s-Pomerance定理"></index>
+<theorem  label="th:CEP" name="Canfield-Erd\H{o}s-Pomerance">
+记$$\psi(x, y)=\#\{n<x\mid P^+(x)\le y\},$$其中$P^+(x)$表示$x$的最大素因子，再设$$L(x)=\exp\left(\sqrt{\ln x\ln\ln x}\right),$$则有估计$$\psi(x,L(x)^a)=xL(x)^{-\frac{1}{2a}+o(1)},\quad x\rightarrow+\infty.$$其中$a$为正实数。
+</theorem>
+
+由上面两个定理我们可以得到选取$B$的一些信息，设素数$p\mid N$，而$B=L(p)^a$，由定理##th:Hasse 和##th:CEP 知道平均要试$L(p)^{\frac{1}{2a}+o(1)}$条曲线可以得到一个阶为$B$-光滑的椭圆曲线，算法##alg:ecm 计算总共需要$L(p)^{a+\frac{1}{2a}+o(1)}$个群运算，为使运算量最小，因此可取$a=\frac{1}{\sqrt{2}}$。实践中$B$的选择依赖于时间的承受限度，例如我们将搜索的素数因子限制在$10^{20}$以下，那么可取$B=12000$（接近$L(10^{20})^{1/\sqrt{2}}$）。
+
+由上面的讨论可以看出，ECM的时间复杂度依赖于$N$的最小素因子$P^-(N)$而非$N$本身（为$L_{P^-(N)}[\frac{1}{2},1]$），因此很适宜在试除法和Pollard $\rho$方法之后用ECM来找出较小的因子（10-20个十进制位左右）。
+
+ECM算法的效率很大程度取决于群运算的快慢，最关键的是模$N$的求逆运算。我们在本节最后给出Montgomery<cite>mon87</cite>的一个加速算法，使得我们能够同时对多条椭圆曲线进行求逆运算。
+
+<algorithm  name="Montgomery">
+设$a_1, \ldots, a_k$为不能被$N$整除的整数，本算法求出其逆$b_1, \ldots, b_k$或给出$N$的一个非平凡因子。
+ 1. 递推计算
+<latex>
+\begin{align*}
+  c_1&\equiv a_1\pmod{N},\\
+  c_2&\equiv a_1a_2\pmod{N},\\
+  \vdots\\
+  c_k&\equiv a_1\cdots a_k\pmod{N}.
+  \end{align*}
+</latex>
+ 2. 施行一次扩展Euclid算法求出$(u,v,d)$满足$d=(c_k,N)$，$uc_k+vN=d$。
+    - 若$d=1$，则$a_i$均有逆，到第三步；
+    - 若$d>1$，依次计算$(d, a_1), (d, a_2), \ldots$直到$(d, a_i)>1$，输出$(d, a_i)$为$N$的一个非平凡因子。
+ 3. 递推计算逆$b_i$并输出：
+<latex>
+\begin{align*}
+  b_k&\equiv uc_{k-1}\pmod{N},\\
+  b_{k-1}&\equiv (ua_k)c_{k-2}\pmod{N},\\
+  \vdots\\
+  b_1&\equiv (ua_k\cdots a_2)\pmod{N}.
+\end{align*}
+</latex>
+</algorithm>
+
+; r:p幂二次方程 ref log计算
+* 二次筛法(QS)
+<index name="QS"></index>
+<index>二次筛法</index>(Quadratic Seive)是由Pomerance<cite>pom82</cite>于1982年提出的，直到1993年仍然是世界上渐进最快的通用大整数因子分解方法，第一的位置后来被数域筛法(NFS)所取代，不过对于120位以下的整数，二次筛法还是要比数域筛法快一些。
+
+** 单个多项式二次筛法(SPQS)
+<index name="QS" sub="SPQS"></index>
+正如我们在CFRAC方法中提到的，QS方法也要构造一组同余式##eq:congruences ，但通过筛法避免了其中$y$在因子基$FB$下的分解，而这种分解在不存在的情况下常常会大量消耗时间。设$Q(a)\in\mathbb{Z}[a]$，若$m\mid Q(a)$，则不难验证对于任意$k\in\mathbb{Z}$，也有$m\mid Q(a+k\cdot m)$。于是我们找到了一系列数都有因子$m$，这样一个事实构成了QS方法的基础。
+
+我们取$y=Q(a)$，为了使其与某个$x^2$模$N$同余，且尽可能小以便在$FB$下分解，考虑二次多项式$Q(a)=通过求解(\lfloor\sqrt{N}\rfloor+a)^2-N$，$x=\lfloor\sqrt{N}\rfloor+a$，则$x^2\equiv Q(a)\pmod{N}$且$Q(a)$为$O(N^{1/2+\varepsilon})$的阶，符合我们的要求。接下来是筛法的过程：对于$FB$中满足搜索极限$B>p^e$的素数$p$及幂次$e$，首先求解方程$z^2\equiv N\pmod{p^e}$，其解数（如果有解的话）
+<latex>
+\begin{equation*}
+  n(p,e)=
+  \begin{cases}
+    1 & p=2, e=1,2,\\
+    4 & p=2, e\ge3, \\
+    2 & p\ge3.
+  \end{cases}
+\end{equation*}</latex>
+并且解都可以快速地求得。对方程的任一个解$z$,令$a_0=z-\lfloor\sqrt{N}\rfloor$，则有$p^k\mid Q(a_0)$。给定一个搜索区间$I$（通常很长），则对任意与$a_0$差$p^e$的整数倍的$a\in I$，$Q(a)$都有因子$p^e$。可用一张表储存区间$I$中每个整数对应的因子，当对所有$p$与$e$进行如上过程后，通过检查表，即可得到许多$I$中在$FB$下完全分解的整数了。接下来的步骤则与CFRAC的后半部分完全相同。
+
+<remark>
+实践过程中可以构造这样一张表，若$p^e\mid Q(a)$，则对应$a$的表项增加$\ln p$（这可预先计算），最后检查表项若接近$\ln Q(a)$，即可知道$Q(a)$在$FB$可完全分解，此处的对数函数的计算可以不那么精确，只要绝对误差在1以下即可。
+</remark>
+
+<remark>
+在一些启发性假设下，利用Canfield-Erd\H{o}s-Pomerance的定理##th:CEP ，可以知道QS的时间复杂度为$L_N[\frac{1}{2}, 1]$，与ECM差不多。但由于筛法的运用，QS的运算更简单一些，实践中要快于ECM，除非是在$P^-(N)$较小的情形。
+</remark>
+
+** 多个多项式二次筛法(MPQS)
+<index name="QS" sub="MPQS"></index>
+MPQS是对上述只用一个二次多项式的SPQS方法的一个改进，使用更多的二次多项式来减小$Q(a)$的值，从而减小$FB$的大小和搜索区间的长度。考虑$Q(a)=A a^2+2B a+C$形式的多项式($A>0$)，配方得$AQ(a)=(Aa+B)^2-(B^2-AC)$，因此可选取系数使$N\mid B^2-AC$，设$x=Aa+b$，则$AQ(a)\equiv x^2\pmod{N}$。我们需要$Q(a)$尽可能的小，设搜索区间的长度$|I|=2M$，自然地把$I$的中心设置在$Q(a)$的极小点$-\dfrac{B}{A}$处，此时$$|Q\left(-B/a\right)|=\dfrac{B^2-AC}{A},$$且$Q(a)$在$I$上的最大值与最小值之差为$$Q\left(-\dfrac{B}{A}+M\right)-Q\left(-\dfrac{B}{A}\right)=AM^2-2\dfrac{B^2-AC}{A},$$从而宜取$B^2-AC=N$，且$A $接近$\sqrt{2N}/M$。因此选择系数的过程可以如下进行
+ 1. 选择区间长度$M$。
+ 2. 选择接近于$\sqrt{2N}/M$的素数$A $。
+ 3. 求解$B^2\equiv N\pmod{A}$(例如利用Shanks算法##al:shanks )。
+ 4. 令$C=(B^2-N)/A$。
+
+接下来的步骤便是对这样选取的多个多项式进行筛法，最终得到足够多的同余式进行$\mathbb{F}_2$上的Gauss消元法。
+
+<remark>
+MPQS的过程明显有着并行化的特性。
+</remark>
+
+* 数域筛法(NFS)
+<index name="NFS"></index>
+<index>数域筛法</index>(Number Field Sieve)是由<cite>llmp</cite>在1993年提出的，为目前渐进最快的通用因子分解方法，其时间复杂度为$L_N[\frac{1}{3},c]$，其中常数$c$依赖于不同的算法实现。例如对于针对$r^e-s$形式整数的特殊数域筛法(<index name="NFS" sub="SNFS">SNFS</index>)有$c=(\frac{32}{9})^{\frac{1}{3}}$，而对于一般数域筛法(<index name="NFS" sub="GNFS">GNFS</index>)有$c=(\frac{64}{9})^{\frac{1}{3}}$。对于120位以上的大数，NFS是最强有力的分解算法。例如互联网上的分布式大整数分解项目[[http://www.nfsnet.org/][NFSNet]]采用的便是此法。由于数域筛法涉及代数数域理论，需要较多的准备，限于篇幅我们不再赘述，感兴趣的读者可参看<cite>cohen</cite>,<cite>pei02</cite>或其他相关文献。

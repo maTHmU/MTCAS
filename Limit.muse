@@ -1,0 +1,338 @@
+#title 符号极限
+
+<contents>
+
+极限可以形象地反映出函数的渐进行为,整个微积分的大厦是建立在极限的基础之上的,在符号计算中自然也会关注如何计算符号表达式的极限,不仅这个问题本身是重要的,还为了向其他领域如符号求和,符号积分等提供最基本的微积分运算工具,因此几乎所有的通用计算机代数系统都会或多或少地实现一部分符号极限功能.
+
+从数值的观点来看,我们可以先绘出待求极限点附近的函数图像,然后根据图像来判断或确定极限.但是几何直观往往是不可靠的,Gruntz给出了一个例子(参见<cite>gruntz96</cite>)$$\lim_{x\rightarrow 0^+}{1\over x^{\ln\ln\ln\ln{1\over x}-1}},$$从图像上来看极限式中的函数在$x=0+$处明显是趋近于0,但是仔细的计算表明这个函数的极限其实是$+\infty$,这可以理解为${1\over x}$的增长速度被外面的4个$\ln$记号大大掩盖了.
+
+因此在大多数情况下我们宁愿采用不那么直观的代数方法,符号表达式在其连续点处的极限可以通过简单地计算出该点处的函数值而求得,对于其他情况则需要仔细地分析函数在待求极限点附近的渐进行为.既然是渐进行为,那么用"适当"近似后的子表达式来替换原来的子表达式是不会对最终结果产生影响的,这就是我们在处理复杂表达式极限问题时的中心思想.
+
+* 古典方法
+
+早期的计算机代数系统在计算极限时更像一个数学家,它们内部实现了大量传统的计算极限的技巧,通过启发式算法将这些技巧有机地糅合在一起,这种带有尝试性的智能计算过程因此具有很高的计算复杂度.
+
+** 复合函数
+
+根据有关复合函数的极限定理,只要表达式在待求极限点处连续,我们在计算复杂表达式的极限时,就可以先计算各个子表达式的极限,然后将子表达式替换为各自的极限,再去计算整个表达式的极限.
+
+复杂表达式一般可以看做是由未定元,根式和超越子表达式通过各种运算包括加,减,乘,除以及幂的复合而获得的,于是它也是关于各个子表达式的有理函数.
+<theorem name="有理函数极限" label="th:rational-function-limit">
+设$R(f_1(x),\ldots,f_n(x))$是关于$f_i(x)$的有理函数,如果极限$$\lim_{x\rightarrow x_0}f_i(x)=y_i,\quad 1\le i\le n$$都存在,同时$R(y_1,\ldots,y_n)$有定义,那么$$\lim_{x\rightarrow x_0}R(f_1(x),\ldots,f_n(x))=R(y_1,\ldots,y_n).$$
+</theorem>
+<proof>
+有理函数在其定义域上是连续函数,由复合函数的极限定理即得证.
+</proof>
+
+** 代数变换与级数近似
+
+<problem>
+计算$$\lim\limits_{x\rightarrow +\infty}\sqrt{x^2+x}-x.$$
+</problem>
+<proof>
+通过分子有理化,我们得到
+<latex>
+\begin{align*}
+\lim\limits_{x\rightarrow +\infty}\sqrt{x^2+x}-x
+&=\lim\limits_{x\rightarrow +\infty}\frac{(x^2+x)-x^2}{\sqrt{x^2+x}+x}\\
+&=\lim\limits_{x\rightarrow +\infty}\frac{1}{\sqrt{1+\frac{1}{x}}+1}\\
+&=\frac{1}{2},
+\end{align*}
+</latex>
+因此极限为$\frac{1}{2}$.
+</proof>
+
+这个结果也可以通过Taylor级数展开得到.
+<proof>
+将$\sqrt{1+\frac{1}{x}}$替换为其<index>级数近似</index>
+<latex>
+\begin{align*}
+\lim\limits_{x\rightarrow +\infty}\sqrt{x^2+x}-x
+&=\lim\limits_{x\rightarrow +\infty}x(\sqrt{1+\frac{1}{x}}-1)\\
+&=\lim\limits_{x\rightarrow +\infty}x(1+\frac{1}{2x}+o(\frac{1}{x})-1)\\
+&=\lim\limits_{x\rightarrow +\infty}(\frac{1}{2}+o(1))\\
+&=\frac{1}{2}.
+\end{align*}
+</latex>
+</proof>
+
+实际计算中,常常将诸如分子有理化之类的代数变换技巧和级数近似结合起来使用,它们可以解决一部分常见形式的有理函数极限计算问题.
+
+** L'Hospital法则
+
+<index>L'Hospital法则</index>是用来计算$${0\over 0},{\infty\over\infty},0\cdot\infty,\infty-\infty,0^0,\infty^0,1^\infty$$等七种不定式的极限的法则(参见<cite>shuxueshouce</cite>).
+
+对于${0\over 0}$型的极限.
+<theorem  name="L'Hospital第一法则">
+设函数$f(x)$和$g(x)$是在区间$(a,b]$内定义的,满足$\lim_{x\rightarrow a}f(x)=0$,$\lim_{x\rightarrow a}g(x)=0$,并且在区间$(a,b]$内存在有限导数$f'(x)$及$g'(x)$,$g'(x)\neq 0$.如果存在极限(有穷或无穷)$$\lim_{x\rightarrow a}{f'(x)\over g'(x)}=K,$$那么$$\lim_{x\rightarrow a}{f(x)\over g(x)}=\lim_{x\rightarrow a}{f'(x)\over g'(x)}=K.$$
+</theorem>
+如果$\lim_{x\rightarrow a}{f'(x)\over g'(x)}$又是${0\over 0}$型不定式,可以再用上法求极限.
+
+对于${\infty\over\infty}$型的极限.
+<theorem  name="L'Hospital第二法则">
+设函数$f(x)$和$g(x)$是在区间$(a,b]$内定义的,满足$\lim_{x\rightarrow a}f(x)=\infty$,$\lim_{x\rightarrow a}g(x)=\infty$,并且在区间$(a,b]$内存在有限导数$f'(x)$及$g'(x)$,$g'(x)\neq 0$.如果存在极限(有穷或无穷)$$\lim_{x\rightarrow a}{f'(x)\over g'(x)}=K,$$那么$$\lim_{x\rightarrow a}{f(x)\over g(x)}=\lim_{x\rightarrow a}{f'(x)\over g'(x)}=K.$$
+</theorem>
+如果$\lim_{x\rightarrow a}{f'(x)\over g'(x)}$又是${\infty\over \infty}$型不定式,可以再用上法求极限.
+
+对于其他类型不定式,可以设法归结到以上两种情形.
+<theorem  name="其他L'Hospital法则">
+ 1.对$0\cdot\infty$的不定式,可先把它变成${0\over 0}$型或${\infty\over\infty}$型,然后再应用L'Hospital法则,设$$\lim_{x\rightarrow a}f(x)=0,\quad\lim_{x\rightarrow a}g(x)=\infty,$$如果要计算$\lim_{x\rightarrow a}f(x)\cdot g(x)$,那么可以进行变形$$f(x)\cdot g(x)={f(x)\over{1\over g(x)}}={g(x)\over{1\over f(x)}},$$其中的第二式在$x\rightarrow a$时是${0\over 0}$型不定式,第三式是${\infty\over\infty}$型不定式.
+ 2.$\infty-\infty$型的不定式也能变成${0\over 0}$型或${\infty\over\infty}$型,如果要计算$\lim\limits_{x\rightarrow a}[f(x)-g(x)]$,这里$$\lim_{x\rightarrow a}f(x)=+\infty,\quad\lim_{x\rightarrow a}g(x)=+\infty.$$那么可以进行下面的变形,把它变成${0\over 0}$型不定式:$$f(x)-g(x)={1\over{1\over f(x)}}-{1\over{1\over g(x)}}=\frac{{1\over g(x)}-{1\over f(x)}}{{1\over f(x)}\cdot{1\over g(x)}}.$$
+ 3.对于$1^\infty,0^0,\infty^0$型的不定式,可以预先把这些表达式取对数.设$y=[f(x)]^{g(x)}$,则$\ln{y}=g(x)\ln{f(x)}$.$\ln{y}$的极限就是$0\cdot\infty$型的不定式,假如用上述任一方法能求出$\lim\limits_{x\rightarrow a}\ln{y}$,比如它等于$K$(或$+\infty,-\infty$),那么$\lim\limits_{x\rightarrow a}y$就等于$e^K$(或$\infty,0$).
+</theorem>
+应用L'Hospital法则一个简单的例子是证明指数函数比所有幂函数都增长得快.
+<problem>
+$$\lim_{x\rightarrow\infty}{x^n\over e^x}=\lim_{x\rightarrow\infty}{nx^{n-1}\over e^x}=\cdots=\lim_{x\rightarrow\infty}{n!\over e^x}=0.$$
+</problem>
+
+L'Hospital法则可以看成一个同时降低分子与分母零点阶数或极点阶数的过程,因此如果可以事先通过级数展开式比较并消去分子分母的零点或极点阶数,就可以避免这样反复逐次求导的过程,与此同时,对于某些特殊的极限式,L'Hospital法则是不可终止的,这时就需要借助其他数学工具来计算极限.
+
+** 其他技巧
+
+除了代数变换,级数近似和L'Hospital法则之外,还有一些其他的传统计算极限的技巧,它们不仅具有重要的理论意义,还是手工计算极限的重要工具,但是一般很难写成具有确定性步骤的算法.
+
+关于极限与不等式之间的过渡关系,我们有著名的
+<index name="夹逼引理"></index>
+<lemma  name="夹逼引理">
+如果函数$g(x)$在极限点$x_0$的邻域可以用不等式$f(x)\le g(x)\le h(x)$控制,那么有$$\lim\limits_{x\rightarrow x_0}f(x)\le \lim\limits_{x\rightarrow x_0}g(x)\le \lim\limits_{x\rightarrow x_0}h(x),$$特别的,如果$$\lim\limits_{x\rightarrow x_0}f(x)=\lim\limits_{x\rightarrow x_0}h(x)=a,$$那么$$\lim\limits_{x\rightarrow x_0}g(x)=a.$$
+</lemma>
+
+考虑一个简单的应用.
+<problem>
+当$q>1$时,计算$$\lim\limits_{x\rightarrow +\infty}\frac{x}{q^x}.$$
+</problem>
+<proof>
+已知当$q>1$时$$\lim\limits_{n\rightarrow\infty}\frac{n}{q^n}=0,$$利用不等式$$\frac{1}{q}\cdot\frac{[x]}{q^{[x]}}<\frac{x}{q^x}<q\cdot\frac{[x]+1}{q^{[x]+1}},$$则$$\lim\limits_{x\rightarrow +\infty}\frac{x}{q^x}=0.$$
+</proof>
+
+对于分式型的极限,除了应用L'Hospital法则之外,还可以先将分子,分母展开成幂级数,比较分子和分母的幂级数中零点或极点的阶数,据此判断出整个分式极限是0,常数还是无穷大,很多情况下这样做比L'Hospital法则的逐次求导要快得多.
+
+* Gruntz算法
+
+<index>Gruntz算法</index>是用来计算所谓指对数函数(exp-log function)的极限的方法(参见<cite>gruntz96</cite>).
+
+** 指对数函数域
+
+用$\mathcal{K}$表示定义在半开区间$x>x'\in\mathbb{R}$上的所有单变量实值函数构成的集合,我们在$\mathcal{K}$上定义等价关系.
+<definition name="函数芽">
+设$f_{1}$,$f_{2}$为$\mathcal{K}$中元素,它们分别定义在区间$x>x_{1}$和$x>x_{2}$上,若存在$x_{0}>\max(x_{1},x_{2})$使得对所有$x>x_{0}$有$f_{1}(x)=f_{2}(x)$,则称$f_{1}$等价于$f_{2}$,记为$f_1\sim f_2$.
+
+$\mathcal{K}$按此等价关系得到的等价类称为$+\infty$处的<index>函数芽</index>.
+</definition>
+<remark label="re:germs1">
+以下用$\bar{f}$表示一个函数芽.可通过函数的加法与乘法定义结合商映射引入函数芽的相应运算,即$$\bar{f}+\bar{g}=\overline{f+g},\quad \bar{f}\cdot \bar{g}=\overline{f\cdot g}.$$容易验证,这样的运算是定义得好的.
+</remark>
+
+不难看出,在同一个函数芽中的两个函数的微分也在同一个函数芽中.
+<definition name="函数芽微分">
+函数芽$f$的微分是由$f$中所有元素$g$的微分所构成的函数芽.
+</definition>
+
+<definition  name="Hardy域">
+一个<index>Hardy域</index>$H$是正半轴上实值函数芽组成的集合,它对微分是封闭的,并且在注##re:germs1 所定义的函数芽加法和乘法下构成一个域.
+</definition>
+<theorem>
+设$H$是Hardy域,则$\forall f\in H$,$\lim_{x\rightarrow +\infty}f(x)$一定存在,而且等于有限常数或者$\pm\infty$.
+</theorem>
+<proof>
+如果$H$是Hardy域,非零元素$f\in H^*$,那么依定义有$1/f\in H^*$,这表明当$x\rightarrow +\infty$时,$f(x)\nrightarrow 0$.因为$f'\in H$,$f$对于充分大的$x$可微,从而连续,因此$f$应该是恒正,恒负或恒零.而这一点对于$f'$同样成立,因此$f$是最终单调的.这样一来,我们可以说$\forall f\in H$,$\lim_{x\rightarrow +\infty}f(x)$一定存在,而且等于有限常数或者$\pm\infty$.
+</proof>
+
+根据Robinson和Singer的两个引理我们有如下定理,引理和定理的证明请参阅<cite>gruntz96</cite>.
+<theorem name="指对数函数域" label="th:exp-log">
+$\mathbb{R}(x)$由操作$f\rightarrow\exp(f)$和$f\rightarrow\log|f|$生成的域是一个Hardy域,称为<index>指对数函数域</index>,记为$\mathcal{L}$.
+</theorem>
+<remark>
+指对数函数域$\mathcal{L}$是由Hardy最先研究的.
+</remark>
+
+<definition>
+在Hardy域上可以定义如下序关系$$\nu(a)\ge\nu(b)\Leftrightarrow\lim_{x\rightarrow +\infty}a(x)/b(x)\in\mathbb{R}.$$
+</definition>
+
+<definition>
+设$a,b\in\mathcal{H}^{*}$,如果$$\lim_{x\rightarrow +\infty}a(x)/b(x)\in\mathbb{R}^*,$$则称$a$等价于$b$,记为$a\asymp b$.
+
+记$a\in\mathcal{H}^{*}$在此等价关系下构成的等价类为$\nu(a)$,$\mathcal{H}^{*}$中所有元素构成的等价类的集合记为$\Upsilon=\{\nu(a)|a\in\mathcal{H}^{*}\}$.
+</definition>
+<theorem>
+ 
+ 1.$\Upsilon$在从$\mathcal{H}^{*}$诱导出来的乘法下是一个交换群.
+
+ 2.$\Upsilon$在序关系$$\nu(a)\ge\nu(b)\Leftrightarrow\lim_{x\rightarrow +\infty}a(x)/b(x)\in\mathbb{R}$$下是一个全序集.
+</theorem>
+<remark>
+$\Upsilon$中定义的序关系和我们通常对于函数阶的理解是一致的.
+</remark>
+
+将有序交换群$\Upsilon$的群运算记为加法,并定义$\nu(1)=0$,可以得到关于$\nu$的如下几条性质,这些性质的具体证明请参阅<cite>gruntz96</cite>.
+<theorem>
+
+ 1.$\nu(ab)=\nu(a)+\nu(b)$,$\forall a,b\in\mathcal{H}^{*}$;
+
+ 2.$\nu(a)\ge0$当且仅当$\lim_{x\rightarrow+\infty}a(x)\in\mathbb{R}$,$\forall a\in\mathcal{H}^{*}$;
+
+ 3.若$a,b\in\mathcal{H}^{*}$,$a+b\in\mathcal{H}^{*}$,则$\nu(a+b)\ge\min(\nu(a),\nu(b))$,当$\nu(a)\neq\nu(b)$时取等号;
+
+ 4.若$a,b\in\mathcal{H}^{*}$,且$\nu(a),\nu(b)\neq0$,则$\nu(a)\ge\nu(b)$当且仅当$\nu(a')\ge\nu(b')$;
+
+ 5.若$a,b\in\mathcal{H}^{*}$,且$\nu(a)>\nu(b)\neq0$,那么$\nu(a')>\nu(b')$.
+</theorem>
+
+** 可比类 
+
+对于指对数函数而言,普通的函数阶的序关系有时仍然显得区分度不够,这时可以定义更粗糙的序关系.
+<definition>
+$$\gamma(f)=-\nu(\ln|f|).$$
+</definition>
+<remark>
+这样一来,$$\gamma(f)\le\gamma(g)\Leftrightarrow\lim_{x\rightarrow +\infty}\ln|f(x)|/\ln|g(x)|\in\mathbb{R}.$$
+</remark>
+<definition name="可比类">
+类似的,所有满足$\gamma(a)=\gamma(b)$的函数$a,b$也构成一个等价类,称之为<index>可比类</index>.
+
+$f\in\mathcal{H}^{*}$所对应的可比类记为$\gamma(f)$.
+</definition>
+<remark>
+$$\gamma(f)=\gamma(-f)=\gamma(\pm1/f).$$
+</remark>
+<problem>
+设$\mathcal{H}^{*}$是Hardy域,$f,g\in\mathcal{H}^{*}$.并有$\nu(f)\neq0$,$\nu(g)<0$,则$$\gamma(\ln|f|)<\gamma(f),\gamma(e^{g})>\gamma(g).$$
+</problem>
+
+在接下来的讨论中我们将用类似于$f\succ g$的写法表示$\gamma(f)>\gamma(g)$,例如$e^{x}\succ x^{m}.$
+
+** Gruntz算法
+<index name="MRV"></index>
+<definition  name="MRV" label="de:mrv">
+将"$h$是$g$的子表达式"记为$h\triangleleft g$.
+
+若$f$不依赖于$x$,定义$MRV(f)=\{\}$.
+
+其他情形$$MRV(f)=\begin{cases}
+\{\},\text{若}\ensuremath{x\ntriangleleft f}\\
+\{g|g\triangleleft f\wedge(\nexists (h\triangleleft f:h\succ g)\}\end{cases}.$$
+</definition>
+<remark>
+<cite>gruntz96</cite>中证明了$MRV(f)$中的所有元素具有相同的可比类.
+</remark>
+<remark>
+MRV(Most Rapidly Varying)其实就是$f$中具有极大可比类的子表达式构成的集合,它的值依赖于$f$的表达式的形式,因此数学上等价的表达式对应的MRV可能不同.
+</remark>
+
+根据MRV的定义(定义##de:mrv )可以得到如下计算公式,公式的具体证明请参阅<cite>gruntz96</cite>.
+<theorem label="th:mrv1">
+<latex>
+\begin{align*}
+MRV(f) & =\{\}, \text{若}\ensuremath{x\ntriangleleft f},\\
+MRV(x) & =x,\\
+MRV(f\cdot g) & =\max(MRV(f),MRV(g)),\\
+MRV(f+g) & =\max(MRV(f),MRV(g)),\\
+MRV(f^{c})\wedge c\in\mathcal{C} & =MRV(f),\\
+MRV(\ln|f|) & =MRV(f),\\
+MRV(e^{f}) & =\begin{cases}
+\max(\{e^{f}\},MRV(f)), \text{若}\ensuremath{\lim_{x\rightarrow+\infty}f=\pm\infty}\\
+MRV(f)\end{cases}.\end{align*}
+</latex>
+</theorem>
+<remark>
+函数$\max$接受两个集合作为参数,并返回可比类较大的那个集合;如果两个集合的可比类相同,则返回两个集合的并.
+</remark>
+
+举一个计算MRV的例子.
+<problem>
+$$MRV(x+e^{-x^{2}})=\max(MRV(x),MRV(e^{-x^{2}}))=\max(\{x\},\{e^{-x^{2}}\})=\{e^{-x^{2}}\}.$$
+</problem>
+<remark>
+计算的正确性可以通过$$\lim_{x\rightarrow+\infty}\frac{\ln e^{x+e^{-x^{2}}}}{\ln e^{-x^{2}}}=\lim_{x\rightarrow+\infty}\frac{x+e^{-x^{2}}}{-x^{2}}=\lim_{x\rightarrow+\infty}-\frac{1}{x}-\frac{e^{-x^{2}}}{x^{2}}=0$$来验证.
+</remark>
+
+MRV具有如下性质,具体证明请参阅<cite>gruntz96</cite>.
+<lemma>
+设$f$为指对数函数,$x\triangleleft f$,$g\in \Omega=MRV(f)$.
+
+ 1.$g=x$或$g=e^{h}\wedge h\rightarrow+\infty$.
+
+ 2.$g>0$.
+
+ 3.$\nu(g)\neq0$.
+
+ 4.$\lim_{x\rightarrow+\infty}g=\begin{cases}
+\infty, & \text{若\ensuremath{g=x\text{或}g=e^{h}\wedge h>0}}\\
+0, & \text{若}g=e^{h}\text{且\ensuremath{h<0}}\end{cases}$.
+
+ 5.$g\succeq x$.
+
+ 6.若$g=e^{h}$则$MRV(h)\preceq g$.
+
+ 7.$g\in MRV(g)\subseteq\Omega$.
+</lemma>
+
+设$f,g$是$\Omega=mrv(u)$中的两个元素,假定$x\in\Omega$且$f=e^{s}$和$g=e^{t}$为指数函数,则$f,g>0$且$f\in MRV(f)$,$g\in MRV(g)$.
+
+由$\gamma(f)=\gamma(g)$知$c=\lim_{x\rightarrow+\infty}s/t\in\mathbb{R}^{*}$.令$A=\frac{f}{g^{c}}=e^{\ln f-c\ln g}=e^{s-ct}$,则$f=A\cdot g^{c}$,且
+<latex>
+\begin{align*}
+\lim_{x\rightarrow+\infty}\frac{\ln A}{\ln g}&=\lim_{x\rightarrow+\infty}\frac{\ln f-c\ln g}{\ln g}\\
+&=\lim_{x\rightarrow+\infty}\frac{\ln f}{\ln g}-c\\
+&=c-c=0,
+\end{align*}
+</latex>
+即$A\prec g$.
+
+设$\omega\in\Omega$,$MRV(\omega)=\{\omega\}$,则$\omega$在$\Omega$中没有子表达式.设$u_{0}=u$,$\Omega_{i}=MRV(u_{i})$.找到$f_{i}\in\Omega_{i}$使得$f_{i}$不是$\Omega_{i}$中其他任何元素的子表达式,将$u_{i}$按$\omega$展开得到$u_{i+1}$($f_{i}$需满足的条件等价于$|MRV(f_{i})|=\max\{|MRV(f)||f\in\Omega_{i}\}$).
+
+$\Omega_{i+1}=\Omega_{i}\backslash\{f_{i}\}\cup\{\omega\}$,最终将得到$\Omega_{n}=mrv(u_{n})=\{\omega\}$,$n=|\Omega|$.
+
+<theorem>
+设$f$为指对数函数,$MRV(f)=\{\omega\}$.其中$\omega\rightarrow0$,$\omega=e^{h}$且$MRV(h)\prec\omega$.则$f$关于$\omega$在$\omega=0^{+}$处可以展成幂级数$\sum_{i=0}^{\infty}c_{i}\omega^{e_{i}}$.其中$MRV(c_{i})\prec\omega$,$e_{i}\in\mathcal{C}$.
+</theorem>
+<proof>
+若$f$不依赖于$\omega$或者$f=\omega$,则定理显然成立.根据指对数函数域的定义(定理##th:exp-log ),$f$可以由$\omega$通过加,乘,逆和指数,对数操作得到的,因此我们可以用归纳法来证明定理.
+
+根据定理##th:mrv1 ,$$MRV(a\cdot b)\le\max(MRV(a),MRV(b)),MRV(a+b)\le\max(MRV(a),MRV(b)),$$因此定理对幂级数的和与积成立,也即对于加,乘操作成立.
+ 逆和指数,对数操作的情形可以用类似的方法证明,定理的详细证明请参阅<cite>gruntz96</cite>.
+</proof>
+
+下面是一个利用MRV直接计算出函数极限的简单例子.
+<problem>
+$$f(x)=\frac{e^{1/x-e^{-x}}-e^{1/x}}{e^{-x}},$$计算$$\lim_{x\rightarrow+\infty}f(x).$$
+</problem>
+<proof>
+计算知$MRV(f(x))=\{e^{-x}\}$.在$f(x)$中将$e^{-x}$换成$\omega$得到$$f(\omega)=(e^{1/x-\omega}-e^{1/x})/\omega,$$ 然后将$f(\omega)$在$\omega=0$处展成幂级数,则$$f(\omega)=-e^{1/x}\cdot\omega^{0}+\frac{1}{2}e^{1/x}\cdot\omega^{1}-\frac{1}{6}e^{1/x}\cdot\omega^{2}+O(\omega^{3}).$$级数的首项是$-e^{1/x}\cdot\omega^{0}$,其指数为0.因此$$\lim_{x\rightarrow+\infty}f(x)=\lim_{x\rightarrow+\infty}-e^{1/x}=-1.$$
+</proof>
+
+<lemma>
+设$f(x),g(x),v(x)$为指对数函数,$\lim_{x\rightarrow+\infty}v(x)=+\infty$,则$$
+f(x)\prec g(x)\Rightarrow f(v(x))\prec g(v(x)).$$
+</lemma>
+<proof>
+设$u(x)=\frac{\ln f(x)}{\ln g(x)}$,则$$\lim_{x\rightarrow+\infty}\frac{\ln f(v(x))}{\ln g(v(x))}=\lim_{x\rightarrow+\infty}u(v(x))=\lim_{x\rightarrow+\infty}u(x)=0.$$
+</proof>
+<theorem>
+若$f(x)$和$g(x)$都是指对数函数,且$\lim_{x\rightarrow +\infty}f(x)=\alpha$,$\lim_{x\rightarrow +\infty}g(x)=+\infty$,那么$$\lim_{x\rightarrow +\infty}f(g(x))=\alpha.$$
+</theorem>
+<proof>
+显然.
+</proof>
+<remark>
+当$f$中包含对数子表达式时,可以将$f(x)$里所有的$x$替换为$e^x$.
+</remark>
+
+现在可以正式写出Gruntz算法的详细过程了.
+<algorithm  name="Gruntz算法">
+
+输入:指对数函数$f(x)$.
+
+输出:极限$$\lim_{x\rightarrow+\infty}f(x).$$
+
+ 1.计算$\Omega=MRV(f)$.
+
+ 2.在$\Omega$中选取表达式$\omega$,使得满足$\omega>0$且$\omega\rightarrow 0.$并将$\Omega$中的其它元素重写为$A\omega^{c}$的形式.
+
+ 3.设$f(\omega)$是将$f$中所有属于$\Omega$的元素用$\omega$表示后得到的函数,将所有独立于$\omega$的表达式视为常数,然后将$f(\omega)$在$\omega=0^{+}$处展成幂级数.
+
+ 4.设幂级数的首项为$c_0\omega^{e_0}$.若$e_{0}>0$,则返回0.若首项指数$e_{0}<0$,则返回$\pm\infty$,且符号与首项系数$c_{0}$的符号相同.若首项指数$e_{0}=0$,则返回首项系数$c_{0}$的极限.
+</algorithm>
+
+关于Gruntz算法和其他计算符号极限的方法的详细介绍,请参阅<cite>gruntz96</cite>.

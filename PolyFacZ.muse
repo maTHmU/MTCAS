@@ -1,0 +1,735 @@
+#title 整系数多项式因子分解
+
+<contents>
+
+<index name="因子分解" sub="整系数多项式"></index>
+下面我们讨论$\mathbb{Z}$和$\mathbb{Q}$上的多项式的因子分解。由高等代数学知识，我们知道对于$\mathbb{Z}[x]$上的多项式$f$，其在$\mathbb{Q}[x]$中的不可约因子分解可对应于在$\mathbb{Z}[x]$中的不可约因子分解，设$f$是本原多项式,其在$\mathbb{Q}[x]$中的不可约因子分解为若$$f=f_1f_2\cdots f_r(f_i\in\mathbb{Q}[x]),$$则有$$f=f_1'f_2'\cdots f_r'(f_i'\in\mathbb{Z}[x]).$$
+其中$f_i'$可由$f_i$乘以其各个系数既约分母的最小公倍数再本原化得到.
+于是$\mathbb{Z}[x]$上任一多项式$f$的因子分解归结于$\mathbb{Z}$上的因子分解和$\mathbb{Z}[x]$上本原多项式的因子分解。
+
+很自然的，由前面的最大公因子模方法我们可以想到用模方法来求解因子分解问题。我们可以利用有限域上无平方因子分解的方法得到$\mathbb{Z}[x]$上的无平方因子本原多项式$f$,这时，我们会遇到如下一些问题：
+
+ 1. 素数$p$的选取要足够大，以使我们能从$f \bmod p$得到$f$,这一点我们可由模公因子算法中介绍的Mignotte界理论得到。
+
+ 2. 虽然$f$已是无平方因子，但$f \bmod p$却不一定是无平方因子的。如多项式$f=x^2+5x+4$无平方因子，但$f \bmod 3=x^2+2x+1=(x+1)^2$.那么在随机选取素数$p$的时候如何使得$f \bmod p$也是无平方因子呢？这一点依赖于结式理论并且将在后文中回答.
+
+ 3. 当我们在$\mathbb{F}_p[x]$中将多项式分解后，因为若$f$有不可约分解$f=f_1f_2\cdots f_r$,则$\overline{f}=\overline{f_1}\cdots\overline{f_r}$,但$\overline{f_i}$不一定不可约。因此还要考虑如何将$f \bmod p$的分解对应到$f$的分解。最简单的方法是尝试每一种可能的因子组合。当然，用这种尝试的方法,其复杂度是指数阶的.
+
+综上，我们首先要进入$\mathbb{F}_p[x]$中求得因子分解，这一步我们可以利用“大素数”方法和“小素数”方法。。第二步是由$\mathbb{F}_p[x]$返回$\mathbb{Z}[x]$中，求得最终结果，可以用因子组合的方法.后面还会介绍一种多项式复杂度的格中短向量方法，尽管其理论上十分优美,但是没有因子组合算法实用.
+
+* 大素数模方法和因子组合算法
+
+利用结式理论,我们先讨论$f\bmod p$在什么情况下是无平方因子的.
+
+<definition>
+对于域$F$上的多项式$f$,定义其判别式为$\mathrm{disc}(f)=\mathrm{res}(f,f')$.
+</definition>
+
+由推论##cor:squarefree1 知，$\overline{f}=f\bmod p$是无平方因子的当且仅当$\mathrm{disc}(\overline{f})\neq 0$.
+
+<lemma>
+设$'$表示形式微商，则有$\overline{f'}=\overline{f}'$.
+</lemma>
+
+<theorem>
+令$f\in\mathbb{Z}[x]$是一非零无平方因子多项式,$p$为素数且$p\nmid \mathrm{lc}(f)$,则$\overline{f}$是无平方因子的当且仅当$p\nmid\mathrm{disc}(f)$.
+</theorem>
+
+<proof>
+$\overline{f}$无平方因子$\Leftrightarrow\mathrm{disc}(\overline{f})\neq 0\Leftrightarrow\mathrm{res}(\overline{f},\overline{f}')\neq 0$,再由上面引理知:$$\mathrm{res}(\overline{f},\overline{f}')\neq 0\Leftrightarrow\mathrm{res}(\overline{f},\overline{f'})\neq 0.$$ 又$p\nmid \mathrm{lc}(f)$,则由引理##le:resultant2 知$$\mathrm{res}(\overline{f},\overline{f'})\neq 0\Leftrightarrow\overline{\mathrm{res}(f,f')}\neq 0\Leftrightarrow p\nmid \mathrm{disc}(f).$$
+
+证毕。
+</proof>
+
+由于$\mathrm{lc}(f)\mid \mathrm{res}(f,f')$,我们有下面的：
+
+<corollary label="cor:modpsquarefree">
+$f$是$\mathbb{Z}[x]$上非零无平方因子多项式，则$\overline{f}$无平方因子当且仅当$p\nmid \mathrm{disc}(f)=\mathrm{res}(f,f')\in\mathbb{Z}\setminus \{0\}$.
+</corollary>
+
+<remark>
+由推论##cor:modpsquarefree 可知,$p$可以随机选取,只有很小概率会使得$\overline{f}$是有重因子的.实际检测时,我们不需要计算结式以判别选择的$p$是否可行,只需要直接计算$\gcd(\overline{f},\overline{f}')$即可.
+</remark>
+
+设$f\in\mathbb{Z}[x]$为本原多项式，有分解$f=f_1f_2\cdots f_k$,且在模$p$下有：$$\overline{f}=\overline{f_1}\overline{f_2}\cdots\overline{f_k}=\overline{\mathrm{lc}(f)}g_1g_2\cdots g_r,$$其中$g_i$为$\field{p}[x]$上首一不可约多项式.若$p/2$比Mignotte界$(n+1)^{1/2}2^n|\mathrm{lc}(f)|\cdot\|f\|_{\infty}$小,则有下面的等式：$$\frac{\mathrm{lc}(f)}{\mathrm{lc}(f_1)}f_1=\mathrm{lc}(f)\prod_{i\in S}g_i\in\mathrm{Z}[x],$$该式原先在$\mathbb{F}_p[x]$上就已成立了.其中指标集$S$为$S=\{i\in\{1,\ldots,r\}\big|\ g_i\mid\overline{f_1}\}$.由此启发我们得到算法##al:bpfc1 .
+
+<index name="大素数和因子组合算法"></index>
+<algorithm  label="al:bpfc1"  name="整系数多项式因子分解1:大素数和因子组合算法">
+
+输入：无平方因子$ n $次本原多项式$f\in\mathbb{Z}[x]$，其中$\mathrm{lc}(f)>0$且$\|f\|_{\infty}=A$,
+
+输出：$f$在$\mathbb{Z}[x]$上的不可约因子$\{f_1,\ldots,f_k\}$.
+
+ 1. 若$n=1$则输出$f$,否则$b=\mathrm{lc}(f),B=(n+1)^{1/2}2^nAb$,
+
+ 2. 随机任取一个奇素数$p\in(2B,4B)$,直至$\gcd(\overline{f},\overline{f}')=1\in\field{p}[x]$,即满足推论##cor:modpsquarefree 条件,
+
+ 3. 利用有限域上因子分解算法求出$g_1,\ldots,g_r\in\mathbb{Z}[x]$,其无穷范数均比$p/2$要小，且在$\field{p}$上不可约，于是$f\equiv bg_1\cdots g_r\pmod{p}$,
+
+ 4. $T=\{1,\ldots,r\}$,$s=1$,$G=\emptyset$,$f^*=f$,(此步之后即为因子组合)
+
+ 5. 当$2s\le\#T$时循环执行下面4步，否则转第10步,
+
+ 6. 枚举$T$的所有$s$元子集$S$,并做下两步7、8循环：
+
+ 7. 计算$g^*$,$h^*\in\mathbb{Z}[x]$使得其无穷范数比$p/2$要小并且$g^*\equiv b\prod_{i\in S}g_i\pmod{p}$,$h^*\equiv b\prod_{i\in T\setminus S}g_i\pmod{p}$,
+
+ 8. 若$\|g^*\|_1\|h^*\|_1\le B$则$T=T\setminus S$,$G=G\cup\{\mathrm{pp}(g^*)\}$,$f^*=\mathrm{pp}(h^*)$,$b=\mathrm{lc}(f^*)$,跳出6、7、8循环并转第5步,
+
+ 9. $s=s+1$,
+
+ 10. 输出$G\cup\{f^*\}$.
+</algorithm>
+
+<proof name="算法有效性">
+由第2步$p>B\Rightarrow p\nmid b$我们已经知道$\overline{f}$是无平方因子的。在第8步中，若条件真则有$g^*h^*=bf^*$，因为由$g^*h^*\equiv bf^*\pmod{p}$和$\|g^*h^*\|_{\infty}\le\|g^*h^*\|_1\le\|g^*\|_1\|h^*\|_1\le B<p/2$知等式是成立的。记$f$的因子$u\in\mathbb{Z}[x]$,其在$\mathbb{F}_p[x]$中不可约因子个数为$\mu(u)$.现在我们要归纳证明在每次到第5步时，有下面命题成立：
+
+ 1. $f^*\equiv b\prod_{i\in T}g_i\pmod{p},\quad b=\mathrm{lc}(f^*),\quad f=f^*\prod_{g\in G}g$,
+
+ 2. $G$中多项式均不可约,
+
+ 3. $f^*$本原且它的任何一个不可约因子$u\in\mathbb{Z}[x]$有$\mu(u)\ge s$.
+
+初始时命题显然成立，假设命题在每次循环进行到第7步前均是成立的，此时经过第7步后当第8步的条件成立时，各量均要发生变化，根据前面的分析则有$g^*h^*=bf^*$,于是$\mathrm{pp}(g^*)$是$\mathrm{pp}(bf^*)=f^*$的因子。由于$\mu(g^*)=s$且对任何$f^*$的不可约因子$u$有$\mu(u)\ge s$,则$\mathrm{pp}(g^*)$是$f^*$的不可约因子.当$f^*$有一个不可约因子$g$满足$\mu(g)=s$时，当循环到$s$时必然能将此因子选出，这一点可以构造来证明，即取指标集$S$为$g$在$\field{p}[x]$中不可约因子的编号.
+
+最后一步是证明在第5步时，若$2s>\#T$，则$f^*$是不可约的.令$g\in\mathbb{Z}[x]$是$f^*$的一个不可约因子且$h=f^*/g$非平凡,于是$s\le\mu(g),\mu(h)\le\#T$.但是$\mu(g)+\mu(h)=\#T$，且$s>\#T/2$，则$h$必为常数，$f^*$必不可约.
+</proof>
+
+<problem label="example:factorization1">
+求$f=4x^4+13x^3+28x^2+27x+18$在$\mathbb{Z}[x]$上的分解.
+</problem>
+
+<solution>
+$f$是本原的,且$f'=16x^3+39x^2+56x+27$,$\mathrm{disc}(f)=1656288$,于是$f$无平方因子.此时$n=4$,$A=28$,$b=\mathrm{lc}(f)=4$,则$B=(n+1)^{1/2}2^nAb=1792\sqrt{5}=4007.03$,取素数$p=8017>2B$且$p\nmid \mathrm{disc}(f)$,此时可以得到$\mathbb{F}_{8017}$上的分解：$$f\equiv 4(x-955)(x+957)(x^2-2003x-4007)\pmod{p}.$$
+
+首先$s=1$,若取$S=\{1\}$,则
+$$g^*\equiv 4(x-955)\equiv 4x-3820\pmod{p},$$
+$$h^*\equiv 4(x+957)(x^2-2003x-4007)\equiv 4x^3+3833x^2-3226x-2275\pmod{p},$$
+$$\|g^*\|_1\|h^*\|_1=(4+3820)(4+2833+3226+2275)>B,$$
+同样的取$S=\{2\}$时也可验证是不可行的。若取$S=\{3\}$,则
+$$g^*\equiv 4(x^2-2003x-4007)\equiv 4x^2+5x+6\pmod{p},$$
+$$h^*\equiv 4(x-955)(x+957)\equiv 4x^2+8x+12\pmod{p},$$
+此时$\|g^*\|_1\|h^*\|_1=15*24=360<B$,则$G=\{4x^2+5x+6\}$,$f^*=\mathrm{pp}(h^*)=x^2+2x+3$,$b=\mathrm{lc}(f^*)=1$,$T=\{1,2\}$。下一步$s=2$,循环条件不满足，则$G=G\bigcup\{f^*\}=\{x^2+2x+3,4x^2+5x+6\}$.
+</solution>
+
+利用算法##al:bpfc1 我们可以得到如下对于一般的多项式的分解算法. 
+
+<algorithm  name="整系数多项式的因子分解2">
+
+输入：$f\in\mathbb{Z}[x]$，$\deg f=n>1$且$\|f\|_{\infty}=A$,
+
+输出：常数$c\in\mathbb{Z}$和序对集$\{(f_1,e_1),\ldots,(f_k,e_k)\}$,其中$f_i\in\mathbb{Z}[x]$均是不可约两两互素的多项式,$e_i\in\mathbb{N}$,且$f=c\prod_{i=1}^{k}f_i^{e_i}$.
+
+ 1. $c=\mathrm{cont}(f)$,$g=\mathrm{pp}(f)$,若$\mathrm{lc}(f)<0$则$c=-c$,$g=-g$,
+
+ 2. 调用算法##al:SFD 得到分解$g=\prod_{1\le i\le s}g_i^i$,且$\mathrm{lc}(g_i)>0$,$g_s$非平凡,
+
+ 3. $G=\emptyset$,
+
+ 4. 对$1\le i\le s$循环,调用上面算法##al:bpfc1 得到$g_i$的所有不可约因子$h_1,\ldots,h_t\in\mathbb{Z}[x]$,$G=G\bigcup\{(h_1,i),\ldots,(h_t,i)\}$,
+
+ 5. 输出$c$和$G$.
+</algorithm>
+
+<remark>
+当然,在算法第4步分解无平方因子多项式时,也可以调用后面几节将要介绍的Hensel提升或格中短向量算法进行因子分解.
+</remark>
+
+* Hensel提升理论
+
+首先我们来简单介绍一下为什么要用<index>Hensel提升算法</index>以及Hensel提升大致要解决的是什么问题.
+
+依照我们前面介绍的求整系数多项式最大公因子的小素数模算法的思想,如果要对本原多项式$f\in\mathbb{Z}[x]$进行因子分解,应当选取一系列小素数$p_1,p_2,\ldots,p_k$并在相应的环$\mathbb{F}_{p_i}[x]$中作分解
+$$f\equiv b_ih_{1i}h_{2i}\cdots h_{r_ii}\pmod{p_i},$$
+其中$h_{ji}$均为首一不可约多项式,$b_i$是领项系数,$r_i$是$f$在$\mathbb{F}_{p_i}[x]$中分解得到的不可约多项式个数.然后利用中国剩余定理,将各个环中的分解合并,设$m=\prod_{1\le i\le k}p_i$,我们将得到
+$$f\equiv bh_1h_2\cdots h_r\pmod{m},$$
+只要$m$依照Mignotte界选取,那么由此进行因子组合算法可还原到得$\mathbb{Z}[x]$中的分解.这样的设想虽然很好,但是会存在如下问题:
+
+<latex>
+\begin{itemize}
+\item 在不同的环$\mathbb{F}_{p_i}[x]$中分解得到的不可约因子的个数未必相同,即$r_i$未必全相等.
+\item 即使各个$r_i$均是相等的,但是不同环中得到的不可约因子不能一一对应起来,这会给中国剩余定理算法带来麻烦.例如考虑多项式$f=(x+3)(x+5)$的分解,在$\mathbb{F}_3[x]$和$\mathbb{F}_5[x]$中有
+$$f\equiv x(x+2)\pmod{3},\quad f\equiv x(x+3)\pmod{5},$$
+虽然分解得到相同的因子$x$,而实际上两个分解中的$x$并不是对应的.
+\end{itemize}
+</latex>
+
+基于以上考虑,我们需要换一个思路.假设对于某个小素数$p$,我们已有分解
+$$f\equiv bh_1h_2\cdots h_r\pmod{p},$$
+如果能通过某种方法将其“提升”,从而得到分解
+$$f\equiv ag_1g_2\cdots g_r\pmod{p^l},$$
+其中$a\equiv b\pmod{p}$,$g_i\equiv h_i\pmod{p}$,而$p^l$已足够大,那么亦能达到同样的目的.Hensel<cite>hensel18</cite>于1918年提出了提升算法,用以解决这样的问题.
+
+; 以下我们全在整数环这个特殊的UFD中讨论Hensel提升算法,有些算法和命题在将$\mathbb{Z}$换为其它的UFD,如$\mathbb{Z}[x]$也是正确的。
+
+** Hensel单步算法
+
+当我们已知一个分解$f\equiv gh\pmod{p}$($g$,$h$互素)时，最简单的问题是如何获得分解$f\equiv g^*h^*\pmod{p^2}$,即将其“提升”。由于$p$是素数，则存在$s$,$t\in\mathbb{Z}[x]$使得$sg+th\equiv 1\pmod{p}$,如果我们取：$$e=f-gh,\quad g^*=g+te,\quad h^*=h+se,$$则有
+<latex>
+\begin{align}
+f-g^*h^*&=f-(g+te)(h+se)=f-gh-(sg+th)e-ste^2\notag \\
+&=(1-sg-th)e-ste^2\equiv 0\pmod{p^2},\notag 
+\end{align}
+</latex>
+这样可以达到我们的要求,下面是一个具体计算的例子.
+
+<problem label="ex:henselstep1">
+考虑$f=x^4-1$,$m=5$,$h=x-2$,$g=x^3+2x^2-x-2$,$s=-2$,$t=2x^2-2x-1$的情况.
+</problem>
+
+<solution>
+顺次计算有$$e=f-gh=5x^2-5,$$ $$g^*=g+te=10x^4-9x^3-13x^2+9x+3,$$ $$h^*=h+se=-10x^2+x+8.$$
+我们看到,$\deg g^*>\deg g$,$\deg h^*>\deg h$,这种规模的增大无疑对后续的提升造成更多的计算负担,并且次数的提高时我们无法得到正确的因子分解结果.
+</solution>
+
+鉴于提升时$g$和$h$的次数增长,我们需要对此方法作一些改动,在提出改动后的Hensel单步提升算法之前,我们先给出如下引理.
+
+<lemma>
+在$\mathbb{Z}[x]$中,我们有如下结论:
+
+ 1. 设$f$,$g\in\mathbb{Z}[x]$,其中$g$非零且首一,则存在唯一的多项式$q$,$r\in\mathbb{Z}[x]$使得$f=qg+r$且$\deg r<\deg g$.
+
+ 2. $f$,$g$,$q$,$r$同上，若对于某个整数$m$有$f\equiv 0\pmod{m}$,则$q\equiv r\equiv 0\pmod{m}$.
+</lemma>
+
+<proof>
+第一条基本同Euclid环中的证明方法,只要注意到$g$是首一的即可。对于第二条，由$f\equiv 0\pmod{m}$知必有$\mathbb{Z}[x]$中的多项式$f^*$使得$f=mf^*$，于是必存在唯一的$q^*,r^*$使得$$f^*=q^*g+r^*,\quad \deg r^*<\deg q^*,$$此时有$f=mf^*=(mq^*)g+(mr^*)$,由唯一性得$q=mq^*$,$r=mr^*$.
+</proof>
+
+<remark label="remark:forhensel">
+将2的条件改为$f\equiv qg+r\pmod{m^2}$,结论也是正确的.只需将证明中的$\mathbb{Z}[x]$相应地改为$\mathbb{Z}_{m^2}[x]$即可.
+</remark>
+
+我们可以给出如下的<index name="Hensel提升算法" sub="单步Hensel提升">单步Hensel提升</index>(Hensel Step)算法.
+
+<algorithm label="al:henselstep" name="单步Hensel提升">
+
+输入：整数$m\in\mathbb{Z}$,多项式$f,g,h,s,t\in\mathbb{Z}[x]$使得$$f\equiv gh\pmod{m},\quad sg+th\equiv 1\pmod{m},$$ 其中$h$首一，且$\deg f=n=\deg g+\deg h$,$\deg s<\deg h$,$\deg t<\deg g$.
+
+输出：多项式$g^*,h^*,s^*,t^*\in\mathbb{Z}[x]$使得$$f\equiv g^*h^*\pmod{m^2},\quad s^*g^*+t^*h^*\equiv 1\pmod{m^2},$$ $h^*$首一，$g^*\equiv g\pmod{m}$,$h^*\equiv h\pmod{m}$,$s^*\equiv s\pmod{m}$,$t^*\equiv t\pmod{m}$,$\deg g^*=\deg g$,$\deg h^*=\deg h$,$\deg s^*<\deg h^*$,$\deg t^*<\deg g^*$.
+
+ 1. 计算$e,q,r,g^*,h^*\in\mathbb{Z}[x]$使得$\deg r<\deg h$且
+<latex>
+\begin{align}
+e&\equiv f-gh\pmod{m^2},\qquad &se&\equiv qh+r\pmod{m^2},\notag\\
+g^*&\equiv g+te+qg\pmod{m^2}, &h^* &\equiv h+r\pmod{m^2}, \notag
+\end{align}
+</latex>
+ 2. 计算$b,c,d,s^*,t^*\in\mathbb{Z}[x]$使得$\deg d<\deg h^*$且
+<latex>
+\begin{align}
+b&\equiv sg^*+th^*-1\pmod{m^2},\qquad &sb&\equiv ch^*+d\pmod{m^2},\notag\\
+s^*&\equiv s-d\pmod{m^2},&t^*&\equiv t-tb-cg^*\pmod{m^2},\notag
+\end{align}
+</latex>
+ 3. 输出$g^*,h^*,s^*,t^*$.
+
+</algorithm>
+
+<proof name="算法有效性">
+我们验证各项输出的确满足要求.首先验证$f\equiv g^*h^*\pmod{m^2}$,
+<latex>
+\begin{align}
+f-g^*h^*&\equiv f-(g+te+qg)(h+r)\equiv f-(g+te+qg)(h+se-qh)\notag\\
+&\equiv (f-gh)-(sg+th)e-ste^2+q^2gh+(th-sg)eq+qgh-qgh\notag\\
+&\equiv (1-sg-th)e-ste^2+q^2gh+(th-sg)eq\equiv 0\pmod{m^2},\notag
+\end{align}
+</latex>
+这是因为根据注##remark:forhensel 及$se\equiv qh+r\pmod{m^2}$,我们由$se\equiv 0\pmod{m}$得到$q\equiv r\equiv 0\pmod{m}$.
+
+由$\deg r<\deg h$知$h^*$也是首一的,且$$g^*-g\equiv te+qg\equiv 0\pmod{m},$$ $$h^*-h\equiv r\equiv 0\pmod{m},$$ 由$h^*\equiv h+r\pmod{m^2}$也可得到$\deg h^*=\deg h$,于是$\deg g^*=\deg f-\deg h^*=\deg f-\deg h=\deg g$.
+
+其次验证$s^*g^*+t^*h^*\equiv 1\pmod{m}$,
+<latex>
+\begin{align}
+s^*g^*+t^*h^*&\equiv (s-d)g^*+(t-tb-cg^*)h^*\notag\\
+&\equiv (s-sb+ch^*)g^*+(t-tb-cg^*)h^*\equiv (sg^*+th^*)(1-b)\notag\\
+&\equiv (sg^*+th^*)(2-sg^*-th^*)\equiv 1-(sg^*+th^*-1)^2\equiv 1-(sg+th-1)^2\notag\\
+&\equiv 1\pmod{m^2},\notag
+\end{align}
+</latex>
+由$sb\equiv 0\pmod{m}$可知$c\equiv d\equiv 0\pmod{m}$,于是$$s^*-s\equiv d\equiv 0\pmod{m},$$ $$t^*-t\equiv tb+cg^*\equiv 0\pmod{m},$$ 而$\deg d<\deg h^*$,于是$\deg s^*\le\deg(s-d)<\deg h^*$,由$s^*g^*+t^*h^*\equiv 1\pmod{m^2}$知$\deg t^*<\deg g^*$.所有结论证毕.
+</proof>
+
+既然本节开始提出的方法已经能够解决问题,为什么还要引入上面的算法呢？我们通过下面一个例子来说明问题：
+
+<problem>
+仍然考虑例##ex:henselstep1 $f=x^4-1$,$m=5$,$h=x-2$,$g=x^3+2x^2-x-2$,$s=-2$,$t=2x^2-2x-1$的情况.
+</problem>
+
+<solution>
+我们用算法##al:henselstep 来进行提升:
+
+$ e $任取为$5x^2-5$,则对$se$进行$h$的带余除法有：$$se=-10x^2+1\equiv (-10x+5)h-5\pmod{25},$$ 于是$q=-10x+5$,$r=-5$,故$$g^*\equiv g+te+qg\equiv x^3+7x^2-x-7\pmod{25},$$ $$h^*\equiv h+r\equiv x-7\pmod{25},$$ $$b\equiv sg^*+th^*-1\equiv -5x^2-10x-5,$$ $$c=10x-10,\quad d=-10,$$ $$s^*\equiv s-d\equiv 8\pmod{25},$$ $$t^*\equiv t-tb-cg^*\equiv -8x^2-12x-1.$$
+
+正如Hensel单步提升算法所提到的,我们有$\deg g^*=\deg g$,$\deg h^*=\deg h$.
+</solution>
+
+我们可归纳地利用单步Hensel算法,依次对$m$,$m^2$,$m^4$,$\cdots$使用。由于对任何正整数$l$，我们总可找到比其大的$2$的幂次，于是有下面的：
+
+<theorem label="th:helsellemma" name="Hensel引理">
+对于给定的正整数$l$以及算法##al:henselstep 中输入的条件,我们可以将$m^2$用$m^l$代替，仍然得到满足条件的输出.
+</theorem>
+
+<theorem label="th:henseluniqueness" name="Hensel提升的唯一性">
+对于非零整数$m$和正整数$l$以及非零多项式$g,h,g^*,h^*,s,t\in\mathbb{Z}[x]$,其中$sg+th\equiv 1\pmod{m}$,$\mathrm{lc}(g)$和$\mathrm{lc}(h)$不是$\mathbb{Z}_m$中的零因子,$g$和$g^*$有同样的领项和次数，且模$m$同余；对于$h$和$h^*$也有相似的条件.此时若$gh\equiv g^*h^*\pmod{m^l}$,则$g\equiv g^*\pmod{m^l}$,$h\equiv h^*\pmod{m^l}$.
+</theorem>
+
+<proof>
+假设结论不成立,即$g\not\equiv g^*\pmod{m^l}$或$h\not\equiv h^*\pmod{m^l}$,不妨假设前者不成立,于是我们可以找到最大的指标$i(1\le i<l)$使得$m^i\mid g-g^*$且$m^i\mid h-h^*$，不妨设$g^*-g=um^i$,$h^*-h=vm^i$且$m\nmid u$.则$$0\equiv g^*h^*-gh\equiv g^*(h^*-h)+h(g^*-g)\equiv (g^*v+hu)m^i\pmod{m^l},$$ 于是$m\mid m^{l-i}\mid (g^*v+hu)$,若$f$将模$m$的象以$\overline{f}$来记，则有$$\overline{sg}+\overline{th}=1,\quad \overline{g^*}=\overline{g},\quad \overline{g^*v}+\overline{hu}=0.$$ 因此$$0=\overline{t}(\overline{g^*v}+\overline{hu})=\overline{tgv}+(1-\overline{sg})\overline{u}=(\overline{tv}-\overline{su})\overline{g}+\overline{u},$$ 于是$\overline{g}\mid \overline{u}$,又$g$和$g^*$的领项和次数均相同,我们有$\deg\overline{u}<\deg\overline{g}$,于是由整除性知$\overline{u}=0$,这与$m\nmid u$矛盾.
+</proof>
+
+** 利用因子树进行多因子Hensel提升
+
+前面所说的均是二因子的Hensel提升,对于多因子,情况有些不同.Victor Shoup提出了一种利用“因子树”进行提升的方法,最早在NTL库中实现(参见<cite>mca</cite>15.5节),von zur Gathen<cite>jvzg84</cite>于1984年提出了同时提升多个因子的算法.本节我们介绍因子树方法.
+
+我们先给出<index>因子树</index>的定义：
+
+<definition  name="因子树(Factor Tree)">
+对于$\mathbb{Z}[x]$中的多项式$f$,以及正整数$m$(例如我们可以取作素数$p$),设有整数$a$使得$a\mathrm{lc}(f)\equiv 1\pmod{m}$,则$f$模$m$的因子树是指一个二叉树$\tau$:其根结点是$af$;每个结点的两个子结点均是该结点在$\mathbb{Z}_m[x]$中的非平凡首一因子;叶结点均为$\mathbb{Z}_m[x]$的不可约因子.
+</definition>
+
+<remark>
+实际我们用模素数的因子分解生成因子树时,需要用扩展Euclid算法算出各个属于同一中间结点的两个子结点的Bezout系数,以便进行下面的多因子Hensel提升算法.一个典型的因子树如图<literal>\ref{fig:factortree}</literal>所示.其中每个结点的括号中显示了其相应的Bezout系数.
+</remark>
+
+<latex>
+\begin{figure}[h]
+\centering\includegraphics[scale=.75]{images/factortree}
+\caption{模~5~因子树}
+\label{fig:factortree}
+\end{figure}
+</latex>
+
+当然由模$m$的因子树我们可以由单步Hensel算法得到模$m^2$乃至更高次幂的因子树,只要我们由根结点依次在每个结点做Hensel提升即可.下面给出该算法：
+
+<index name="Hensel提升算法" sub="多因子Hensel提升"></index>
+<algorithm label="al:multifactorhensellifting" name="多因子Hensel提升">
+
+输入：整数$m$和$n$次多项式$f\in\mathbb{Z}[x]$,$a_0\in\mathbb{Z}$使得$a_0\mathrm{lc}(f)\equiv 1\pmod{m}$,正整数$l$,一个$f$模$m$的因子树$\tau$,共有$r$个叶子.
+
+输出：整数$a^*$使得$a^*\mathrm{lc}(f)\equiv 1\pmod{m^l}$和一个$f$模$m^l$的因子树$\tau^*$,各个新结点$v^*$和原结点$v$满足$v^*\equiv v\pmod{m}$.
+
+ 1. $d=\lceil\log_2l\rceil$,$\tau_0=\tau$,
+
+ 2. 对$j$从$1$循环到$d$,执行第3至5步,
+
+ 3. 计算整数$a_j$使得$a_j\equiv 2a_{j-1}-\mathrm{lc}(f)a_{j-1}^2\pmod{m^{2^j}}$,$\tau_j=\tau_{j-1}$,将$\tau_j$的根结点换为$a_jf$,
+
+ 4. 从根结点遍历$\tau_j$的结点,对每个非叶结点$v$,执行第5步（由根向叶结点方向进行）,
+
+ 5. 调用算法##al:henselstep ,输入$m^{2^{j-1}}$来提升$v=g_vh_v$和$s_vg_v+t_vh_v\equiv 1\pmod{m^{2^{j-1}}}$,提升到模$m^{2^{j}}$,
+
+ 6. 输出$a_d$,$\tau_d$.
+</algorithm>
+
+<remark>
+注意到$d$的选取能够使$2^d\ge l$,即我们已将因子树提升到足够高的次数.
+</remark>
+
+<remark>
+为说明算法的有效性，我们只需要说明每一步求得的$a_j$确实满足要求.这是因为$a_j\mathrm{lc}(f)\equiv 2a_{j-1}\mathrm{lc}(f)-\mathrm{lc}^2(f)a_{j-1}^2\equiv 1-(1-a_{j-1}\mathrm{lc}(f))^2\equiv 1\pmod{m^{2^j}}$.
+</remark>
+
+* 应用Hensel提升的Zassenhaus算法
+
+有了前面的Hensel提升理论,我们就可以利用它取代大素数模算法.Zassenhaus<cite>hz69</cite>在1969年将Hensel提升算法引入到整系数多项式因子分解算法中,下面我们就来介绍<index>Zassenhaus算法</index>.
+
+<algorithm name="整系数多项式分解3:素数幂和因子组合算法" label="al:primepower3">
+
+输入：一个无平方因子本原$ n $次多项式$f\in\mathbb{Z}[x]$,$\mathrm{lc}(f)>0$且$\|f\|_{\infty}=A$,
+
+输出：$f$的不可约因子$\{f_1,\ldots,f_k\}\subset\mathbb{Z}[x]$.
+
+ 1. 若$n=1$则输出$f$,否则$b=\mathrm{lc}(f)$,$B=(n+1)^{1/2}2^nAb$,$C=(n+1)^{2n}A^{2n-1}$,$\gamma=\lceil 2\log_2C\rceil$,
+
+ 2. 任意选取素数$p\le 2\gamma\ln\gamma$,$\overline{f}=f \bmod p$,直到$p\nmid b$且$\gcd(\overline{f},\overline{f}')=1\in\field{p}[x]$,然后令$l=\lceil\log_p(2B+1)\rceil$,
+
+ 3. 调用有限域上因子分解算法计算$h_1,\ldots,h_r\in\mathbb{Z}[x]$,各因子均是首一不可约因子,且无穷范数小于$p/2$,于是$f\equiv bh_1\cdots h_r\pmod{p}$,
+
+ 4. $a=b^{-1}\bmod p$,利用扩展Euclid算法建立$f$模$p$的因子树,叶结点为$h_1,\ldots,h_r$,再调用算法##al:multifactorhensellifting 计算分解$f\equiv bg_1\cdots g_r\pmod{p^l}$,其中$g_i\in\mathbb{Z}[x]$为首一且无穷范数小于$p^l/2$,$g_i\equiv h_i\pmod{p}$,
+
+ 5. 调用因子组合算法并输出.(此处同算法##al:bpfc1 第4～10步.) $T=\{1,\ldots,r\}$,$s=1$,$G=\emptyset$,$f^*=f$,
+
+ 6. 当$2s\le\#T$时循环执行下面4步，否则转第11步,
+
+ 7. 枚举$T$的所有$s$元子集$S$,并做下两步8、9循环：
+
+ 8. 计算$g^*$,$h^*\in\mathbb{Z}[x]$使得其无穷范数比$p^l/2$要小并且$g^*\equiv b\prod_{i\in S}g_i\pmod{p^l}$,$h^*\equiv b\prod_{i\in T\setminus S}g_i\pmod{p^l}$,
+
+ 9. 若$\|g^*\|_1\|h^*\|_1\le B$则$T=T\setminus S$,$G=G\bigcup\{\mathrm{pp}(g^*)\}$,$f^*=\mathrm{pp}(h^*)$,$b=\mathrm{lc}(f^*)$,跳出7、8、9循环并转第6步,
+
+ 10. $s=s+1$,
+
+ 11. 输出$G\bigcup\{f^*\}$.
+</algorithm>
+
+<remark>
+步骤2中$\gamma$的引入见<cite>mca</cite>18.4节.
+</remark>
+
+<remark>
+关于素数的选取,我们也可以由序列$3,5,7,\ldots$依次选取,或者预先准备好小素数表.为了降低因子组合的复杂性,选取$p$并进行分解
+$$f\equiv bh_1\cdots h_r\pmod{p}$$
+后,我们可以多选几个适合的$p$分解,取$r$最小的那个$p$进行后面的Hensel提升.
+</remark>
+
+<remark>
+我们还可以在进行Hensel提升的过程中一边检查各个因子是不是$f$在$\mathbb{Z}[x]$中的因子,如果是则将其从树中移除,仅提升剩余的因子.这样,我们有可能在提升到$l$次幂之前就已经分解完全了.
+</remark>
+
+<proof name="算法有效性">
+记$f$的因子$u\in\mathbb{Z}[x]$,其在$\mathbb{F}_p[x]$中不可约因子个数$\mu(u)$.现在我们要归纳证明在每次到第6步时，有下面命题成立：
+
+ 1. $f^*\equiv b\prod_{i\in T}g_i\pmod{p^l},\quad b=\mathrm{lc}(f^*),\quad f=f^*\prod_{g\in G}g$,
+
+ 2. $G$中多项式均不可约,
+
+ 3. $f^*$本原且它的任何一个不可约因子$u\in\mathrm{Z}[x]$有$\mu(u)\ge s$.
+
+主要证法和算法##al:bpfc1 的证明一致,我们只需证明当$f^*$有一个不可约因子$g$满足$\mu(g)=s$时，当循环到s时必然能将此因子选出，这一点可以构造来证明，即取指标集$S$为$g$在$\field{p}[x]$中不可约因子的编号.当然这里与前面的证法有所不同,因为$\mathbb{Z}_{p^l}[x]$并不是UFD,要证明唯一性还需要用Hensel提升的唯一性定理.首先可设$\mathrm{lc}(h)g\equiv b\prod_{i\in S}g_i\pmod{p}$,$\mathrm{lc}(g)h\equiv b\prod_{i\in T\setminus S}g_i\pmod{p}$,再设$g^*\equiv b\prod_{i\in S}g_i\pmod{p^l}$,$h^*\equiv b\prod_{i\in T\setminus S}g_i\pmod{p^l}$.由$f^*=gh$可知
+$$bf^*=\plc{h}g\plc{g}h,$$
+另外
+$$bf^*\equiv g^*h^*\pmod{p^l},$$
+以上两式均是$bf^*\bmod p$的提升,于是$\mathrm{lc}(h)g\equiv g^*\pmod{p^l}$且$\mathrm{lc}(g)h\equiv h^*\pmod{p^l}$,再由所定的Mignotte界和$ l $的选择可知9中的条件必然成立.
+</proof>
+
+<problem label="example:factorization2">
+仍然考虑例##example:factorization1 中$f=4x^4+13x^3+28x^2+27x+18\in\mathbb{Z}[x]$的分解.
+</problem>
+
+<solution>
+首先,$n=4$,$A=28$,$b=4$,$B=1792\sqrt{5}=4007.03$,$\gamma=104$,而$2,3\mid \mathrm{disc}(f)$,故取$p=5$,此时$l=\lceil\log_5(2B+1)\rceil=6$,要提升3次.首先利用模$5$因子分解和扩展Euclid算法得到如下模5因子树(图<literal>\ref{fig:factortree}</literal>)：
+
+<latex>
+\begin{equation*}
+4f=
+\begin{cases}
+s=x,g=x^2-1\begin{cases}s=3,g=x+1\\t=2,h=x-1\end{cases}\\
+t=-x+2,h=x^2+2x-2
+\end{cases}
+\end{equation*}
+</latex>
+
+利用多因子提升算法提升为模25因子树：
+
+<latex>
+\begin{equation*}
+19f=\begin{cases}
+s=6x,g=x^2-5x-11\begin{cases}s=-2,g=x-9\\t=2,h=x+4\end{cases}\\
+t=-6x-8,h=x^2+2x+3
+\end{cases}
+\end{equation*}
+</latex>
+以此类推有模$5^4=625$因子树：
+<latex>
+\begin{equation*}
+469f=\begin{cases}
+s=-69x,g=x^2-155x-311\begin{cases}s=-177,g=x-134\\t=177,h=x-21\end{cases}\\
+t=69x-208,h=x^2+2x+3
+\end{cases}
+\end{equation*}
+</latex>
+模$5^8=390625$因子树：
+<latex>
+\begin{equation*}
+292969f=\begin{cases}
+s=86806x,g=x^2-97655x-195311\begin{cases}s=-108927,g=x+82991\\t=108927,h=x-180646\end{cases}\\
+t=-86806x-130208,h=x^2+2x+3
+\end{cases}
+\end{equation*}
+</latex>
+于是我们有$f\equiv 4(x+82991)(x-180646)(x^2+2x+3)\pmod{5^8}$.这里我们再对其进行还原时，显然有$s=1$时可得到不可约因子$(x^2+2x+3)$,此时$f^*=h^*\equiv 4(x+82991)(x-180646)\equiv 4x^2+5x+6\pmod{5^8}$.于是再一次得到分解$f=(x^2+2x+3)(4x^2+5x+6)$.
+</solution>
+
+* 格中短向量理论
+
+** 问题的引入
+
+通过大素数模方法或Hensel提升方法,我们都可以得到多项式$f\in\mathbb{Z}[x]$在模某个整数$m$后的分解,即$f\equiv bg_1\cdots g_r\pmod{m}$.这时候我们用因子组合的算法将它们拼起来还原.很显然,因子组合算法的时间复杂度是指数级的,在某些情况下这种方法的效率很低,如Swinnerton-Dyer多项式(见<cite>mca</cite>15.3节),这个例子是最坏的情况,即多项式不可约但是在有限域上却分解为一次不可约因子的乘积,组合时要尝试所有$2^n$种情况才能得到结果.下面几小节将要介绍的<index>格中短向量方法</index>是一种多项式时间算法,它从理论上改进了原先因子组合算法的指数时间复杂度,尽管我们实际仍然使用因子组合算法(<cite>cohen</cite>3.5.5节).
+
+按照定义##def:norm ，以下我们取默认的范数$\|f\|$为2-范数,即$\|f\|_2$.我们将多项式的系数看作列向量，则多项式范数等同于该向量的范数.首先我们有:
+<index name="Hadamard不等式"></index>
+<theorem  name="Hadamard不等式" label="th:hadamardineq">
+设$n$阶方阵$A$用$n$个列向量表示为
+$$A=(a_1,a_2,\ldots,a_n),$$
+则$\deg A\le\|a_1\|\|a_2\|\cdots\|a_n\|$.
+</theorem>
+
+证明参见高等代数学教材,如可参考<cite>ZhaXu04</cite>278页48题.
+
+<lemma label="le:shortvectors1">
+设$f$,$g\in\mathbb{Z}[x]$分别是$n$,$k$次多项式,$u\in\mathbb{Z}[x]$是一非平凡首一多项式,$m$为一正整数,若在$\mathbb{Z}_m[x]$中有$u\mid f\pmod{m}$,$u\mid g\pmod{m}$,$\|f\|^k\|g\|^n<m$.则$f$和$g$有非平凡公因子.
+</lemma>
+
+<proof>
+假设$f$,$g$没有非平凡的公因子,则在$\mathbb{Q}[x]$中有$\gcd(f,g)=1$,由结式理论推论##cor:resultant3 可知存在$s$,$t\in\mathbb{Z}[x]$使得$sf+tg\equiv\mathrm{res}(f,g)\pmod{m}$,由于$u$在模$m$下能整除$f$和$g$，则$u\mid \mathrm{res}(f,g)\bmod m$.但$u$是非平凡首一多项式,于是必有$\mathrm{res}(f,g)\equiv 0\pmod{m}$,再由Hadamard不等式有$|\mathrm{res}(f,g)|<\|f\|^k\|g\|^n<m$,此即说明$\mathrm{res}(f,g)=0$,与$\gcd(f,g)=1\in\mathbb{Q}[x]$矛盾.于是二者在$\mathbb{Z}[x]$中有非平凡公因子.
+</proof>
+
+由前面我们已得出的分解结果和上面的引理,我们产生如下的分解的想法。首先我们已经有待分解的$n$次多项式$f\in\mathbb{Z}[x]$和$f$在模$m$下的一个因子$u\in\mathbb{Z}[x]$,此时我们需要找到一个较“短”的$k$次多项式$g\in\mathbb{Z}[x]$使得$\|g\|^n<m\|f\|^{-k}$,且$u\mid g\bmod m$,于是可通过$\gcd(f,g)$得到$f$的一个非平凡因子.为了叙述方便,以后记号$f$既可以表示$n$次多项式,也可以表示$n+1$维系数列向量.引入下面的定义：
+
+<definition>
+设有正整数$n$和向量$f_1,\ldots,f_n\in\mathbb{R}^n$,则$$L=\sum_{1\le i\le n}\mathbb{Z}f_i=\{\sum_{1\le i\le n}r_if_i\mid r_1,\ldots,r_n\in\mathbb{Z}\}$$称为由$f_1,\ldots,f_n$生成的格(Lattice).$f_1,\ldots,f_n$称为$L$的基.而$L$的范数是定义为$$|L|=|\det(f_1,\ldots,f_n)|\in\mathbb{R}.$$后面将看到范数的定义是与基的选择无关的.
+</definition>
+
+现在我们考虑寻找一个次数小于$j$的多项式$g\in\mathbb{Z}^j$,设$L\subset\mathbb{Z}^j$是由$u$和$m$生成的,即$$L=\{g=qu+rm\mid q,r\in\mathbb{Z}[x],\deg q<j-d,\deg r<d\},$$其中$d=\deg u$.这时我们有下面的定理：
+
+<theorem>
+对于任何一个次数小于$j$的多项式$g$,$u\mid g\bmod m\Leftrightarrow g\in L$.
+</theorem>
+
+; (<cite>mca</cite>中证明此处写作$q^*$对$u$的除法)
+<proof>
+对于$\Rightarrow$显然,对于$\Leftarrow$,我们有$g=q^*u+r^*m$,再由$r^*$对首一多项式$u$的除法可得$r^*=q^{**}u+r^{**}$,其中$\deg r^{**}<\deg u$.令$q=q^*+mq^{**}$,$r=r^{**}$,则有$g=qu+rm$,且$\deg q<j-d$,$\deg r<d$,于是$g\in L$.
+</proof>
+
+现在我们的问题化为在$L$中寻找一种约化的基,以使得基向量长度较短,满足要求.
+
+** 约化基算法
+
+下面要介绍的<index>约化基算法</index>即是所谓的3-L(Lenstra,Lenstra and Lov\'asz)算法.
+
+<lemma>
+令$N\subset M\subset \mathbb{R}^n$为两个格，分别由$g_1,\cdots g_n$和$f_1,\ldots,f_n$生成,则$|M|$整除$|N|$.
+</lemma>
+
+<proof>
+由$N\subset M$知$N$的生成元$g_i$均是$M$的生成元$f_i$的线性组合,即存在整系数矩阵$A$使得$(g_1,\ldots,g_n)=A(f_1,\ldots,f_n)$,于是$|N|=\det A|M|$,$\deg A\in\mathbb{Z}$.
+</proof>
+
+取$N=M$可知格的范数与生成元无关.由Hadamard不等式我们知道$|M|\le\|f_1\|\cdots\|f_n\|$.
+
+因为范数与基的选择无关,因而我们想到,如果选取的基越“正交”,那么某种程度上这组基向量的长度越短.因而,向量基的正交化可以启示我们得到一种求约化基（即所谓的短向量）的方法.
+
+现在我们已知由$f_1,\ldots,f_n$生成的格,若取内积为$\langle f,g\rangle=f^Tg$,由高等代数学(例如参见<cite>ZhaXu04</cite>281页)的内容我们知道可以对它们进行<index>Gram-Schmidt正交化</index>,正交化的过程可以归纳地进行,即令$f_1^*=f_1$,对于$i\ge 2$,有
+$$f_i^*=f_i-\sum_{1\le j<i}f_j^*\mu_{ji},\text{其中}\mu_{ji}=\frac{\idea{f_i,f_j^*}}{\idea{f_j^*,f_j^*}}.$$
+于是存在一个上三角阵$M=(\mu_{ij})$,其对角元为1,使得
+$$(f_1,\ldots,f_n)=(f_1^*,\ldots,f_n^*)M,$$
+其中$f_i^*$张成同样的空间,且两两互相正交.由正交化的几何意义我们可以很明显地看到,每个向量的长度都不大于原向量的长度,即基向量的长度缩短了.但是光作GSO(Gram-Schmidt orthogonalization)是不行的,因为正交化后所得的向量的组合系数可以为有理数，并不一定是原先格中的向量.但是首先，我们有下面的估计：
+
+<lemma label="le:reducedbase1">
+设$L$为由$(f_1,\ldots,f_n)$生成的格,$(f_1^*,\ldots,f_n^*)$是对其进行GSO所得的基,则对任意非零向量$f\in L$,我们有$$\|f\|\ge\min\{\|f_1^*\|,\ldots,\|f_n^*\|\}.$$
+</lemma>
+
+<proof>
+由GSO过程知道有对角元为1的上三角阵$M=(\mu_{ij})$满足$$(f_1,\ldots,f_n)=(f_1^*,\ldots,f_n^*)M,$$ 则$f_i=\sum_{1\le j\le n}f_j^*\mu_{ji}=\sum_{1\le j\le i}f_j^*\mu_{ji}$.对于非零向量$f\in L$,存在$k\le n$使得$$f=\sum_{1\le i\le k}\lambda_if_i,\quad \lambda_k\neq 0,\lambda_1\cdots\lambda_k\in\mathbb{Z}.$$
+
+于是$f=\sum_{1\le i\le k}\lambda_if_i=\sum_{1\le i\le k}\lambda_i\sum_{1\le j\le i}f_j^*\mu_{ji}=\lambda_kf_k^*+\sum_{1\le i<k}\gamma_if_i^*$,其中$\gamma_i\in\mathbb{R}$,将此式代入$\|f\|$可得：
+<latex>
+\begin{align*}
+\|f\|^2&=(\lambda_kf_k^*+\sum_{1\le i<k}\gamma_if_i^*)(\lambda_kf_k^*+\sum_{1\le i<k}\gamma_if_i^*)\\
+&=\lambda_k^2\|f_k^*\|^2+\sum_{1\le i<k}\gamma_i^2\|f_i^*\|^2\ge\lambda_k^2\|f_k^*\|^2\\
+&\ge\|f_k^*\|^2\ge\min\{\|f_1^*\|^2,\ldots,\|f_n^*\|^2\}.
+\end{align*}
+</latex>
+
+证毕.
+</proof>
+
+既然我们用GSO得到的不一定是格中的向量,那么我们可以放宽条件,下面给出一种约化基的定义方式：
+
+<definition>
+设$f_1,\ldots,f_n\in\mathbb{R}^n$线性无关且$(f_1^*,\ldots,f_n^*)$是其对应的GS正交基.则称$(f_1,\ldots,f_n)$是约化基，如果对于$1\le i<n$有$\|f_i^*\|^2\le 2\|f_{i+1}^*\|^2$且对于$\mu_{ji}$的非零元均有$|\mu_{ji}|<1/2$.
+</definition>
+
+下面给出的定理对于后面利用约化基算法进行因子分解是有用的.
+
+<theorem label="th:reducedbase2">
+设$(f_1,\ldots,f_n)$是其所生成的格$\in\mathbb{R}^n$的约化基且$f\in L\setminus\{0\}$,则$\|f_1\|\le 2^{(n-1)/2}\|f\|$.
+</theorem>
+
+<proof>由于
+$$\|f_1\|^2=\|f_1^*\|^2\le 2\|f_2^*\|^2\le 2^2\|f_3^*\|^2\le\cdots\le 2^{n-1}\|f_n^*\|^2,$$
+可设$\|f_m^*\|=\min\{\|f_1^*\|,\ldots,\|f_n^*\|\}$,则由引理##le:reducedbase1 可得
+$$2^{n-1}\|f\|^2\ge 2^{n-1}\|f_m^*\|^2\ge 2^{m-1}\|f_m^*\|^2\ge\|f_1^*\|^2=\|f_1\|^2,$$
+于是命题得证.
+</proof>
+
+下面给出生成约化基的算法：<index name="约化基算法"></index>
+<algorithm label="al:basereduction" name="约化基算法">
+
+输入：线性无关的向量$f_1,\ldots,f_n\in\mathbb{Z}^n$,
+
+输出：由输入向量所生成的格的约化基$(g_1,\ldots,g_n)$.
+
+ 1. 将$g_1,\ldots,g_n$初始化为$f_1,\ldots,f_n$,并进行相应的GSO过程,得到约化基$G^*=(g_1^*,\ldots,g_n^*)$和变换矩阵$M\in\mathbb{Q}^{n\times n}$使得$G=G^*M$,$i=2$,
+
+ 2. 当$i\le n$时,执行下面3～5步,
+
+ 3. 让$j$从$i-1$循环到$1$，执行下面4步,
+
+ 4. $g_i=g_i-g_j\lceil\mu_{ji}\rfloor$(最接近$\mu_{ji}$的整数),重新计算GSO得到$G^*$,$M$,
+
+ 5. 若$i>1$且$\|g_{i-1}^*\|^2>2\|g_i^*\|^2$则交换$g_{i-1}$和$g_i$,并重新计算GSO得到$G^*$,$M$,$i=i-1$,否则$i=i+1$,
+
+ 6. 输出$(g_1,\ldots,g_n)$.
+</algorithm>
+
+<remark>
+也可以由GSO过程求得变换矩阵$M$使得$(f_1^*,\ldots,f_n^*)=(f_1,\ldots,f_n)M$,再将$M$中元素均取整后代替算法##al:basereduction 第4步中的计算.下面举的几个例子用此算法,当然算法##al:basereduction 中的矩阵$M$更好计算一些.
+</remark>
+
+<problem label="example:basereduction1">
+记$a=219914302784468853031851163930189578018051741$,$b=5^{64}$,设$L$由$(1,a)$和$(0,b)$生成,用上面的算法求其约化基.
+</problem>
+
+<solution>
+通过计算可得如下约化基：$$g_1=(-6999570441183108942993, -13384313532767302775813),$$ $$g_2=(-32538542807519884274273, 15228795581564048106332),$$ 其中$$g_1=-6999570441183108942993(1,a)+2839517743881186811624(0,b).$$
+
+我们取$g^*=g_1$作为短矢量,有$$g^*=-6999570441183108942993x-13384313532767302775813.$$
+
+如果我们再考虑由$(1,a,0),(0,1,a),(0,0,b)$生成的格,则按照算法可得如下约化基：$$g_1=(4, 5, 6),$$ $$g_2=(5989804332598408382848, 487684974564901535567,-4399607033869690201541),$$ $$g_3=(-3921135160431868252895, 6733001971931690223946,-2996744869655163018019),$$ 其中
+<latex>
+\begin{align*}
+g_1&=4(1,a,0)-879657211137875412127404655720758312072206959(0,1,a)\\
+&+356850792566185450269524416969136119168940313(0,0,b),
+\end{align*}
+</latex>
+
+此时得到短矢量$g^*=4x^2+5x+6$.
+</solution>
+
+** 约化基算法的一些细节说明
+
+约化基算法##al:basereduction 大致说明了生成约化基的思路,实际计算约化基时我们需要对它的细节描述推敲一下.例如仔细分析一下我们会发现该算法第4步中的GSO更新是不必要的,可以将这一步省去.而且在每一步交换两个基向量时对GSO的更新也是有很多冗余计算的.
+
+; 当我们采用本节介绍的算法后,我们可以发现它甚至能比原算法效率提高一百倍.
+
+事实上,关于格的约化基的定义方式在各文献中不一致,上小节所提的定义方式是<cite>mca</cite>给出的.A. K. Lenstra, H. W. Lenstra和L. Lov\'asz<cite>LLL82</cite>最初给出如下定义:
+
+<definition>
+设$f_1,\ldots,f_n\in\mathbb{R}^n$线性无关且$(f_1^*,\ldots,f_n^*)$是其对应的GS正交基,并且记$\mu_{ij}=\idea{f_i,f_j^*}/\idea{f_j^*,f_j^*}$则称$(f_1,\ldots,f_n)$是约化基,如果满足以下条件:
+
+ 1. $|\mu_{ij}|\le 1/2,\forall 1\le j<i\le n$,
+
+ 2. $|f_i^*+\mu_{i,i-1}f_{i-1}^*|^2\ge\frac{3}{4}|f_{i-1}^*|^2,\forall 1<i\le n$.
+</definition>
+
+<remark>
+这里关于矩阵元$\mu_{ij}$的定义与上小节有略微不同,这是由于上小节将$f_i$视为列向量,而本节视为行向量,只是叙述语言的不同,并无本质差别.
+</remark>
+
+从定义中我们明显看出,本小节定义的约化基一定是上一小节定义的约化基,其条件更强,因此对后面的算法是没有影响的.下面我们给出新的<index>约化基算法</index>,它在细节处理上比前节的算法要节省很多计算.
+
+<algorithm label="al:basereduction2" name="约化基算法">
+输入输出同算法##al:basereduction .
+
+ 1. 初始化工作.首先将各$g_i$初化为$f_i$,并且$i$顺次由1循环到$n$,执行第2至4步,
+
+ 2. $g_i^*=g_i$,
+
+ 3. 将$j$顺次由1循环到$i-1$,计算$\mu_{ij}=\idea{g_i,g_j^*}/G_j$,$g_i^*=g_i^*-\mu_{ij}g_j^*$,
+
+ 4. $G_i=\idea{g_i^*,g_i^*}$,
+
+ 5. $k=2$,并循环做下面6-10步,
+
+ 6. 将$l$顺次由$k-1$递减到$1$,做如下7-8步,
+
+ 7. 若$|\mu_{kl}|>1/2$,则
+$$r=\lfloor\mu_{kl}\rceil,g_k=g_k-rg_l,$$
+对$j=1,2,\ldots,l-1$顺次计算$\mu_{kj}=\mu_{kj}-r\mu_{lj}$,并且$\mu_{kl}=\mu_{kl}-r$,
+
+ 8. 若$l=k-1$则检验$G_k<(\frac{3}{4}-\mu_{k,k-1}^2)G_{k-1}$是否成立,若成立则交换$g_k$与$g_{k-1}$并更新此时的各GSO结果,并直接转第6步,
+
+ 9. 若$k=n$则终止算法并输出$(g_1,\ldots,g_n)$,
+
+ 10. $k=k+1$.
+</algorithm>
+
+算法的终止性证明可参见<cite>LLL82</cite>.
+
+本算法仅在初始化时需要计算诸$g_i^*$,在后面的算法中实际上已不需要它们,只要保存$\mu_{ij}$矩阵以及各$g_i^*$的模$G_i$即可.在本节的开始,我们也提到了在交换两个基矢时对整个GSO的更新实际上包含了很多不必要的计算,因此本算法第8步所提的到的更新GSO步骤是很重要的,我们在下面给出:
+
+<algorithm label="al:basereduction21" name="约化基算法第八步的更新">
+各符号同算法##al:basereduction2 .
+
+ 1. $\mu=\mu_{k,k-1}$,$G=G_k+\mu^2G_{k-1}$,$\mu_{k,k-1}=\mu G_{k-1}/G$,$G_k=G_{k-1}G_k/G$,$G_{k-1}=G$,
+
+ 2. 交换两个基矢$(g_{k-1},g_k)=(g_k,g_{k-1})$,
+
+ 3. 对$j=1,2,\ldots,k-2$顺次交换$(\mu_{k-1,j},\mu_{kj})=(\mu_{kj},\mu_{k-1,j})$,
+
+ 4. 对$i=k+1,k+2,\ldots,n$顺次计算
+$$\begin{pmatrix}\mu_{i,k-1}\\ \mu_{ik}\end{pmatrix}=\begin{pmatrix}1 &\mu_{k,k-1}\\ 0 &1\end{pmatrix}\begin{pmatrix}0 &1\\ 1 &-\mu\end{pmatrix}\begin{pmatrix}\mu_{i,k-1}\\ \mu_{ik}\end{pmatrix}$$
+
+ 5. 若$k>2$则$k=k-1$.
+</algorithm>
+
+更新算法的正确性可通过一些计算证明,限于篇幅，我们也不在这里验证了,感兴趣的读者可以参考<cite>LLL82</cite>520页.
+
+* 应用格中短向量的分解算法
+
+下面以Hensel提升和格中短向量方法为例说明约化基算法如何用于因子分解.这里我们先证明一个引理,用于后面算法正确性的证明.
+
+<lemma>
+$p\in\mathbb{Z}$是素数,$l$是正整数,$f$,$g$,$u\in\mathbb{Z}[x]$是非零多项式且$p\nmid \mathrm{lc}(f)$,$f\bmod p$无平方,$g\mid f$,$u$是首一非平凡多项式,且$u\mid f\bmod p^l$,$u\mid g\bmod p$.则$u\mid g\bmod p^l$.
+</lemma>
+
+<proof>
+令$h,v,w\in\mathbb{Z}[x]$使得$f=gh\equiv uw\pmod{p^l}$且$g\equiv uv\pmod{p}$.$f\bmod p$无平方,则$g\bmod p$也无平方因子,$\gcd(u\bmod p,v\bmod p)=1\in\field{p}[x]$.由Hensel引理知有$u^*$,$v^*\in\mathbb{Z}[x]$使得$u^*\equiv u\pmod{p}$,$v^*\equiv v\pmod{p}$且$g\equiv u^*v^*\pmod{p^l}$.于是$uvh\equiv gh\equiv uw\pmod{p}$推出$vh\equiv w\pmod{p}$.$v^*h\equiv vh\equiv w\pmod{p}$且$u^*(v^*h)\equiv gh=f\equiv uw\pmod{p^l}$.再由$u$,$v$在模$p$下互素,我们由提升的唯一性知$u^*\equiv u\pmod{p^l}$,$g\equiv uv^*\pmod{p^l}$.
+</proof>
+
+下面给出算法<cite>mca</cite>477页.
+
+<algorithm label="al:shortvectors" name="整系数因子分解算法4:Hensel提升和格中短向量算法">
+
+输入：一个无平方因子本原$n(\ge 1)$次多项式$f\in\mathbb{Z}[x]$,$\mathrm{lc}(f)>0$且$\|f\|_{\infty}=A$,
+
+输出：$f$的不可约因子$\{f_1,\ldots,f_k\}\subset\mathbb{Z}[x]$.
+
+ 1. 若$n=1$则输出$\{f\}$,否则$b=\mathrm{lc}(f)$,$B=(n+1)^{1/2}2^nA$,$C=(n+1)^{2n}A^{2n-1}$,$\gamma=\lceil 2\log_2C\rceil$,
+
+ 2. 任选素数$p\le 2\gamma\ln\gamma$,$\overline{f}=f\bmod p$,直至$p\nmid b$且$\gcd(\overline{f},\overline{f}')=1\in\field{p}[x]$,再令$l=\lceil\log_p(2^{n^2}B^{2n})\rceil$,
+
+ 3. 在$\field{p}[x]$上得到分解$f\equiv bh_1\cdots h_r\pmod{p}$,各因子无穷范数小于$p/2$且首一,
+
+ 4. 利用Hensel提升得到分解$f\equiv bg_1\cdots g_r\pmod{p^l}$,各因子不可约且无穷范数小于$p^l/2$,首一,
+
+ 5. $T=\{1,\ldots,r\}$,$G=\emptyset$,$f^*=f$,
+
+ 6. 当$T\neq\emptyset$时,做下面7～10步,
+
+ 7. 在$\{g_t\mid t\in T\}$中选择次数最大的因子$u$,$d=\deg u$,$n^*=\deg f^*$,对$d<j\le n^*$的$j$循环做下面8、9步,
+
+ 8. 调用算法##al:basereduction 计算一个短矢量$g^*\in L$,其中$L$为$$\{ux^i\mid 0\le i<j-d\}\cup\{p^lx^i\mid 0\le i<d\},$$
+
+ 9. 用试除法得到$S\subset T$,其中$S=\{i\in T|h_i|g^*\bmod p\}$,计算$h^*\in\mathbb{Z}[x]$使得其无穷范数小于$p^l/2$且满足$h^*\equiv b\prod_{i\in T\setminus S}g_i\pmod{p^l}$,若$\|\mathrm{pp}(g^*)\|_1\|\mathrm{pp}(h^*)\|_1\le B$则$T=T\setminus S$,$G=G\bigcup\{\mathrm{pp}(g^*)\}$,$f^*=\mathrm{pp}(h^*)$,$b=\mathrm{lc}(f^*)$,转第6步,
+
+ 10. $T=\emptyset$,$G=G\bigcup\{f^*\}$,
+
+ 11. 输出$G$.
+</algorithm>
+
+<remark>
+算法复杂度为<cite>mca</cite>
+$$O\left(n^6(n+\log A)M(n^2(n+\log A))(\log n+\log\log A)\right).$$
+</remark>
+
+<proof name="算法有效性:">
+只需证明每次执行第6步时,我们有$$f^*\equiv b\prod_{i\in T}g_i\pmod{p^l},\quad b=\mathrm{lc}(f^*),\quad f=\pm f^*\prod_{g\in G}g,$$ 且$G$中多项式均不可约.初始时显然满足,假设每次到第7步时均满足,令$g\in\mathbb{Z}[x]$为$f^*$的一个不可约因子且$u\mid g\bmod p$,则由本节开始的引理知$u\mid g\bmod p^l$.相反地,若$v\in\mathbb{Z}[x]$是$f$的因子且在模$p$下能被$u$整除，则$g\mid v\in\mathbb{Z}[x]$.我们可以证明第9步中的条件成立当且仅当$\mathrm{pp}(g^*)\mathrm{pp}(h^*)=\pm f^*$,又$\deg g^*<j$,我们知道只要$j\le\deg g$则条件不满足.同样地，第10步能使得上述条件在算法循环结束时也是成立的,如果$\#T=1$且$g=f^*$是不可约的.
+
+假设$\deg g<n^*$,令$j=1+\deg g$.则$g\in L$.于是由定理##th:reducedbase2 有$\|g^*\|\le 2^{(j-1)/2}\|g\|<2^nB$.再由$l$的选择,我们有$$\|g^*\|^{j-1}\|g\|^{\deg g^*}<(2^nB)^nB^n\le p^l,$$ 于是由引理##le:shortvectors1 知$\gcd(g,g^*)$非平凡,由$g$不可约以及$\deg g^*\le j-1=\deg g$得$g=\pm\mathrm{pp}(g^*)$.
+
+令$h=f^*/g$,则由Hensel提升唯一性知在第9步有$\mathrm{lc}(g)h\equiv h^*\pmod{p^l}$.再由$p^l/2$大于$\|bh\|_{\infty}$的Mignotte界bB,于是$\mathrm{lc}(g)h=h^*,h=\mathrm{pp}(h^*)$,且$f^*=\pm\mathrm{pp}(g^*)\mathrm{pp}(h^*)$,算法会到到$f$的不可约因子$g$.
+</proof>
+
+<problem>
+利用算法##al:shortvectors 分解例##example:factorization1 和例##example:factorization2 中的例子$f=4x^4+13x^3+28x^2+27x+18\in\mathbb{Z}[x]$.
+</problem>
+
+<solution>
+首先,此时$l=\log_5(2^{n^2}B^{2n})=48.1266$,故需提升6次,我们在例##example:factorization2 的结果上再提升三次,可以得到如下结果：
+<latex>
+\begin{align*}
+f&\equiv 4(x^2+2x+3)(x+219914302784468853031851163930189578018051741)\\
+&(x+186661511897595309720943636396038563766616229)\pmod{5^{64}},
+\end{align*}
+</latex>
+另外由前面例##example:factorization2 结果我们知道$$f\equiv 4(x^2+2x-2)(x+1)(x-1)\pmod{5}.$$
+
+首先$u=x^2+2x+3$,$d=2$,则$L$的生成元为$$\{(1,2,3),(0,5^{64},0),(0,0,5^{64})\}.$$很显然$(1,2,3)$应该是一个短向量,由试除法得到$S=\{1\}$,$h^*=4\prod_{i=2,3}g_i\bmod 5^{64}=4x^2+5x+6$,显然满足条件,得到一个不可约因子$x^2+2x+3$,此时$f^*=4x^2+5x+6$,$b=4$.此时我们再取因子$$u=x+219914302784468853031851163930189578018051741,$$ $d=1$,$n^*=2$,$j$只能取$2$,则得到$L$的生成元$\{u,(0,5^{64})\}$,由例##example:basereduction1 得到$$g^*=-6999570441183108942993x-13384313532767302775813,$$ $g^*$是本原的且是$g^*\equiv 2x+2\pmod{5}$,由试除法知$S=\{2\}$,但此时已有$\|g^*\|_1>B$,故此时无解，循环结束，第二个不可约因子为此时的$f^*=4x^2+5x+6$.
+
+其实我们第一步如果不取最大次数的$u$,可以对短向量方法有更深的体会.若取$u=g_2$,当$j=3$时则由例##example:basereduction1 后半部分的讨论可知此时得到短向量$g^*=4x^2+5x+6$.
+</solution>
+
